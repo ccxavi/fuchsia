@@ -1,0 +1,47 @@
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import { Tabs } from 'expo-router';
+import React from 'react';
+
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { HapticTab } from '@/components/haptic-tab';
+
+export default function TabLayout() {
+  const insets = useSafeAreaInsets();
+
+  return (
+    <Tabs
+      screenOptions={{
+        tabBarActiveTintColor: '#0B0B0D',
+        tabBarInactiveTintColor: '#A1A1AA',
+        headerShown: false,
+        tabBarButton: HapticTab,
+        tabBarStyle: {
+          backgroundColor: '#fff',
+          borderTopColor: '#E4E4E7',
+          borderTopWidth: 1,
+          paddingTop: 4,
+          paddingBottom: insets.bottom > 0 ? insets.bottom + 12 : 16,
+          height: 52 + (insets.bottom > 0 ? insets.bottom + 12 : 16),
+        },
+        tabBarLabelStyle: {
+          fontFamily: 'Manrope_600SemiBold',
+          fontSize: 11,
+        },
+      }}>
+      <Tabs.Screen
+        name="index"
+        options={{
+          title: 'Home',
+          tabBarIcon: ({ color }) => <MaterialIcons name="home" size={22} color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="profile"
+        options={{
+          title: 'Profile',
+          tabBarIcon: ({ color }) => <MaterialIcons name="person-outline" size={22} color={color} />,
+        }}
+      />
+    </Tabs>
+  );
+}

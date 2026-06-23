@@ -1,0 +1,53 @@
+{
+  "expo": {
+    "name": "Fuchsia",
+    "slug": "fuchsia",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/fuchsia.png",
+    "scheme": "fuchsia",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#FAFAFA",
+        "foregroundImage": "./assets/images/fuchsia.png"
+      },
+      "edgeToEdgeEnabled": true,
+      "softwareKeyboardLayoutMode": "resize",
+      "predictiveBackGestureEnabled": false,
+      "package": "com.CS3105N_fuchsia"
+    },
+    "web": {
+      "output": "static",
+      "favicon": "./assets/images/fuchsia.ico"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/images/fuchsia.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "backgroundColor": "#FAFAFA",
+          "dark": {
+            "backgroundColor": "#000000"
+          }
+        }
+      ],
+      "expo-secure-store",
+      "expo-build-properties"
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    },
+    "extra": {
+      "router": {}
+    }
+  }
+}
