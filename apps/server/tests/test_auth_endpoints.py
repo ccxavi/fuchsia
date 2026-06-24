@@ -218,21 +218,9 @@ class AuthEndpointsTestCase(unittest.TestCase):
             response = self.client.patch(
                 "/api/v1/auth/me",
                 headers={"Authorization": "Bearer valid-token"},
-                json={"display_name": "  Gian  ", "currency": "php"},
+                json={"display_name": "  Gian  "},
             )
 
         self.assertEqual(response.status_code, 200)
         user = response.json()["user"]
         self.assertEqual(user["display_name"], "Gian")
-        self.assertEqual(user["currency"], "PHP")  # normalized to upper
-
-    def test_patch_me_rejects_invalid_currency(self) -> None:
-        with patch("app.core.auth.get_supabase_jwt_verifier") as verifier_factory:
-            verifier_factory.return_value.verify_token.return_value = self._claims()
-            response = self.client.patch(
-                "/api/v1/auth/me",
-                headers={"Authorization": "Bearer valid-token"},
-                json={"currency": "dollars"},
-            )
-
-        self.assertEqual(response.status_code, 422)

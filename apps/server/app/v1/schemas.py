@@ -10,7 +10,6 @@ class AuthenticatedUserResponse(BaseModel):
     supabase_user_id: str
     email: str | None
     display_name: str | None = None
-    currency: str | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -21,7 +20,6 @@ class AuthMeResponse(BaseModel):
 
 class UserPreferencesUpdateRequest(BaseModel):
     display_name: str | None = None
-    currency: str | None = None
 
     @field_validator("display_name")
     @classmethod
@@ -33,16 +31,6 @@ class UserPreferencesUpdateRequest(BaseModel):
             raise ValueError("display_name must not be empty")
         if len(cleaned) > 120:
             raise ValueError("display_name must be at most 120 characters")
-        return cleaned
-
-    @field_validator("currency")
-    @classmethod
-    def validate_currency(cls, value: str | None) -> str | None:
-        if value is None:
-            return None
-        cleaned = value.strip().upper()
-        if len(cleaned) != 3 or not cleaned.isalpha():
-            raise ValueError("currency must be a 3-letter ISO 4217 code")
         return cleaned
 
 

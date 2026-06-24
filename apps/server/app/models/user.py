@@ -28,5 +28,3 @@ class User(TimestampMixin, Base):
         index=True,
     )
     display_name: Mapped[str | None] = mapped_column(String(120), nullable=True)
-    # ISO 4217 code; the user's display currency for amounts (clients format with it).
-    currency: Mapped[str | None] = mapped_column(String(3), nullable=True)

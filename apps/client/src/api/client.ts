@@ -110,7 +110,6 @@ export type AuthenticatedUserResponse = {
   supabase_user_id: string;
   email: string | null;
   display_name: string | null;
-  currency: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -125,7 +124,6 @@ export async function getMe(): Promise<AuthMeResponse> {
 
 export type UserPreferencesUpdateRequest = {
   display_name?: string | null;
-  currency?: string | null;
 };
 
 export async function updateProfile(payload: UserPreferencesUpdateRequest): Promise<AuthMeResponse> {
