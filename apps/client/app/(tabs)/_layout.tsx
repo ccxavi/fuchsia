@@ -2,7 +2,8 @@ import { View, StyleSheet, Pressable } from 'react-native';
 import { Tabs } from 'expo-router';
 import React from 'react';
 import { Svg, Path } from 'react-native-svg';
-import { Home, Shirt, Plus } from 'lucide-react-native';
+import { Home, CalendarDays, Sparkles, Shirt, User } from 'lucide-react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FuchsiaColors } from '@/constants/theme';
@@ -23,7 +24,7 @@ export default function TabLayout() {
           paddingTop: 8,
           paddingBottom: Math.max(insets.bottom, 12),
           height: 52 + Math.max(insets.bottom, 12),
-          position: 'absolute', // Ensure background overlay works
+          position: 'absolute',
           elevation: 0,
         },
         tabBarBackground: () => (
@@ -33,7 +34,6 @@ export default function TabLayout() {
                 <Path d="M0 24C0 24 16 0 40 0C64 0 80 24 80 24H0Z" fill="#fff" />
               </Svg>
             </View>
-            {/* Cover the 1px top border line under the arc */}
             <View style={styles.arcBorderCover} />
           </View>
         ),
@@ -51,7 +51,14 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="add"
+        name="calendar"
+        options={{
+          title: 'Calendar',
+          tabBarIcon: ({ color }) => <CalendarDays size={20} color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="chat"
         options={{
           title: '',
           tabBarIcon: () => null,
@@ -59,12 +66,17 @@ export default function TabLayout() {
           tabBarButton: ({ ref, ...props }: any) => (
             <Pressable
               {...props}
-              style={[props.style, styles.addButtonContainer]}
+              style={[props.style, styles.chatButtonContainer]}
               android_ripple={{ color: 'transparent' }}
             >
-              <View style={styles.addButton}>
-                <Plus size={24} color="#fff" />
-              </View>
+              <LinearGradient
+                colors={['#86003C', '#B5004D', '#D4145A']}
+                start={{ x: 0, y: 0.5 }}
+                end={{ x: 1, y: 0.5 }}
+                style={styles.chatButton}
+              >
+                <Sparkles size={24} color="#fff" />
+              </LinearGradient>
             </Pressable>
           ),
         }}
@@ -74,6 +86,13 @@ export default function TabLayout() {
         options={{
           title: 'Closet',
           tabBarIcon: ({ color }) => <Shirt size={20} color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="profile"
+        options={{
+          title: 'Profile',
+          tabBarIcon: ({ color }) => <User size={20} color={color} />,
         }}
       />
     </Tabs>
@@ -107,18 +126,17 @@ const styles = StyleSheet.create({
     height: 2,
     backgroundColor: '#fff',
   },
-  addButtonContainer: {
+  chatButtonContainer: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  addButton: {
+  chatButton: {
     position: 'absolute',
-    top: -24,
+    top: -16,
     width: 52,
     height: 52,
     borderRadius: 26,
-    backgroundColor: FuchsiaColors.deep,
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: FuchsiaColors.vibrant,

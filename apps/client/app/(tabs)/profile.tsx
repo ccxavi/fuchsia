@@ -2,20 +2,20 @@ import { View, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ThemedText } from '@/components/themed-text';
 import { FuchsiaColors, FuchsiaFonts } from '@/constants/theme';
-import { Sparkles } from 'lucide-react-native';
+import { User } from 'lucide-react-native';
 
-export default function AddScreen() {
+export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.content}>
         <View style={styles.iconContainer}>
-          <Sparkles size={32} color={FuchsiaColors.vibrant} />
+          <User size={32} color={FuchsiaColors.vibrant} />
         </View>
-        <ThemedText style={styles.title}>Add Item Coming Soon</ThemedText>
+        <ThemedText style={styles.title}>Profile Coming Soon</ThemedText>
         <ThemedText style={styles.subtitle}>
-          Soon you&apos;ll be able to upload your clothes and start building outfits!
+          Manage your account and preferences here. Stay tuned!
         </ThemedText>
       </View>
     </View>
