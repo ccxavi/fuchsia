@@ -5,6 +5,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Sparkles, Lightbulb, Palette, LogOut } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
+import { useState, useEffect } from 'react';
+import { getMe } from '@/api/client';
 
 import { ThemedText } from '@/components/themed-text';
 import { FuchsiaColors, FuchsiaFonts } from '@/constants/theme';
@@ -12,6 +14,29 @@ import { FuchsiaColors, FuchsiaFonts } from '@/constants/theme';
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+
+  const [userName, setUserName] = useState<string>('there');
+  const [greetingTime, setGreetingTime] = useState<string>('Good morning');
+
+  useEffect(() => {
+    const hour = new Date().getHours();
+    if (hour < 12) setGreetingTime('Good morning');
+    else if (hour < 18) setGreetingTime('Good afternoon');
+    else setGreetingTime('Good evening');
+
+    const fetchUser = async () => {
+      try {
+        const data = await getMe();
+        if (data?.user?.display_name) {
+          setUserName(data.user.display_name.split(' ')[0]);
+        }
+      } catch (error) {
+        console.error('Error fetching user name from API:', error);
+      }
+    };
+    
+    fetchUser();
+  }, []);
 
   const handleLogout = async () => {
     await SecureStore.deleteItemAsync('access_token');
@@ -28,7 +53,7 @@ export default function HomeScreen() {
       >
         {/* Header Row */}
         <View style={styles.headerRow}>
-          <ThemedText style={styles.greeting}>Good morning, Czachary</ThemedText>
+          <ThemedText style={styles.greeting}>{greetingTime}, {userName}</ThemedText>
           <Pressable onPress={handleLogout} style={({ pressed }) => [styles.logoutButton, pressed && { opacity: 0.7 }]}>
             <LogOut size={20} color={FuchsiaColors.slate} />
           </Pressable>
