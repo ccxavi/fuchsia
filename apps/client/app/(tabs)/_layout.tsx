@@ -24,7 +24,7 @@ export default function TabLayout() {
           height: 52 + (insets.bottom > 0 ? insets.bottom + 12 : 16),
         },
         tabBarLabelStyle: {
-          fontFamily: 'Manrope_600SemiBold',
+          fontFamily: 'Inter_600SemiBold',
           fontSize: 11,
         },
       }}>
