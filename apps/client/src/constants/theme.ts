@@ -9,13 +9,15 @@ const tintColorLight = '#0B0B0D';
 const tintColorDark = '#fff';
 
 export const FuchsiaColors = {
-  ink: '#0B0B0D',
-  charcoal: '#18181B',
-  slate: '#2A2A31',
-  fog: '#A1A1AA',
-  mist: '#D4D4D8',
-  cloud: '#F4F4F5',
-  paper: '#FAFAFA',
+  deep: "#86003C",
+  vibrant: "#D4145A",
+  soft: "#F472B6",
+  blush: "#FDF2F8",
+  ink: "#1A1A2E",
+  slate: "#4A4A68",
+  mist: "#E5E5EF",
+  cloud: "#F8F8FC",
+  paper: "#FEFEFE",
 };
 
 /** Dark gradient: from-zinc-950 via-zinc-900 to-zinc-700 */

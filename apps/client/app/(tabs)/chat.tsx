@@ -2,20 +2,20 @@ import { View, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ThemedText } from '@/components/themed-text';
 import { FuchsiaColors, FuchsiaFonts } from '@/constants/theme';
-import { User } from 'lucide-react-native';
+import { Sparkles } from 'lucide-react-native';
 
-export default function ProfileScreen() {
+export default function ChatScreen() {
   const insets = useSafeAreaInsets();
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.content}>
         <View style={styles.iconContainer}>
-          <User size={32} color={FuchsiaColors.vibrant} />
+          <Sparkles size={32} color="#fff" />
         </View>
-        <ThemedText style={styles.title}>Profile Coming Soon</ThemedText>
+        <ThemedText style={styles.title}>AI Stylist Coming Soon</ThemedText>
         <ThemedText style={styles.subtitle}>
-          Manage your account and preferences here. Stay tuned!
+          Your personal AI fashion assistant is on the way. Stay tuned!
         </ThemedText>
       </View>
     </View>
@@ -38,7 +38,7 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 20,
-    backgroundColor: FuchsiaColors.blush,
+    backgroundColor: FuchsiaColors.deep,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 8,

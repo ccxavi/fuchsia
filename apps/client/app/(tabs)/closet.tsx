@@ -2,20 +2,20 @@ import { View, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ThemedText } from '@/components/themed-text';
 import { FuchsiaColors, FuchsiaFonts } from '@/constants/theme';
-import { User } from 'lucide-react-native';
+import { Sparkles } from 'lucide-react-native';
 
-export default function ProfileScreen() {
+export default function ClosetScreen() {
   const insets = useSafeAreaInsets();
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.content}>
         <View style={styles.iconContainer}>
-          <User size={32} color={FuchsiaColors.vibrant} />
+          <Sparkles size={32} color={FuchsiaColors.vibrant} />
         </View>
-        <ThemedText style={styles.title}>Profile Coming Soon</ThemedText>
+        <ThemedText style={styles.title}>Closet Coming Soon</ThemedText>
         <ThemedText style={styles.subtitle}>
-          Manage your account and preferences here. Stay tuned!
+          We&apos;re working hard on bringing your virtual closet to life. Stay tuned!
         </ThemedText>
       </View>
     </View>

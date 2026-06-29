@@ -81,6 +81,7 @@ export default function WelcomeScreen() {
             if (refreshToken) {
               await SecureStore.setItemAsync('refresh_token', refreshToken);
             }
+            
             router.replace('/(tabs)');
           }
         }
