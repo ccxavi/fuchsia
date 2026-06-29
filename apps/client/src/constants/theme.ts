@@ -22,10 +22,10 @@ export const FuchsiaColors = {
 export const FuchsiaGradient = ['#09090B', '#18181B', '#3F3F46'] as const;
 
 export const FuchsiaFonts = {
-  heading: 'Syne_600SemiBold',
-  body: 'Manrope_400Regular',
-  bodySemiBold: 'Manrope_600SemiBold',
-  data: 'IBMPlexMono_600SemiBold',
+  heading: 'Outfit_600SemiBold',
+  body: 'Inter_400Regular',
+  bodySemiBold: 'Inter_600SemiBold',
+  data: 'DMMono_500Medium',
 };
 
 export const Colors = {

@@ -6,15 +6,26 @@ import { useEffect } from 'react';
 import 'react-native-reanimated';
 
 import {
-  IBMPlexMono_600SemiBold,
-  useFonts as useIBMPlexMonoFonts,
-} from '@expo-google-fonts/ibm-plex-mono';
+  DMMono_500Medium,
+  useFonts as useDMMonoFonts,
+} from '@expo-google-fonts/dm-mono';
 import {
-  Manrope_400Regular,
-  Manrope_600SemiBold,
-  useFonts as useManropeFonts,
-} from '@expo-google-fonts/manrope';
-import { Syne_600SemiBold, useFonts as useSyneFonts } from '@expo-google-fonts/syne';
+  PlayfairDisplay_600SemiBold_Italic,
+  useFonts as usePlayfairDisplayFonts,
+} from '@expo-google-fonts/playfair-display';
+import {
+  Inter_400Regular,
+  Inter_500Medium,
+  Inter_600SemiBold,
+  Inter_700Bold,
+  useFonts as useInterFonts,
+} from '@expo-google-fonts/inter';
+import {
+  Outfit_500Medium,
+  Outfit_600SemiBold,
+  Outfit_700Bold,
+  useFonts as useOutfitFonts,
+} from '@expo-google-fonts/outfit';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
@@ -27,11 +38,22 @@ export const unstable_settings = {
 export default function RootLayout() {
   const colorScheme = useColorScheme();
 
-  const [syneLoaded] = useSyneFonts({ Syne_600SemiBold });
-  const [manropeLoaded] = useManropeFonts({ Manrope_400Regular, Manrope_600SemiBold });
-  const [ibmPlexMonoLoaded] = useIBMPlexMonoFonts({ IBMPlexMono_600SemiBold });
+  const [dmMonoLoaded] = useDMMonoFonts({ DMMono_500Medium });
 
-  const fontsReady = syneLoaded && manropeLoaded && ibmPlexMonoLoaded;
+  const [playfairLoaded] = usePlayfairDisplayFonts({ PlayfairDisplay_600SemiBold_Italic });
+  const [interLoaded] = useInterFonts({
+    Inter_400Regular,
+    Inter_500Medium,
+    Inter_600SemiBold,
+    Inter_700Bold,
+  });
+  const [outfitLoaded] = useOutfitFonts({
+    Outfit_500Medium,
+    Outfit_600SemiBold,
+    Outfit_700Bold,
+  });
+
+  const fontsReady = dmMonoLoaded && playfairLoaded && interLoaded && outfitLoaded;
 
   useEffect(() => {
     if (fontsReady) {
