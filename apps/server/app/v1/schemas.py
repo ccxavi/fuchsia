@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -80,3 +81,27 @@ class AuthSessionResponse(BaseModel):
     token_type: str | None
     expires_in: int | None
     user: SupabaseAuthUserResponse | None
+
+
+class ChatMessage(BaseModel):
+    role: Literal["system", "user", "assistant"]
+    content: str = Field(..., min_length=1, max_length=32768)
+
+    @field_validator("content")
+    @classmethod
+    def validate_content(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("content must not be empty")
+        return value
+
+
+class ChatRequest(BaseModel):
+    messages: list[ChatMessage] = Field(..., min_length=1, max_length=128)
+    temperature: float = Field(default=0.7, ge=0.0, le=2.0)
+    max_tokens: int = Field(default=1024, ge=16, le=8192)
+
+
+class ChatResponse(BaseModel):
+    message: ChatMessage
+    model: str
+    usage: dict[str, Any] | None = None

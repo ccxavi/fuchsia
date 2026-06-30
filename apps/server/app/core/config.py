@@ -12,6 +12,9 @@ class Settings(BaseSettings):
     supabase_issuer: str | None = None
     supabase_jwks_url: str | None = None
     supabase_audience: str | None = None
+    deepseek_api_key: str | None = None
+    deepseek_base_url: str = "https://api.deepseek.com"
+    deepseek_model: str = "deepseek-chat"
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
@@ -53,6 +56,18 @@ class Settings(BaseSettings):
         raise ValueError(
             "Neither SUPABASE_PUBLISHABLE_KEY nor SUPABASE_ANON_KEY is configured."
         )
+
+    def require_deepseek_api_key(self) -> str:
+        if not self.deepseek_api_key:
+            raise ValueError("DEEPSEEK_API_KEY is not configured.")
+
+        return self.deepseek_api_key
+
+    def require_deepseek_base_url(self) -> str:
+        if not self.deepseek_base_url:
+            raise ValueError("DEEPSEEK_BASE_URL is not configured.")
+
+        return self.deepseek_base_url.rstrip("/")
 
 
 settings = Settings()
