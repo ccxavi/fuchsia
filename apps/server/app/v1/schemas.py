@@ -80,3 +80,19 @@ class AuthSessionResponse(BaseModel):
     token_type: str | None
     expires_in: int | None
     user: SupabaseAuthUserResponse | None
+
+
+class ClothingItemResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    user_id: str
+    name: str
+    category: str | None
+    color: str | None
+    brand: str | None
+    image_url: str | None
+    is_favorite: bool
+    created_at: datetime
+    updated_at: datetime
+
