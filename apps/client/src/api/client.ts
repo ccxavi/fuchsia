@@ -67,8 +67,9 @@ async function apiFetch<T>(
 ): Promise<T> {
   const token = await SecureStore.getItemAsync('access_token');
 
+  const isFormData = options.body instanceof FormData;
   const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
+    ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
     ...(options.headers as Record<string, string> ?? {}),
   };
@@ -130,5 +131,83 @@ export async function updateProfile(payload: UserPreferencesUpdateRequest): Prom
   return apiFetch<AuthMeResponse>('/auth/me', {
     method: 'PATCH',
     body: JSON.stringify(payload),
+  });
+}
+
+// ── Closet / Wardrobe ─────────────────────────────────────────────────────────
+
+export type WardrobeResponse = {
+  id: string;
+  user_id: string;
+  name: string;
+  quantity: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export async function getWardrobes(): Promise<WardrobeResponse[]> {
+  return apiFetch<WardrobeResponse[]>('/wardrobes');
+}
+
+export type WardrobeCreateRequest = {
+  name: string;
+  quantity?: number;
+};
+
+export async function createWardrobe(payload: WardrobeCreateRequest): Promise<WardrobeResponse> {
+  return apiFetch<WardrobeResponse>('/wardrobes', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export type ClothingItemResponse = {
+  id: string;
+  user_id: string;
+  name: string;
+  category: string | null;
+  color: string | null;
+  brand: string | null;
+  image_url: string | null;
+  is_favorite: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export async function getClothingItems(): Promise<ClothingItemResponse[]> {
+  return apiFetch<ClothingItemResponse[]>('/clothing-items');
+}
+
+export type ClothingItemCreateRequest = {
+  name: string;
+  category?: string;
+  color?: string;
+  brand?: string;
+  wardrobe_ids?: string[];
+  imageUri?: string;
+};
+
+export async function createClothingItem(data: ClothingItemCreateRequest): Promise<ClothingItemResponse> {
+  const formData = new FormData();
+  formData.append('name', data.name);
+  if (data.category) formData.append('category', data.category);
+  if (data.color) formData.append('color', data.color);
+  if (data.brand) formData.append('brand', data.brand);
+  
+  if (data.wardrobe_ids && data.wardrobe_ids.length > 0) {
+    data.wardrobe_ids.forEach(id => formData.append('wardrobe_ids', id));
+  }
+
+  if (data.imageUri) {
+    const filename = data.imageUri.split('/').pop() || 'image.jpg';
+    const match = /\.(\w+)$/.exec(filename);
+    const type = match ? `image/${match[1]}` : `image`;
+    // @ts-ignore - React Native FormData expects this format for files
+    formData.append('image', { uri: data.imageUri, name: filename, type });
+  }
+
+  return apiFetch<ClothingItemResponse>('/clothing-items', {
+    method: 'POST',
+    body: formData,
   });
 }
