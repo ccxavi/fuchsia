@@ -35,6 +35,10 @@ class Wardrobe(TimestampMixin, Base):
         nullable=False,
         default=0,
     )
+    image_url: Mapped[str | None] = mapped_column(
+        String(500),
+        nullable=True,
+    )
     
     clothing_items: Mapped[list["ClothingItem"]] = relationship(
         "ClothingItem",

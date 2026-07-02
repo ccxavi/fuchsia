@@ -1,27 +1,50 @@
 from typing import Annotated
+from uuid import uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from fastapi.security import HTTPAuthorizationCredentials
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core.auth import AuthenticatedUser, get_current_authenticated_user
+from app.core.auth import AuthenticatedUser, bearer_scheme, get_current_authenticated_user
 from app.db.session import get_db_session
 from app.models.wardrobe import Wardrobe
-from app.v1.schemas import WardrobeCreateRequest, WardrobeResponse, WardrobeUpdateRequest
+from app.services.supabase_storage import upload_file_to_supabase
+from app.v1.schemas import WardrobeResponse
 
 router = APIRouter()
 
 
 @router.post("/", status_code=status.HTTP_201_CREATED, response_model=WardrobeResponse)
-def create_wardrobe(
-    payload: WardrobeCreateRequest,
-    user: Annotated[AuthenticatedUser, Depends(get_current_authenticated_user)],
-    db: Annotated[Session, Depends(get_db_session)],
+async def create_wardrobe(
+    name: Annotated[str, Form(...)],
+    quantity: Annotated[int, Form()] = 0,
+    image: Annotated[UploadFile | None, File()] = None,
+    user: AuthenticatedUser = Depends(get_current_authenticated_user),
+    credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
+    db: Session = Depends(get_db_session),
 ):
+    image_url = None
+    if image:
+        if not image.content_type.startswith("image/"):
+            raise HTTPException(status_code=400, detail="File must be an image")
+            
+        file_ext = image.filename.split(".")[-1] if image.filename and "." in image.filename else "jpg"
+        file_path = f"{user.user.supabase_user_id}/{uuid4()}.{file_ext}"
+        
+        image_url = await upload_file_to_supabase(
+            bucket_name="wardrobe_img",
+            file_path=file_path,
+            file=image.file,
+            content_type=image.content_type,
+            access_token=credentials.credentials,
+        )
+
     db_wardrobe = Wardrobe(
         user_id=user.user.id,
-        name=payload.name,
-        quantity=payload.quantity,
+        name=name,
+        quantity=quantity,
+        image_url=image_url
     )
     db.add(db_wardrobe)
     db.commit()
@@ -57,11 +80,14 @@ def get_wardrobe(
 
 
 @router.patch("/{wardrobe_id}", response_model=WardrobeResponse)
-def update_wardrobe(
+async def update_wardrobe(
     wardrobe_id: str,
-    payload: WardrobeUpdateRequest,
-    user: Annotated[AuthenticatedUser, Depends(get_current_authenticated_user)],
-    db: Annotated[Session, Depends(get_db_session)],
+    name: Annotated[str | None, Form()] = None,
+    quantity: Annotated[int | None, Form()] = None,
+    image: Annotated[UploadFile | None, File()] = None,
+    user: AuthenticatedUser = Depends(get_current_authenticated_user),
+    credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
+    db: Session = Depends(get_db_session),
 ):
     wardrobe = db.scalar(
         select(Wardrobe).where(
@@ -71,9 +97,26 @@ def update_wardrobe(
     if not wardrobe:
         raise HTTPException(status_code=404, detail="Wardrobe not found")
 
-    update_data = payload.model_dump(exclude_unset=True)
-    for field, value in update_data.items():
-        setattr(wardrobe, field, value)
+    if name is not None:
+        wardrobe.name = name
+    if quantity is not None:
+        wardrobe.quantity = quantity
+        
+    if image:
+        if not image.content_type.startswith("image/"):
+            raise HTTPException(status_code=400, detail="File must be an image")
+            
+        file_ext = image.filename.split(".")[-1] if image.filename and "." in image.filename else "jpg"
+        file_path = f"{user.user.supabase_user_id}/{uuid4()}.{file_ext}"
+        
+        image_url = await upload_file_to_supabase(
+            bucket_name="wardrobe_img",
+            file_path=file_path,
+            file=image.file,
+            content_type=image.content_type,
+            access_token=credentials.credentials,
+        )
+        wardrobe.image_url = image_url
 
     db.commit()
     db.refresh(wardrobe)

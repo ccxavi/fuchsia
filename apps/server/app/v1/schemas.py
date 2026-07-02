@@ -114,5 +114,6 @@ class WardrobeResponse(BaseModel):
     user_id: str
     name: str
     quantity: int
+    image_url: str | None
     created_at: datetime
     updated_at: datetime
