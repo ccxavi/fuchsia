@@ -70,6 +70,7 @@ async function apiFetch<T>(
   const isFormData = options.body instanceof FormData;
   const headers: Record<string, string> = {
     ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
+    'Cache-Control': 'no-cache',
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
     ...(options.headers as Record<string, string> ?? {}),
   };
@@ -201,12 +202,17 @@ export async function createClothingItem(data: ClothingItemCreateRequest): Promi
   if (data.imageUri) {
     const filename = data.imageUri.split('/').pop() || 'image.jpg';
     const match = /\.(\w+)$/.exec(filename);
-    const type = match ? `image/${match[1]}` : `image`;
+    let type = 'image/jpeg';
+    if (match) {
+      const ext = match[1].toLowerCase();
+      if (ext === 'jpg') type = 'image/jpeg';
+      else type = `image/${ext}`;
+    }
     // @ts-ignore - React Native FormData expects this format for files
     formData.append('image', { uri: data.imageUri, name: filename, type });
   }
 
-  return apiFetch<ClothingItemResponse>('/clothing-items', {
+  return apiFetch<ClothingItemResponse>('/clothing-items/', {
     method: 'POST',
     body: formData,
   });

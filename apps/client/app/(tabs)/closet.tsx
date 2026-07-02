@@ -1,4 +1,5 @@
-import { View, Text, StyleSheet, Pressable, ScrollView, FlatList, Image, ImageBackground, ActivityIndicator, TextInput } from 'react-native';
+import { View, Text, StyleSheet, Pressable, ScrollView, FlatList, ImageBackground, ActivityIndicator, TextInput, RefreshControl, useWindowDimensions } from 'react-native';
+import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useState, useEffect, useCallback } from 'react';
 import { useFocusEffect } from 'expo-router';
@@ -35,43 +36,57 @@ const CATEGORIES = ['All', 'Tops', 'Bottoms', 'Shoes', 'Outerwear', 'Accessories
 
 export default function ClosetScreen() {
   const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
+  const itemWidth = (width - 40 - 16) / 2; // 40 for horizontal padding, 16 for column gap
+
   const [activeTab, setActiveTab] = useState<'outfits' | 'wardrobe' | 'items'>('outfits');
   const [clothingItems, setClothingItems] = useState<ClothingItemResponse[]>([]);
   const [wardrobes, setWardrobes] = useState<WardrobeResponse[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [activeCategory, setActiveCategory] = useState('All');
+
+  const fetchData = async () => {
+    try {
+      const fetchedWardrobes = await getWardrobes().catch(err => {
+        console.error('Failed to fetch wardrobes:', err);
+        return [];
+      });
+      setWardrobes(fetchedWardrobes);
+
+      const fetchedItems = await getClothingItems().catch(err => {
+        console.error('Failed to fetch items:', err);
+        return [];
+      });
+      setClothingItems(fetchedItems);
+    } finally {
+      setIsLoading(false);
+      setIsRefreshing(false);
+    }
+  };
 
   useFocusEffect(
     useCallback(() => {
-      async function fetchData() {
-        try {
-          // Fetch independently so if one fails, the other can still load!
-          const fetchedWardrobes = await getWardrobes().catch(err => {
-            console.error('Failed to fetch wardrobes:', err);
-            return [];
-          });
-          setWardrobes(fetchedWardrobes);
-
-          const fetchedItems = await getClothingItems().catch(err => {
-            console.error('Failed to fetch items:', err);
-            return [];
-          });
-          setClothingItems(fetchedItems);
-        } finally {
-          setIsLoading(false);
-        }
-      }
       fetchData();
     }, [])
   );
 
+  const onRefresh = () => {
+    setIsRefreshing(true);
+    fetchData();
+  };
+
   const filteredOutfits = OUTFITS.filter(o => o.title.toLowerCase().includes(searchQuery.toLowerCase()));
   const filteredWardrobes = wardrobes.filter(w => w.name.toLowerCase().includes(searchQuery.toLowerCase()));
-  const filteredItems = clothingItems.filter(i => 
-    i.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-    (i.category && i.category.toLowerCase().includes(searchQuery.toLowerCase()))
-  );
+  const filteredItems = clothingItems.filter(i => {
+    const matchesSearch = i.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                          (i.category && i.category.toLowerCase().includes(searchQuery.toLowerCase()));
+    const matchesCategory = activeCategory === 'All' || 
+                            (i.category && i.category.toLowerCase() === activeCategory.toLowerCase());
+    return matchesSearch && matchesCategory;
+  });
 
   const renderEmptyState = (message: string) => (
     <View style={styles.emptyContainer}>
@@ -152,11 +167,12 @@ export default function ClosetScreen() {
       columnWrapperStyle={styles.gridRow}
       contentContainerStyle={[styles.listContent, filteredOutfits.length === 0 && { flex: 1 }]}
       showsVerticalScrollIndicator={false}
+      refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor={FuchsiaColors.vibrant} />}
       ListEmptyComponent={() => renderEmptyState("Your stylish outfits will appear here!\nTap the + below to create one.")}
       renderItem={({ item }) => (
-        <Pressable style={styles.gridItem}>
+        <Pressable style={[styles.gridItem, { width: itemWidth, flex: 0 }]}>
           <View style={styles.imageContainer}>
-            <Image source={item.image} style={styles.image} />
+            <Image source={item.image} style={styles.image} contentFit="cover" />
           </View>
           <View style={styles.itemInfo}>
             <Text style={styles.itemTitle} numberOfLines={1}>{item.title}</Text>
@@ -173,6 +189,7 @@ export default function ClosetScreen() {
       keyExtractor={(item) => item.id}
       contentContainerStyle={[styles.listContent, filteredWardrobes.length === 0 && { flex: 1 }]}
       showsVerticalScrollIndicator={false}
+      refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor={FuchsiaColors.vibrant} />}
       ListEmptyComponent={() => renderEmptyState("Curate your perfect collections here!\nTap the + below to start a new wardrobe.")}
       renderItem={({ item }) => {
         const imageUrl = (item as any).image_url;
@@ -218,12 +235,13 @@ export default function ClosetScreen() {
     <View style={styles.flex1}>
       <View style={styles.categoriesWrapper}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoriesContent}>
-          {CATEGORIES.map((cat, index) => {
-            const isActive = index === 0; // Mock 'All' as active for UI
+          {CATEGORIES.map((cat) => {
+            const isActive = cat === activeCategory;
             return (
               <Pressable
                 key={cat}
                 style={[styles.categoryPill, isActive && styles.categoryPillActive]}
+                onPress={() => setActiveCategory(cat)}
               >
                 <Text style={[styles.categoryText, isActive && styles.categoryTextActive]}>{cat}</Text>
               </Pressable>
@@ -233,7 +251,7 @@ export default function ClosetScreen() {
       </View>
       <View style={styles.statsBanner}>
         <Text style={styles.statsCount}>{filteredItems.length} items</Text>
-        <Text style={styles.statsLabel}>All categories</Text>
+        <Text style={styles.statsLabel}>{activeCategory === 'All' ? 'All categories' : activeCategory}</Text>
       </View>
       <FlatList
         data={filteredItems}
@@ -242,13 +260,16 @@ export default function ClosetScreen() {
         columnWrapperStyle={filteredItems.length > 0 ? styles.gridRow : undefined}
         contentContainerStyle={[styles.listContent, filteredItems.length === 0 && { flex: 1 }]}
         showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor={FuchsiaColors.vibrant} />}
         ListEmptyComponent={() => renderEmptyState("Your virtual closet awaits!\nTap the + below to add your first clothing item.")}
         renderItem={({ item }) => (
-          <Pressable style={styles.gridItem}>
+          <Pressable style={[styles.gridItem, { width: itemWidth, flex: 0 }]}>
             <View style={styles.imageContainer}>
               <Image 
                 source={{ uri: item.image_url || `https://placehold.co/300x375/FDF2F8/86003C/png?text=${encodeURIComponent(item.name)}` }} 
                 style={styles.image} 
+                contentFit="cover"
+                transition={200}
               />
               {item.category && (
                 <View style={styles.categoryBadge}>
