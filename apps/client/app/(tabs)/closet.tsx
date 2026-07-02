@@ -2,6 +2,7 @@ import { View, Text, StyleSheet, Pressable, ScrollView, FlatList, Image, ImageBa
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useState, useEffect } from 'react';
 import { Search, X } from 'lucide-react-native';
+import Animated, { FadeIn, FadeOut, Layout } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 
 import { FuchsiaColors, FuchsiaFonts } from '@/constants/theme';
@@ -74,34 +75,44 @@ export default function ClosetScreen() {
   const renderHeader = () => (
     <View style={styles.header}>
       <Text style={styles.headerTitle}>My Closet</Text>
-      {isSearching && (
-        <TextInput
-          style={[styles.searchInput, { marginLeft: 16 }]}
-          placeholder="Search..."
-          placeholderTextColor={FuchsiaColors.slate}
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-          autoFocus
-          returnKeyType="search"
-        />
-      )}
-      <Pressable 
-        style={styles.searchButton}
-        onPress={() => {
-          if (isSearching) {
-            setSearchQuery('');
-            setIsSearching(false);
-          } else {
-            setIsSearching(true);
-          }
-        }}
+      <Animated.View 
+        layout={Layout.duration(250)}
+        style={[
+          styles.searchContainer,
+          isSearching ? { flex: 1, marginLeft: 16 } : { width: 40 }
+        ]}
       >
-        {isSearching ? (
-          <X size={20} color={FuchsiaColors.slate} />
-        ) : (
-          <Search size={20} color={FuchsiaColors.slate} />
+        {isSearching && (
+          <Animated.View entering={FadeIn.delay(100).duration(200)} exiting={FadeOut.duration(100)} style={styles.searchInputWrapper}>
+            <TextInput
+              style={styles.searchInputInner}
+              placeholder="Search..."
+              placeholderTextColor={FuchsiaColors.slate}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              autoFocus
+              returnKeyType="search"
+            />
+          </Animated.View>
         )}
-      </Pressable>
+        <Pressable 
+          style={styles.searchIconButton}
+          onPress={() => {
+            if (isSearching) {
+              setSearchQuery('');
+              setIsSearching(false);
+            } else {
+              setIsSearching(true);
+            }
+          }}
+        >
+          {isSearching ? (
+            <X size={20} color={FuchsiaColors.slate} />
+          ) : (
+            <Search size={20} color={FuchsiaColors.slate} />
+          )}
+        </Pressable>
+      </Animated.View>
     </View>
   );
 
@@ -288,26 +299,30 @@ const styles = StyleSheet.create({
     fontSize: 24,
     color: FuchsiaColors.ink,
   },
-  searchInput: {
-    flex: 1,
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
     height: 40,
     backgroundColor: '#fff',
     borderRadius: 12,
-    paddingHorizontal: 16,
+    borderWidth: 1,
+    borderColor: FuchsiaColors.mist,
+    overflow: 'hidden',
+  },
+  searchInputWrapper: {
+    flex: 1,
+    paddingLeft: 12,
+  },
+  searchInputInner: {
+    flex: 1,
     fontFamily: FuchsiaFonts.body,
     fontSize: 14,
     color: FuchsiaColors.ink,
-    borderWidth: 1,
-    borderColor: FuchsiaColors.mist,
-    marginRight: 12,
+    padding: 0,
   },
-  searchButton: {
+  searchIconButton: {
     width: 40,
     height: 40,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: FuchsiaColors.mist,
-    backgroundColor: '#fff',
     alignItems: 'center',
     justifyContent: 'center',
   },
