@@ -1,9 +1,15 @@
 import { View, StyleSheet, Pressable, TouchableWithoutFeedback, Text } from 'react-native';
 import { Tabs, useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Svg, Path } from 'react-native-svg';
-import { Home, CalendarDays, Plus, Shirt, User, Layers, Briefcase, Sparkles, X } from 'lucide-react-native';
+import { Home, CalendarDays, Plus, Shirt, User, Layers, Briefcase, Sparkles } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import Animated, { 
+  useSharedValue, 
+  useAnimatedStyle, 
+  withTiming,
+  interpolate
+} from 'react-native-reanimated';
 
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FuchsiaColors } from '@/constants/theme';
@@ -12,6 +18,33 @@ export default function TabLayout() {
   const insets = useSafeAreaInsets();
   const [menuVisible, setMenuVisible] = useState(false);
   const router = useRouter();
+  
+  const menuProgress = useSharedValue(0);
+
+  useEffect(() => {
+    menuProgress.value = withTiming(menuVisible ? 1 : 0, {
+      duration: 200,
+    });
+  }, [menuVisible]);
+
+  const iconAnimatedStyle = useAnimatedStyle(() => {
+    return {
+      transform: [
+        { rotate: `${menuProgress.value * 45}deg` }
+      ],
+    };
+  });
+
+  const overlayAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: menuProgress.value,
+  }));
+
+  const menuSheetAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: menuProgress.value,
+    transform: [
+      { translateY: interpolate(menuProgress.value, [0, 1], [15, 0]) }
+    ],
+  }));
 
   return (
     <View style={{ flex: 1 }}>
@@ -85,12 +118,16 @@ export default function TabLayout() {
         />
       </Tabs>
 
-      {menuVisible && (
-        <View style={[StyleSheet.absoluteFill, { zIndex: 50, elevation: 50 }]}>
-          <TouchableWithoutFeedback onPress={() => setMenuVisible(false)}>
-            <View style={styles.modalOverlay}>
-              <TouchableWithoutFeedback>
-                <View style={[styles.menuSheet, { bottom: Math.max(insets.bottom, 24) + 80 }]}>
+      <Animated.View 
+        pointerEvents={menuVisible ? 'auto' : 'none'}
+        style={[StyleSheet.absoluteFill, { zIndex: 50 }, overlayAnimatedStyle]}
+      >
+        <TouchableWithoutFeedback onPress={() => setMenuVisible(false)}>
+          <View style={styles.modalOverlay}>
+            <TouchableWithoutFeedback>
+              <Animated.View 
+                style={[styles.menuSheet, { bottom: Math.max(insets.bottom, 24) + 80 }, menuSheetAnimatedStyle]}
+              >
                   <Pressable
                     style={({ pressed }) => [styles.menuItem, pressed && styles.menuItemPressed]}
                     onPress={() => {
@@ -134,14 +171,13 @@ export default function TabLayout() {
                     <Sparkles size={20} color={FuchsiaColors.slate} />
                     <Text style={styles.menuItemText}>Chat with AI</Text>
                   </Pressable>
-                </View>
+                </Animated.View>
               </TouchableWithoutFeedback>
             </View>
           </TouchableWithoutFeedback>
-        </View>
-      )}
+        </Animated.View>
 
-      <View pointerEvents="box-none" style={[StyleSheet.absoluteFill, { zIndex: 100, elevation: 100, alignItems: 'center', justifyContent: 'flex-end' }]}>
+      <View pointerEvents="box-none" style={[StyleSheet.absoluteFill, { zIndex: 100, alignItems: 'center', justifyContent: 'flex-end' }]}>
         <Pressable
           onPress={() => setMenuVisible(!menuVisible)}
           style={[styles.chatButton, { bottom: Math.max(insets.bottom, 24) + 16 }]}
@@ -152,7 +188,9 @@ export default function TabLayout() {
             end={{ x: 1, y: 0.5 }}
             style={styles.chatButtonInner}
           >
-            {menuVisible ? <X size={24} color="#fff" /> : <Plus size={24} color="#fff" />}
+            <Animated.View style={iconAnimatedStyle}>
+              <Plus size={24} color="#fff" />
+            </Animated.View>
           </LinearGradient>
         </Pressable>
       </View>
