@@ -71,6 +71,9 @@ export default function RootLayout() {
         <Stack.Screen name="index" options={{ headerShown: false }} />
         <Stack.Screen name="welcome" options={{ headerShown: false }} />
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="add-item" options={{ headerShown: false, presentation: 'modal' }} />
+        <Stack.Screen name="add-outfit" options={{ headerShown: false, presentation: 'modal' }} />
+        <Stack.Screen name="add-wardrobe" options={{ headerShown: false, presentation: 'modal' }} />
       </Stack>
       <StatusBar style="auto" />
     </ThemeProvider>
