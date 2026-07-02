@@ -2,7 +2,7 @@ import { View, StyleSheet, Pressable } from 'react-native';
 import { Tabs } from 'expo-router';
 import React from 'react';
 import { Svg, Path } from 'react-native-svg';
-import { Home, CalendarDays, Sparkles, Shirt, User } from 'lucide-react-native';
+import { Home, CalendarDays, Plus, Shirt, User } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -51,10 +51,10 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="calendar"
+        name="closet"
         options={{
-          title: 'Calendar',
-          tabBarIcon: ({ color }) => <CalendarDays size={20} color={color} />,
+          title: 'Closet',
+          tabBarIcon: ({ color }) => <Shirt size={20} color={color} />,
         }}
       />
       <Tabs.Screen
@@ -75,17 +75,17 @@ export default function TabLayout() {
                 end={{ x: 1, y: 0.5 }}
                 style={styles.chatButton}
               >
-                <Sparkles size={24} color="#fff" />
+                <Plus size={24} color="#fff" />
               </LinearGradient>
             </Pressable>
           ),
         }}
       />
       <Tabs.Screen
-        name="closet"
+        name="calendar"
         options={{
-          title: 'Closet',
-          tabBarIcon: ({ color }) => <Shirt size={20} color={color} />,
+          title: 'Calendar',
+          tabBarIcon: ({ color }) => <CalendarDays size={20} color={color} />,
         }}
       />
       <Tabs.Screen
