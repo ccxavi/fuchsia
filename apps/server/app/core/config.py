@@ -15,6 +15,9 @@ class Settings(BaseSettings):
     deepseek_api_key: str | None = None
     deepseek_base_url: str = "https://api.deepseek.com"
     deepseek_model: str = "deepseek-chat"
+    gemini_api_key: str | None = None
+    gemini_base_url: str = "https://generativelanguage.googleapis.com/v1beta/openai"
+    gemini_model: str = "gemini-2.5-flash"
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
@@ -68,6 +71,18 @@ class Settings(BaseSettings):
             raise ValueError("DEEPSEEK_BASE_URL is not configured.")
 
         return self.deepseek_base_url.rstrip("/")
+
+    def require_gemini_api_key(self) -> str:
+        if not self.gemini_api_key:
+            raise ValueError("GEMINI_API_KEY is not configured.")
+
+        return self.gemini_api_key
+
+    def require_gemini_base_url(self) -> str:
+        if not self.gemini_base_url:
+            raise ValueError("GEMINI_BASE_URL is not configured.")
+
+        return self.gemini_base_url.rstrip("/")
 
 
 settings = Settings()
