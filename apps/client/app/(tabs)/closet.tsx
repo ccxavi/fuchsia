@@ -1,10 +1,11 @@
-import { View, Text, StyleSheet, Pressable, ScrollView, FlatList, Image, ImageBackground } from 'react-native';
+import { View, Text, StyleSheet, Pressable, ScrollView, FlatList, Image, ImageBackground, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Search } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
 import { FuchsiaColors, FuchsiaFonts } from '@/constants/theme';
+import { getClothingItems, getWardrobes, ClothingItemResponse, WardrobeResponse } from '@/api/client';
 
 // Dummy Data mapped to prototype assets
 const OUTFITS = [
@@ -33,6 +34,27 @@ const CATEGORIES = ['All', 'Tops', 'Bottoms', 'Shoes', 'Outerwear', 'Accessories
 export default function ClosetScreen() {
   const insets = useSafeAreaInsets();
   const [activeTab, setActiveTab] = useState<'outfits' | 'wardrobe' | 'items'>('outfits');
+  const [clothingItems, setClothingItems] = useState<ClothingItemResponse[]>([]);
+  const [wardrobes, setWardrobes] = useState<WardrobeResponse[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchData() {
+      try {
+        const [fetchedItems, fetchedWardrobes] = await Promise.all([
+          getClothingItems(),
+          getWardrobes(),
+        ]);
+        setClothingItems(fetchedItems);
+        setWardrobes(fetchedWardrobes);
+      } catch (err) {
+        console.error('Failed to load closet data:', err);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    fetchData();
+  }, []);
 
   const renderHeader = () => (
     <View style={styles.header}>
@@ -88,19 +110,23 @@ export default function ClosetScreen() {
 
   const renderWardrobe = () => (
     <FlatList
-      data={WARDROBES}
+      data={wardrobes}
       keyExtractor={(item) => item.id}
       contentContainerStyle={styles.listContent}
       showsVerticalScrollIndicator={false}
       renderItem={({ item }) => (
         <Pressable style={styles.wardrobeCard}>
-          <ImageBackground source={item.image} style={styles.wardrobeImage} imageStyle={styles.wardrobeImageStyle}>
+          <ImageBackground 
+            source={{ uri: `https://placehold.co/400x140/86003C/D4145A/png?text=${encodeURIComponent(item.name)}` }} 
+            style={styles.wardrobeImage} 
+            imageStyle={styles.wardrobeImageStyle}
+          >
             <LinearGradient
               colors={['transparent', 'rgba(0,0,0,0.8)']}
               style={styles.wardrobeGradient}
             >
-              <Text style={styles.wardrobeTitle}>{item.title}</Text>
-              <Text style={styles.wardrobeSubtitle}>{item.subtitle}</Text>
+              <Text style={styles.wardrobeTitle}>{item.name}</Text>
+              <Text style={styles.wardrobeSubtitle}>{item.quantity} Items</Text>
             </LinearGradient>
           </ImageBackground>
         </Pressable>
@@ -126,11 +152,11 @@ export default function ClosetScreen() {
         </ScrollView>
       </View>
       <View style={styles.statsBanner}>
-        <Text style={styles.statsCount}>24 items</Text>
-        <Text style={styles.statsLabel}>6 categories</Text>
+        <Text style={styles.statsCount}>{clothingItems.length} items</Text>
+        <Text style={styles.statsLabel}>All categories</Text>
       </View>
       <FlatList
-        data={ITEMS}
+        data={clothingItems}
         keyExtractor={(item) => item.id}
         numColumns={2}
         columnWrapperStyle={styles.gridRow}
@@ -139,14 +165,19 @@ export default function ClosetScreen() {
         renderItem={({ item }) => (
           <Pressable style={styles.gridItem}>
             <View style={styles.imageContainer}>
-              <Image source={item.image} style={styles.image} />
-              <View style={styles.categoryBadge}>
-                <Text style={styles.categoryBadgeText}>{item.category}</Text>
-              </View>
+              <Image 
+                source={{ uri: item.image_url || `https://placehold.co/300x375/FDF2F8/86003C/png?text=${encodeURIComponent(item.name)}` }} 
+                style={styles.image} 
+              />
+              {item.category && (
+                <View style={styles.categoryBadge}>
+                  <Text style={styles.categoryBadgeText}>{item.category}</Text>
+                </View>
+              )}
             </View>
             <View style={styles.itemInfo}>
-              <Text style={styles.itemTitle} numberOfLines={1}>{item.title}</Text>
-              <Text style={styles.itemSubtitle}>{item.worn}</Text>
+              <Text style={styles.itemTitle} numberOfLines={1}>{item.name}</Text>
+              <Text style={styles.itemSubtitle}>Worn 0 times</Text>
             </View>
           </Pressable>
         )}
@@ -159,9 +190,17 @@ export default function ClosetScreen() {
       {renderHeader()}
       {renderTabs()}
       <View style={styles.flex1}>
-        {activeTab === 'outfits' && renderOutfits()}
-        {activeTab === 'wardrobe' && renderWardrobe()}
-        {activeTab === 'items' && renderItems()}
+        {isLoading ? (
+          <View style={styles.centerContainer}>
+            <ActivityIndicator size="large" color={FuchsiaColors.vibrant} />
+          </View>
+        ) : (
+          <>
+            {activeTab === 'outfits' && renderOutfits()}
+            {activeTab === 'wardrobe' && renderWardrobe()}
+            {activeTab === 'items' && renderItems()}
+          </>
+        )}
       </View>
     </View>
   );
@@ -174,6 +213,11 @@ const styles = StyleSheet.create({
   },
   flex1: {
     flex: 1,
+  },
+  centerContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   header: {
     flexDirection: 'row',

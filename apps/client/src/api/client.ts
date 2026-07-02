@@ -132,3 +132,35 @@ export async function updateProfile(payload: UserPreferencesUpdateRequest): Prom
     body: JSON.stringify(payload),
   });
 }
+
+// ── Closet / Wardrobe ─────────────────────────────────────────────────────────
+
+export type WardrobeResponse = {
+  id: string;
+  user_id: string;
+  name: string;
+  quantity: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export async function getWardrobes(): Promise<WardrobeResponse[]> {
+  return apiFetch<WardrobeResponse[]>('/wardrobes');
+}
+
+export type ClothingItemResponse = {
+  id: string;
+  user_id: string;
+  name: string;
+  category: string | null;
+  color: string | null;
+  brand: string | null;
+  image_url: string | null;
+  is_favorite: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export async function getClothingItems(): Promise<ClothingItemResponse[]> {
+  return apiFetch<ClothingItemResponse[]>('/clothing-items');
+}
