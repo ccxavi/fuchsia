@@ -1,6 +1,10 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
 from uuid import uuid4
+
+if TYPE_CHECKING:
+    from app.models.clothing_item import ClothingItem
 
 from sqlalchemy import ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -31,5 +35,9 @@ class Wardrobe(TimestampMixin, Base):
         nullable=False,
         default=0,
     )
-
-
+    
+    clothing_items: Mapped[list["ClothingItem"]] = relationship(
+        "ClothingItem",
+        secondary="clothing_item_wardrobes",
+        back_populates="wardrobes",
+    )
