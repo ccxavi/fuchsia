@@ -56,6 +56,12 @@ export default function ClosetScreen() {
     fetchData();
   }, []);
 
+  const renderEmptyState = (message: string) => (
+    <View style={styles.emptyContainer}>
+      <Text style={styles.emptyMessage}>{message}</Text>
+    </View>
+  );
+
   const renderHeader = () => (
     <View style={styles.header}>
       <Text style={styles.headerTitle}>My Closet</Text>
@@ -92,8 +98,9 @@ export default function ClosetScreen() {
       keyExtractor={(item) => item.id}
       numColumns={2}
       columnWrapperStyle={styles.gridRow}
-      contentContainerStyle={styles.listContent}
+      contentContainerStyle={[styles.listContent, OUTFITS.length === 0 && { flex: 1 }]}
       showsVerticalScrollIndicator={false}
+      ListEmptyComponent={() => renderEmptyState("Your stylish outfits will appear here!\nTap the + below to create one.")}
       renderItem={({ item }) => (
         <Pressable style={styles.gridItem}>
           <View style={styles.imageContainer}>
@@ -112,8 +119,9 @@ export default function ClosetScreen() {
     <FlatList
       data={wardrobes}
       keyExtractor={(item) => item.id}
-      contentContainerStyle={styles.listContent}
+      contentContainerStyle={[styles.listContent, wardrobes.length === 0 && { flex: 1 }]}
       showsVerticalScrollIndicator={false}
+      ListEmptyComponent={() => renderEmptyState("Curate your perfect collections here!\nTap the + below to start a new wardrobe.")}
       renderItem={({ item }) => (
         <Pressable style={styles.wardrobeCard}>
           <ImageBackground 
@@ -159,9 +167,10 @@ export default function ClosetScreen() {
         data={clothingItems}
         keyExtractor={(item) => item.id}
         numColumns={2}
-        columnWrapperStyle={styles.gridRow}
-        contentContainerStyle={styles.listContent}
+        columnWrapperStyle={clothingItems.length > 0 ? styles.gridRow : undefined}
+        contentContainerStyle={[styles.listContent, clothingItems.length === 0 && { flex: 1 }]}
         showsVerticalScrollIndicator={false}
+        ListEmptyComponent={() => renderEmptyState("Your virtual closet awaits!\nTap the + below to add your first clothing item.")}
         renderItem={({ item }) => (
           <Pressable style={styles.gridItem}>
             <View style={styles.imageContainer}>
@@ -218,6 +227,20 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  emptyContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 32,
+    marginTop: 40,
+  },
+  emptyMessage: {
+    fontFamily: FuchsiaFonts.body,
+    fontSize: 14,
+    color: FuchsiaColors.slate,
+    textAlign: 'center',
+    lineHeight: 20,
   },
   header: {
     flexDirection: 'row',
