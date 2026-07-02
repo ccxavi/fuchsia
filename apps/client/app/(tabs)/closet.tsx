@@ -1,6 +1,7 @@
 import { View, Text, StyleSheet, Pressable, ScrollView, FlatList, Image, ImageBackground, ActivityIndicator, TextInput } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { useFocusEffect } from 'expo-router';
 import { Search, X } from 'lucide-react-native';
 import Animated, { FadeIn, FadeOut, Layout } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -41,23 +42,29 @@ export default function ClosetScreen() {
   const [isSearching, setIsSearching] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
-  useEffect(() => {
-    async function fetchData() {
-      try {
-        const [fetchedItems, fetchedWardrobes] = await Promise.all([
-          getClothingItems(),
-          getWardrobes(),
-        ]);
-        setClothingItems(fetchedItems);
-        setWardrobes(fetchedWardrobes);
-      } catch (err) {
-        console.error('Failed to load closet data:', err);
-      } finally {
-        setIsLoading(false);
+  useFocusEffect(
+    useCallback(() => {
+      async function fetchData() {
+        try {
+          // Fetch independently so if one fails, the other can still load!
+          const fetchedWardrobes = await getWardrobes().catch(err => {
+            console.error('Failed to fetch wardrobes:', err);
+            return [];
+          });
+          setWardrobes(fetchedWardrobes);
+
+          const fetchedItems = await getClothingItems().catch(err => {
+            console.error('Failed to fetch items:', err);
+            return [];
+          });
+          setClothingItems(fetchedItems);
+        } finally {
+          setIsLoading(false);
+        }
       }
-    }
-    fetchData();
-  }, []);
+      fetchData();
+    }, [])
+  );
 
   const filteredOutfits = OUTFITS.filter(o => o.title.toLowerCase().includes(searchQuery.toLowerCase()));
   const filteredWardrobes = wardrobes.filter(w => w.name.toLowerCase().includes(searchQuery.toLowerCase()));
@@ -167,23 +174,43 @@ export default function ClosetScreen() {
       contentContainerStyle={[styles.listContent, filteredWardrobes.length === 0 && { flex: 1 }]}
       showsVerticalScrollIndicator={false}
       ListEmptyComponent={() => renderEmptyState("Curate your perfect collections here!\nTap the + below to start a new wardrobe.")}
-      renderItem={({ item }) => (
-        <Pressable style={styles.wardrobeCard}>
-          <ImageBackground 
-            source={{ uri: `https://placehold.co/400x140/86003C/D4145A/png?text=${encodeURIComponent(item.name)}` }} 
-            style={styles.wardrobeImage} 
-            imageStyle={styles.wardrobeImageStyle}
-          >
-            <LinearGradient
-              colors={['transparent', 'rgba(0,0,0,0.8)']}
-              style={styles.wardrobeGradient}
-            >
-              <Text style={styles.wardrobeTitle}>{item.name}</Text>
-              <Text style={styles.wardrobeSubtitle}>{item.quantity} Items</Text>
-            </LinearGradient>
-          </ImageBackground>
-        </Pressable>
-      )}
+      renderItem={({ item }) => {
+        const imageUrl = (item as any).image_url;
+        return (
+          <Pressable style={styles.wardrobeCard}>
+            {imageUrl ? (
+              <ImageBackground 
+                source={{ uri: imageUrl }} 
+                style={styles.wardrobeImage} 
+                imageStyle={styles.wardrobeImageStyle}
+              >
+                <LinearGradient
+                  colors={['transparent', 'rgba(0,0,0,0.8)']}
+                  style={styles.wardrobeGradient}
+                >
+                  <Text style={styles.wardrobeTitle}>{item.name}</Text>
+                  <Text style={styles.wardrobeSubtitle}>{item.quantity} Items</Text>
+                </LinearGradient>
+              </ImageBackground>
+            ) : (
+              <LinearGradient
+                colors={['#D4145A', '#86003C']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.wardrobeImage}
+              >
+                <LinearGradient
+                  colors={['transparent', 'rgba(0,0,0,0.4)']}
+                  style={styles.wardrobeGradient}
+                >
+                  <Text style={styles.wardrobeTitle}>{item.name}</Text>
+                  <Text style={styles.wardrobeSubtitle}>{item.quantity} Items</Text>
+                </LinearGradient>
+              </LinearGradient>
+            )}
+          </Pressable>
+        );
+      }}
     />
   );
 
