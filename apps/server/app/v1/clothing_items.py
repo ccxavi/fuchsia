@@ -108,3 +108,101 @@ def remove_item_from_wardrobe(
         db.refresh(item)
         
     return item
+
+
+@router.get("/", response_model=list[ClothingItemResponse])
+def get_clothing_items(
+    user: AuthenticatedUser = Depends(get_current_authenticated_user),
+    db: Session = Depends(get_db_session),
+):
+    items = db.scalars(
+        select(ClothingItem).where(ClothingItem.user_id == user.user.id)
+    ).all()
+    return items
+
+
+@router.get("/{item_id}", response_model=ClothingItemResponse)
+def get_clothing_item(
+    item_id: str,
+    user: AuthenticatedUser = Depends(get_current_authenticated_user),
+    db: Session = Depends(get_db_session),
+):
+    item = db.scalar(
+        select(ClothingItem).where(
+            ClothingItem.id == item_id, ClothingItem.user_id == user.user.id
+        )
+    )
+    if not item:
+        raise HTTPException(status_code=404, detail="Clothing item not found")
+    return item
+
+
+@router.patch("/{item_id}", response_model=ClothingItemResponse)
+async def update_clothing_item(
+    item_id: str,
+    name: Annotated[str | None, Form()] = None,
+    category: Annotated[str | None, Form()] = None,
+    color: Annotated[str | None, Form()] = None,
+    brand: Annotated[str | None, Form()] = None,
+    is_favorite: Annotated[bool | None, Form()] = None,
+    image: Annotated[UploadFile | None, File()] = None,
+    user: AuthenticatedUser = Depends(get_current_authenticated_user),
+    credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
+    db: Session = Depends(get_db_session),
+):
+    item = db.scalar(
+        select(ClothingItem).where(
+            ClothingItem.id == item_id, ClothingItem.user_id == user.user.id
+        )
+    )
+    if not item:
+        raise HTTPException(status_code=404, detail="Clothing item not found")
+
+    if name is not None:
+        item.name = name
+    if category is not None:
+        item.category = category
+    if color is not None:
+        item.color = color
+    if brand is not None:
+        item.brand = brand
+    if is_favorite is not None:
+        item.is_favorite = is_favorite
+        
+    if image:
+        if not image.content_type.startswith("image/"):
+            raise HTTPException(status_code=400, detail="File must be an image")
+            
+        file_ext = image.filename.split(".")[-1] if image.filename and "." in image.filename else "jpg"
+        file_path = f"{user.user.supabase_user_id}/{uuid4()}.{file_ext}"
+        
+        image_url = await upload_file_to_supabase(
+            bucket_name="clothing_items_img",
+            file_path=file_path,
+            file=image.file,
+            content_type=image.content_type,
+            access_token=credentials.credentials,
+        )
+        item.image_url = image_url
+
+    db.commit()
+    db.refresh(item)
+    return item
+
+
+@router.delete("/{item_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_clothing_item(
+    item_id: str,
+    user: AuthenticatedUser = Depends(get_current_authenticated_user),
+    db: Session = Depends(get_db_session),
+):
+    item = db.scalar(
+        select(ClothingItem).where(
+            ClothingItem.id == item_id, ClothingItem.user_id == user.user.id
+        )
+    )
+    if not item:
+        raise HTTPException(status_code=404, detail="Clothing item not found")
+
+    db.delete(item)
+    db.commit()

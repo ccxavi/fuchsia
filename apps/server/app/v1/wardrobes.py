@@ -10,7 +10,7 @@ from app.core.auth import AuthenticatedUser, bearer_scheme, get_current_authenti
 from app.db.session import get_db_session
 from app.models.wardrobe import Wardrobe
 from app.services.supabase_storage import upload_file_to_supabase
-from app.v1.schemas import WardrobeResponse
+from app.v1.schemas import ClothingItemResponse, WardrobeResponse
 
 router = APIRouter()
 
@@ -139,3 +139,21 @@ def delete_wardrobe(
 
     db.delete(wardrobe)
     db.commit()
+
+
+@router.get("/{wardrobe_id}/clothing-items", response_model=list[ClothingItemResponse])
+def get_wardrobe_clothing_items(
+    wardrobe_id: str,
+    user: Annotated[AuthenticatedUser, Depends(get_current_authenticated_user)],
+    db: Annotated[Session, Depends(get_db_session)],
+):
+    wardrobe = db.scalar(
+        select(Wardrobe).where(
+            Wardrobe.id == wardrobe_id, Wardrobe.user_id == user.user.id
+        )
+    )
+    if not wardrobe:
+        raise HTTPException(status_code=404, detail="Wardrobe not found")
+        
+    return wardrobe.clothing_items
+
