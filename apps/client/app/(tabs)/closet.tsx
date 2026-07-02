@@ -1,7 +1,7 @@
-import { View, Text, StyleSheet, Pressable, ScrollView, FlatList, Image, ImageBackground, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, Pressable, ScrollView, FlatList, Image, ImageBackground, ActivityIndicator, TextInput } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useState, useEffect } from 'react';
-import { Search } from 'lucide-react-native';
+import { Search, X } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
 import { FuchsiaColors, FuchsiaFonts } from '@/constants/theme';
@@ -37,6 +37,8 @@ export default function ClosetScreen() {
   const [clothingItems, setClothingItems] = useState<ClothingItemResponse[]>([]);
   const [wardrobes, setWardrobes] = useState<WardrobeResponse[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     async function fetchData() {
@@ -56,6 +58,13 @@ export default function ClosetScreen() {
     fetchData();
   }, []);
 
+  const filteredOutfits = OUTFITS.filter(o => o.title.toLowerCase().includes(searchQuery.toLowerCase()));
+  const filteredWardrobes = wardrobes.filter(w => w.name.toLowerCase().includes(searchQuery.toLowerCase()));
+  const filteredItems = clothingItems.filter(i => 
+    i.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    (i.category && i.category.toLowerCase().includes(searchQuery.toLowerCase()))
+  );
+
   const renderEmptyState = (message: string) => (
     <View style={styles.emptyContainer}>
       <Text style={styles.emptyMessage}>{message}</Text>
@@ -65,8 +74,33 @@ export default function ClosetScreen() {
   const renderHeader = () => (
     <View style={styles.header}>
       <Text style={styles.headerTitle}>My Closet</Text>
-      <Pressable style={styles.searchButton}>
-        <Search size={20} color={FuchsiaColors.slate} />
+      {isSearching && (
+        <TextInput
+          style={[styles.searchInput, { marginLeft: 16 }]}
+          placeholder="Search..."
+          placeholderTextColor={FuchsiaColors.slate}
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          autoFocus
+          returnKeyType="search"
+        />
+      )}
+      <Pressable 
+        style={styles.searchButton}
+        onPress={() => {
+          if (isSearching) {
+            setSearchQuery('');
+            setIsSearching(false);
+          } else {
+            setIsSearching(true);
+          }
+        }}
+      >
+        {isSearching ? (
+          <X size={20} color={FuchsiaColors.slate} />
+        ) : (
+          <Search size={20} color={FuchsiaColors.slate} />
+        )}
       </Pressable>
     </View>
   );
@@ -94,11 +128,11 @@ export default function ClosetScreen() {
 
   const renderOutfits = () => (
     <FlatList
-      data={OUTFITS}
+      data={filteredOutfits}
       keyExtractor={(item) => item.id}
       numColumns={2}
       columnWrapperStyle={styles.gridRow}
-      contentContainerStyle={[styles.listContent, OUTFITS.length === 0 && { flex: 1 }]}
+      contentContainerStyle={[styles.listContent, filteredOutfits.length === 0 && { flex: 1 }]}
       showsVerticalScrollIndicator={false}
       ListEmptyComponent={() => renderEmptyState("Your stylish outfits will appear here!\nTap the + below to create one.")}
       renderItem={({ item }) => (
@@ -117,9 +151,9 @@ export default function ClosetScreen() {
 
   const renderWardrobe = () => (
     <FlatList
-      data={wardrobes}
+      data={filteredWardrobes}
       keyExtractor={(item) => item.id}
-      contentContainerStyle={[styles.listContent, wardrobes.length === 0 && { flex: 1 }]}
+      contentContainerStyle={[styles.listContent, filteredWardrobes.length === 0 && { flex: 1 }]}
       showsVerticalScrollIndicator={false}
       ListEmptyComponent={() => renderEmptyState("Curate your perfect collections here!\nTap the + below to start a new wardrobe.")}
       renderItem={({ item }) => (
@@ -160,15 +194,15 @@ export default function ClosetScreen() {
         </ScrollView>
       </View>
       <View style={styles.statsBanner}>
-        <Text style={styles.statsCount}>{clothingItems.length} items</Text>
+        <Text style={styles.statsCount}>{filteredItems.length} items</Text>
         <Text style={styles.statsLabel}>All categories</Text>
       </View>
       <FlatList
-        data={clothingItems}
+        data={filteredItems}
         keyExtractor={(item) => item.id}
         numColumns={2}
-        columnWrapperStyle={clothingItems.length > 0 ? styles.gridRow : undefined}
-        contentContainerStyle={[styles.listContent, clothingItems.length === 0 && { flex: 1 }]}
+        columnWrapperStyle={filteredItems.length > 0 ? styles.gridRow : undefined}
+        contentContainerStyle={[styles.listContent, filteredItems.length === 0 && { flex: 1 }]}
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={() => renderEmptyState("Your virtual closet awaits!\nTap the + below to add your first clothing item.")}
         renderItem={({ item }) => (
@@ -253,6 +287,19 @@ const styles = StyleSheet.create({
     fontFamily: FuchsiaFonts.heading,
     fontSize: 24,
     color: FuchsiaColors.ink,
+  },
+  searchInput: {
+    flex: 1,
+    height: 40,
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    fontFamily: FuchsiaFonts.body,
+    fontSize: 14,
+    color: FuchsiaColors.ink,
+    borderWidth: 1,
+    borderColor: FuchsiaColors.mist,
+    marginRight: 12,
   },
   searchButton: {
     width: 40,
