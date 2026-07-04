@@ -8,50 +8,8 @@ import { Image } from 'expo-image';
 
 import { ThemedText } from '@/components/themed-text';
 import { FuchsiaColors, FuchsiaFonts } from '@/constants/theme';
+import { CLOTHING_CATEGORIES } from '@/constants/categories';
 import { createClothingItem, updateClothingItem, getClothingItem } from '@/api/client';
-
-const CLOTHING_CATEGORIES = [
-  {
-    main: 'Tops',
-    subs: ['T-shirts', 'Polo Shirts', 'Blouses', 'Sweaters', 'Hoodies', 'Jackets'],
-  },
-  {
-    main: 'Bottoms',
-    subs: ['Jeans', 'Shorts', 'Skirts', 'Trousers', 'Leggings'],
-  },
-  {
-    main: 'Dresses',
-    subs: [],
-  },
-  {
-    main: 'Outerwear',
-    subs: ['Coats', 'Blazers', 'Cardigans'],
-  },
-  {
-    main: 'Activewear',
-    subs: [],
-  },
-  {
-    main: 'Sleepwear',
-    subs: [],
-  },
-  {
-    main: 'Swimwear',
-    subs: [],
-  },
-  {
-    main: 'Undergarments',
-    subs: [],
-  },
-  {
-    main: 'Accessories',
-    subs: ['Hats', 'Bags', 'Belts', 'Jewelry', 'Scarves'],
-  },
-  {
-    main: 'Footwear',
-    subs: ['Sneakers', 'Sandals', 'Boots', 'Formal Shoes'],
-  },
-];
 
 export default function AddOrEditItemScreen() {
   const { id } = useLocalSearchParams<{ id?: string }>();
@@ -284,7 +242,11 @@ export default function AddOrEditItemScreen() {
             <ThemedText style={styles.label}>Category</ThemedText>
             <Pressable 
               style={[styles.input, { justifyContent: 'center' }]} 
-              onPress={() => setShowCategoryModal(true)}
+              onPress={() => {
+                const parentCat = CLOTHING_CATEGORIES.find(c => c.main === category || c.subs.includes(category || ''))?.main || null;
+                setExpandedCategory(parentCat);
+                setShowCategoryModal(true);
+              }}
             >
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                 <ThemedText style={{ color: category ? FuchsiaColors.ink : FuchsiaColors.mist, fontSize: 14 }}>
