@@ -1,14 +1,57 @@
-import { View, StyleSheet, TextInput, Pressable, KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator, Keyboard, DeviceEventEmitter } from 'react-native';
+import { View, StyleSheet, TextInput, Pressable, KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator, Keyboard, DeviceEventEmitter, Modal } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useState, useEffect } from 'react';
 import { router, useLocalSearchParams } from 'expo-router';
-import { ArrowLeft, Camera, Image as ImageIcon, Sparkles, X } from 'lucide-react-native';
+import { ArrowLeft, Camera, Image as ImageIcon, Sparkles, X, ChevronDown, ChevronUp, Check } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { Image } from 'expo-image';
 
 import { ThemedText } from '@/components/themed-text';
 import { FuchsiaColors, FuchsiaFonts } from '@/constants/theme';
 import { createClothingItem, updateClothingItem, getClothingItem } from '@/api/client';
+
+const CLOTHING_CATEGORIES = [
+  {
+    main: 'Tops',
+    subs: ['T-shirts', 'Polo Shirts', 'Blouses', 'Sweaters', 'Hoodies', 'Jackets'],
+  },
+  {
+    main: 'Bottoms',
+    subs: ['Jeans', 'Shorts', 'Skirts', 'Trousers', 'Leggings'],
+  },
+  {
+    main: 'Dresses',
+    subs: [],
+  },
+  {
+    main: 'Outerwear',
+    subs: ['Coats', 'Blazers', 'Cardigans'],
+  },
+  {
+    main: 'Activewear',
+    subs: [],
+  },
+  {
+    main: 'Sleepwear',
+    subs: [],
+  },
+  {
+    main: 'Swimwear',
+    subs: [],
+  },
+  {
+    main: 'Undergarments',
+    subs: [],
+  },
+  {
+    main: 'Accessories',
+    subs: ['Hats', 'Bags', 'Belts', 'Jewelry', 'Scarves'],
+  },
+  {
+    main: 'Footwear',
+    subs: ['Sneakers', 'Sandals', 'Boots', 'Formal Shoes'],
+  },
+];
 
 export default function AddOrEditItemScreen() {
   const { id } = useLocalSearchParams<{ id?: string }>();
@@ -24,6 +67,8 @@ export default function AddOrEditItemScreen() {
   const [tags, setTags] = useState<string[]>(['Casual', 'Denim']);
   const [tagInput, setTagInput] = useState('');
   
+  const [showCategoryModal, setShowCategoryModal] = useState(false);
+  const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isFetching, setIsFetching] = useState(!!id);
   const [error, setError] = useState('');
@@ -237,13 +282,17 @@ export default function AddOrEditItemScreen() {
 
           <View style={styles.formGroup}>
             <ThemedText style={styles.label}>Category</ThemedText>
-            <TextInput
-              style={styles.input}
-              placeholder="e.g. Outerwear"
-              placeholderTextColor={FuchsiaColors.mist}
-              value={category}
-              onChangeText={setCategory}
-            />
+            <Pressable 
+              style={[styles.input, { justifyContent: 'center' }]} 
+              onPress={() => setShowCategoryModal(true)}
+            >
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <ThemedText style={{ color: category ? FuchsiaColors.ink : FuchsiaColors.mist, fontSize: 14 }}>
+                  {category || 'Select a category'}
+                </ThemedText>
+                <ChevronDown size={20} color={FuchsiaColors.slate} />
+              </View>
+            </Pressable>
           </View>
 
           <View style={styles.row}>
@@ -320,6 +369,88 @@ export default function AddOrEditItemScreen() {
 
       {/* Manual Android Keyboard Spacer */}
       {Platform.OS === 'android' && <View style={{ height: keyboardHeight }} />}
+      {/* Category Selection Modal */}
+      <Modal
+        visible={showCategoryModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowCategoryModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { paddingBottom: insets.bottom || 24 }]}>
+            <View style={styles.modalHeader}>
+              <ThemedText style={styles.modalTitle}>Select Category</ThemedText>
+              <Pressable onPress={() => setShowCategoryModal(false)} style={styles.modalCloseButton}>
+                <X size={20} color={FuchsiaColors.slate} />
+              </Pressable>
+            </View>
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.modalScrollContent}>
+              {CLOTHING_CATEGORIES.map((section) => {
+                const isExpanded = expandedCategory === section.main;
+                const hasSubs = section.subs.length > 0;
+
+                return (
+                  <View key={section.main} style={styles.categorySection}>
+                    <Pressable 
+                      style={styles.categoryItem}
+                      onPress={() => {
+                        if (hasSubs) {
+                          setExpandedCategory(isExpanded ? null : section.main);
+                        } else {
+                          setCategory(section.main);
+                          setShowCategoryModal(false);
+                        }
+                      }}
+                    >
+                      <ThemedText style={[styles.categoryMainText, category === section.main && styles.categorySelectedText]}>
+                        {section.main}
+                      </ThemedText>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                        {category === section.main && !hasSubs && <Check size={18} color={FuchsiaColors.deep} />}
+                        {hasSubs && (isExpanded ? <ChevronUp size={20} color={FuchsiaColors.slate} /> : <ChevronDown size={20} color={FuchsiaColors.slate} />)}
+                      </View>
+                    </Pressable>
+                    
+                    {hasSubs && isExpanded && (
+                      <View style={styles.subCategoryContainer}>
+                        <Pressable 
+                          style={styles.categoryItem}
+                          onPress={() => {
+                            setCategory(section.main);
+                            setShowCategoryModal(false);
+                          }}
+                        >
+                          <ThemedText style={[styles.categorySubText, category === section.main && styles.categorySelectedText]}>
+                            General {section.main}
+                          </ThemedText>
+                          {category === section.main && <Check size={18} color={FuchsiaColors.deep} />}
+                        </Pressable>
+
+                        {section.subs.map((sub) => (
+                          <Pressable 
+                            key={sub} 
+                            style={styles.categoryItem}
+                            onPress={() => {
+                              setCategory(sub);
+                              setShowCategoryModal(false);
+                            }}
+                          >
+                            <ThemedText style={[styles.categorySubText, category === sub && styles.categorySelectedText]}>
+                              {sub}
+                            </ThemedText>
+                            {category === sub && <Check size={18} color={FuchsiaColors.deep} />}
+                          </Pressable>
+                        ))}
+                      </View>
+                    )}
+                  </View>
+                );
+              })}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
     </KeyboardAvoidingView>
   );
 }
@@ -586,5 +717,69 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#fff',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.4)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    maxHeight: '80%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 24,
+    paddingVertical: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: FuchsiaColors.cloud,
+  },
+  modalTitle: {
+    fontFamily: FuchsiaFonts.heading,
+    fontSize: 18,
+    fontWeight: '600',
+    color: FuchsiaColors.ink,
+  },
+  modalCloseButton: {
+    padding: 4,
+  },
+  modalScrollContent: {
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+  },
+  categorySection: {
+    marginBottom: 8,
+  },
+  categoryItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+  },
+  subCategoryContainer: {
+    marginLeft: 16,
+    borderLeftWidth: 1,
+    borderLeftColor: FuchsiaColors.mist,
+    paddingLeft: 16,
+    marginTop: 4,
+  },
+  categoryMainText: {
+    fontFamily: FuchsiaFonts.heading,
+    fontSize: 16,
+    fontWeight: '600',
+    color: FuchsiaColors.ink,
+  },
+  categorySubText: {
+    fontFamily: FuchsiaFonts.body,
+    fontSize: 15,
+    color: FuchsiaColors.slate,
+  },
+  categorySelectedText: {
+    color: FuchsiaColors.deep,
+    fontWeight: '700',
   },
 });
