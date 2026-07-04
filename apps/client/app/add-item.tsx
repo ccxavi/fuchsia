@@ -1,4 +1,4 @@
-import { View, StyleSheet, TextInput, Pressable, KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator } from 'react-native';
+import { View, StyleSheet, TextInput, Pressable, KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator, Keyboard } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useState, useEffect } from 'react';
 import { router } from 'expo-router';
@@ -23,6 +23,21 @@ export default function AddItemScreen() {
   
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+
+  useEffect(() => {
+    if (Platform.OS !== 'android') return;
+    const showSub = Keyboard.addListener('keyboardDidShow', (e) => {
+      setKeyboardHeight(e.endCoordinates.height);
+    });
+    const hideSub = Keyboard.addListener('keyboardDidHide', () => {
+      setKeyboardHeight(0);
+    });
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
 
   // Removed wardrobe fetching since we're using tags instead
 
@@ -93,7 +108,11 @@ export default function AddItemScreen() {
   };
 
   return (
-    <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingView 
+      style={styles.container} 
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 64 : 0}
+    >
       <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
         <Pressable onPress={() => router.back()} style={styles.backButton}>
           <ArrowLeft size={20} color={FuchsiaColors.slate} />
@@ -102,7 +121,11 @@ export default function AddItemScreen() {
         <View style={{ width: 40 }} />
       </View>
 
-      <ScrollView style={styles.content} keyboardShouldPersistTaps="handled">
+      <ScrollView 
+        style={styles.content} 
+        contentContainerStyle={{ paddingBottom: 24 }}
+        keyboardShouldPersistTaps="handled"
+      >
         
         {/* Upload Area */}
         <View style={styles.uploadArea}>
@@ -243,6 +266,9 @@ export default function AddItemScreen() {
           )}
         </Pressable>
       </View>
+
+      {/* Manual Android Keyboard Spacer */}
+      {Platform.OS === 'android' && <View style={{ height: keyboardHeight }} />}
     </KeyboardAvoidingView>
   );
 }
