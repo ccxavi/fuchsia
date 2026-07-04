@@ -2,7 +2,7 @@ import { View, Text, StyleSheet, Pressable, ScrollView, FlatList, ImageBackgroun
 import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useState, useEffect, useCallback } from 'react';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, router } from 'expo-router';
 import { Search, X } from 'lucide-react-native';
 import Animated, { FadeIn, FadeOut, Layout } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -263,7 +263,10 @@ export default function ClosetScreen() {
         refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor={FuchsiaColors.vibrant} />}
         ListEmptyComponent={() => renderEmptyState("Your virtual closet awaits!\nTap the + below to add your first clothing item.")}
         renderItem={({ item }) => (
-          <Pressable style={[styles.gridItem, { width: itemWidth, flex: 0 }]}>
+          <Pressable 
+            style={[styles.gridItem, { width: itemWidth, flex: 0 }]}
+            onPress={() => router.push({ pathname: '/item/[id]', params: { id: item.id } })}
+          >
             <View style={styles.imageContainer}>
               <Image 
                 source={{ uri: item.image_url || `https://placehold.co/300x375/FDF2F8/86003C/png?text=${encodeURIComponent(item.name)}` }} 

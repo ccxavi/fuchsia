@@ -179,6 +179,16 @@ export async function getClothingItems(): Promise<ClothingItemResponse[]> {
   return apiFetch<ClothingItemResponse[]>('/clothing-items');
 }
 
+export async function getClothingItem(id: string): Promise<ClothingItemResponse> {
+  return apiFetch<ClothingItemResponse>(`/clothing-items/${id}`);
+}
+
+export async function deleteClothingItem(id: string): Promise<void> {
+  return apiFetch<void>(`/clothing-items/${id}`, {
+    method: 'DELETE',
+  });
+}
+
 export type ClothingItemCreateRequest = {
   name: string;
   category?: string;
@@ -214,6 +224,42 @@ export async function createClothingItem(data: ClothingItemCreateRequest): Promi
 
   return apiFetch<ClothingItemResponse>('/clothing-items/', {
     method: 'POST',
+    body: formData,
+  });
+}
+
+export type ClothingItemUpdateRequest = {
+  name?: string;
+  category?: string;
+  color?: string;
+  brand?: string;
+  is_favorite?: boolean;
+  imageUri?: string;
+};
+
+export async function updateClothingItem(id: string, data: ClothingItemUpdateRequest): Promise<ClothingItemResponse> {
+  const formData = new FormData();
+  if (data.name !== undefined) formData.append('name', data.name);
+  if (data.category !== undefined) formData.append('category', data.category);
+  if (data.color !== undefined) formData.append('color', data.color);
+  if (data.brand !== undefined) formData.append('brand', data.brand);
+  if (data.is_favorite !== undefined) formData.append('is_favorite', String(data.is_favorite));
+
+  if (data.imageUri) {
+    const filename = data.imageUri.split('/').pop() || 'image.jpg';
+    const match = /\.(\w+)$/.exec(filename);
+    let type = 'image/jpeg';
+    if (match) {
+      const ext = match[1].toLowerCase();
+      if (ext === 'jpg') type = 'image/jpeg';
+      else type = `image/${ext}`;
+    }
+    // @ts-ignore
+    formData.append('image', { uri: data.imageUri, name: filename, type });
+  }
+
+  return apiFetch<ClothingItemResponse>(`/clothing-items/${id}`, {
+    method: 'PATCH',
     body: formData,
   });
 }
