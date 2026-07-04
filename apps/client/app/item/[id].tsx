@@ -17,6 +17,7 @@ export default function ItemDetailScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [isDeleting, setIsDeleting] = useState(false);
   const [menuVisible, setMenuVisible] = useState(false);
+  const [deleteAlertVisible, setDeleteAlertVisible] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -49,28 +50,20 @@ export default function ItemDetailScreen() {
   };
 
   const handleDelete = () => {
-    Alert.alert(
-      'Delete Item',
-      'Are you sure you want to permanently delete this item from your closet?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Delete', 
-          style: 'destructive',
-          onPress: async () => {
-            setIsDeleting(true);
-            try {
-              await deleteClothingItem(id!);
-              router.back();
-            } catch (err) {
-              console.error('Failed to delete item:', err);
-              Alert.alert('Error', 'Could not delete the item. Please try again.');
-              setIsDeleting(false);
-            }
-          }
-        }
-      ]
-    );
+    setDeleteAlertVisible(true);
+  };
+
+  const confirmDelete = async () => {
+    setIsDeleting(true);
+    try {
+      await deleteClothingItem(id!);
+      router.back();
+    } catch (err) {
+      console.error('Failed to delete item:', err);
+      Alert.alert('Error', 'Could not delete the item. Please try again.');
+      setIsDeleting(false);
+      setDeleteAlertVisible(false);
+    }
   };
 
   if (isLoading || !item) {
@@ -134,6 +127,34 @@ export default function ItemDetailScreen() {
             <Trash2 size={16} color="#E11D48" />
             <Text style={[styles.dropdownItemText, { color: '#E11D48' }]}>Delete Item</Text>
           </Pressable>
+        </View>
+      )}
+
+      {/* Custom Delete Confirmation Alert */}
+      {deleteAlertVisible && (
+        <View style={styles.alertOverlay}>
+          <View style={styles.alertBox}>
+            <Text style={styles.alertTitle}>Delete this item?</Text>
+            <Text style={styles.alertMessage}>
+              This action cannot be undone and will permanently remove this item from your closet.
+            </Text>
+            <View style={styles.alertButtonsRow}>
+              <Pressable 
+                style={styles.alertCancelButton} 
+                onPress={() => setDeleteAlertVisible(false)}
+                disabled={isDeleting}
+              >
+                <Text style={styles.alertCancelText}>Keep it</Text>
+              </Pressable>
+              <Pressable 
+                style={styles.alertDeleteButton} 
+                onPress={confirmDelete}
+                disabled={isDeleting}
+              >
+                {isDeleting ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.alertDeleteText}>Delete</Text>}
+              </Pressable>
+            </View>
+          </View>
         </View>
       )}
 
@@ -302,6 +323,74 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: FuchsiaColors.cloud,
     marginVertical: 4,
+  },
+  alertOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(15, 23, 42, 0.4)', // FuchsiaColors.deep with opacity
+    zIndex: 200,
+    justifyContent: 'center',
+    paddingHorizontal: 32,
+  },
+  alertBox: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 24,
+    width: '100%',
+    shadowColor: FuchsiaColors.deep,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 10,
+    borderWidth: 1,
+    borderColor: FuchsiaColors.mist,
+  },
+  alertTitle: {
+    fontFamily: FuchsiaFonts.heading,
+    fontSize: 22,
+    fontWeight: '600',
+    color: FuchsiaColors.ink,
+    marginBottom: 8,
+  },
+  alertMessage: {
+    fontFamily: FuchsiaFonts.body,
+    fontSize: 15,
+    color: FuchsiaColors.slate,
+    lineHeight: 22,
+    marginBottom: 24,
+  },
+  alertButtonsRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  alertCancelButton: {
+    flex: 1,
+    height: 48,
+    borderRadius: 12,
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: FuchsiaColors.mist,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  alertCancelText: {
+    fontFamily: FuchsiaFonts.body,
+    fontSize: 15,
+    fontWeight: '600',
+    color: FuchsiaColors.ink,
+  },
+  alertDeleteButton: {
+    flex: 1,
+    height: 48,
+    borderRadius: 12,
+    backgroundColor: '#E11D48',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  alertDeleteText: {
+    fontFamily: FuchsiaFonts.body,
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#fff',
   },
   backButton: {
     width: 40,
