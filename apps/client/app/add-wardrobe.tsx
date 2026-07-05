@@ -77,6 +77,7 @@ export default function AddWardrobeScreen() {
       await createWardrobe({
         name: name.trim(),
         quantity: 0,
+        imageUri: imageUri || undefined,
       });
       router.back();
     } catch (err: any) {

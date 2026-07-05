@@ -218,19 +218,20 @@ export default function ClosetScreen() {
         return (
           <Pressable style={styles.wardrobeCard}>
             {imageUrl ? (
-              <ImageBackground 
-                source={{ uri: imageUrl }} 
-                style={styles.wardrobeImage} 
-                imageStyle={styles.wardrobeImageStyle}
-              >
+              <View style={styles.wardrobeImage}>
+                <Image 
+                  source={{ uri: imageUrl }} 
+                  style={[StyleSheet.absoluteFillObject, styles.wardrobeImageStyle]} 
+                  contentFit="cover" 
+                />
                 <LinearGradient
                   colors={['transparent', 'rgba(0,0,0,0.8)']}
-                  style={styles.wardrobeGradient}
+                  style={[StyleSheet.absoluteFillObject, styles.wardrobeGradient]}
                 >
                   <Text style={styles.wardrobeTitle}>{item.name}</Text>
                   <Text style={styles.wardrobeSubtitle}>{item.quantity} Items</Text>
                 </LinearGradient>
-              </ImageBackground>
+              </View>
             ) : (
               <LinearGradient
                 colors={['#D4145A', '#86003C']}
@@ -627,6 +628,7 @@ const styles = StyleSheet.create({
   wardrobeGradient: {
     padding: 20,
     paddingTop: 40,
+    justifyContent: 'flex-end',
   },
   wardrobeTitle: {
     fontFamily: FuchsiaFonts.heading,

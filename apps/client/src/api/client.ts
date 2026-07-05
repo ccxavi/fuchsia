@@ -142,6 +142,7 @@ export type WardrobeResponse = {
   user_id: string;
   name: string;
   quantity: number;
+  image_url?: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -153,12 +154,33 @@ export async function getWardrobes(): Promise<WardrobeResponse[]> {
 export type WardrobeCreateRequest = {
   name: string;
   quantity?: number;
+  imageUri?: string;
 };
 
-export async function createWardrobe(payload: WardrobeCreateRequest): Promise<WardrobeResponse> {
-  return apiFetch<WardrobeResponse>('/wardrobes', {
+export async function createWardrobe(data: WardrobeCreateRequest): Promise<WardrobeResponse> {
+  const formData = new FormData();
+  formData.append('name', data.name);
+  
+  if (data.quantity !== undefined) {
+    formData.append('quantity', String(data.quantity));
+  }
+
+  if (data.imageUri) {
+    const filename = data.imageUri.split('/').pop() || 'image.jpg';
+    const match = /\.(\w+)$/.exec(filename);
+    let type = 'image/jpeg';
+    if (match) {
+      const ext = match[1].toLowerCase();
+      if (ext === 'jpg') type = 'image/jpeg';
+      else type = `image/${ext}`;
+    }
+    // @ts-ignore
+    formData.append('image', { uri: data.imageUri, name: filename, type });
+  }
+
+  return apiFetch<WardrobeResponse>('/wardrobes/', {
     method: 'POST',
-    body: JSON.stringify(payload),
+    body: formData,
   });
 }
 
