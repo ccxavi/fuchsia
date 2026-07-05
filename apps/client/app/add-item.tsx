@@ -1,18 +1,22 @@
-import { View, StyleSheet, TextInput, Pressable, KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator } from 'react-native';
+import { View, StyleSheet, TextInput, Pressable, KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator, Keyboard, DeviceEventEmitter, Modal } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useState, useEffect } from 'react';
-import { router } from 'expo-router';
-import { ArrowLeft, Camera, Image as ImageIcon, Sparkles, X } from 'lucide-react-native';
+import { router, useLocalSearchParams } from 'expo-router';
+import { ArrowLeft, Camera, Image as ImageIcon, Sparkles, X, ChevronDown, ChevronUp, Check } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { Image } from 'expo-image';
 
 import { ThemedText } from '@/components/themed-text';
 import { FuchsiaColors, FuchsiaFonts } from '@/constants/theme';
-import { createClothingItem, getWardrobes, WardrobeResponse } from '@/api/client';
+import { CLOTHING_CATEGORIES } from '@/constants/categories';
+import { createClothingItem, updateClothingItem, getClothingItem } from '@/api/client';
 
-export default function AddItemScreen() {
+export default function AddOrEditItemScreen() {
+  const { id } = useLocalSearchParams<{ id?: string }>();
   const insets = useSafeAreaInsets();
+  
   const [imageUri, setImageUri] = useState<string | null>(null);
+  const [originalImage, setOriginalImage] = useState<string | null>(null);
   const [name, setName] = useState('');
   const [category, setCategory] = useState('');
   const [color, setColor] = useState('');
@@ -21,10 +25,48 @@ export default function AddItemScreen() {
   const [tags, setTags] = useState<string[]>(['Casual', 'Denim']);
   const [tagInput, setTagInput] = useState('');
   
+  const [showCategoryModal, setShowCategoryModal] = useState(false);
+  const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isFetching, setIsFetching] = useState(!!id);
   const [error, setError] = useState('');
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
 
-  // Removed wardrobe fetching since we're using tags instead
+  useEffect(() => {
+    if (id) {
+      fetchItem();
+    }
+  }, [id]);
+
+  const fetchItem = async () => {
+    try {
+      const data = await getClothingItem(id!);
+      setName(data.name || '');
+      setCategory(data.category || '');
+      setColor(data.color || '');
+      setOriginalImage(data.image_url || null);
+      if (data.brand) setSeason(data.brand);
+      setTags([]); // Clear default tags if editing
+    } catch (err: any) {
+      setError('Failed to fetch item details.');
+    } finally {
+      setIsFetching(false);
+    }
+  };
+
+  useEffect(() => {
+    if (Platform.OS !== 'android') return;
+    const showSub = Keyboard.addListener('keyboardDidShow', (e) => {
+      setKeyboardHeight(e.endCoordinates.height);
+    });
+    const hideSub = Keyboard.addListener('keyboardDidHide', () => {
+      setKeyboardHeight(0);
+    });
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
 
   const handlePickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -65,16 +107,27 @@ export default function AddItemScreen() {
     setError('');
     
     try {
-      await createClothingItem({
-        name: name.trim(),
-        category: category.trim() || undefined,
-        color: color.trim() || undefined,
-        // Since API doesn't support tags/season yet, we won't send them
-        imageUri: imageUri || undefined,
-      });
+      if (id) {
+        const updatedItem = await updateClothingItem(id, {
+          name: name.trim(),
+          category: category.trim() || undefined,
+          color: color.trim() || undefined,
+          brand: season.trim() || undefined,
+          imageUri: imageUri || undefined,
+        });
+        DeviceEventEmitter.emit('itemUpdated', updatedItem);
+      } else {
+        await createClothingItem({
+          name: name.trim(),
+          category: category.trim() || undefined,
+          color: color.trim() || undefined,
+          brand: season.trim() || undefined,
+          imageUri: imageUri || undefined,
+        });
+      }
       router.back();
     } catch (err: any) {
-      setError(err.message || 'Failed to add item');
+      setError(err.message || `Failed to ${id ? 'update' : 'add'} item`);
     } finally {
       setIsLoading(false);
     }
@@ -92,17 +145,35 @@ export default function AddItemScreen() {
     setTagInput('');
   };
 
+  if (isFetching) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color={FuchsiaColors.deep} />
+      </View>
+    );
+  }
+
+  const displayImage = imageUri || originalImage;
+
   return (
-    <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingView 
+      style={styles.container} 
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 64 : 0}
+    >
       <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
         <Pressable onPress={() => router.back()} style={styles.backButton}>
           <ArrowLeft size={20} color={FuchsiaColors.slate} />
         </Pressable>
-        <ThemedText style={styles.headerTitle}>Add Item</ThemedText>
+        <ThemedText style={styles.headerTitle}>{id ? 'Edit Item' : 'Add Item'}</ThemedText>
         <View style={{ width: 40 }} />
       </View>
 
-      <ScrollView style={styles.content} keyboardShouldPersistTaps="handled">
+      <ScrollView 
+        style={styles.content} 
+        contentContainerStyle={{ paddingBottom: 24 }}
+        keyboardShouldPersistTaps="handled"
+      >
         
         {/* Upload Area */}
         <View style={styles.uploadArea}>
@@ -110,8 +181,10 @@ export default function AddItemScreen() {
             <Camera size={28} color="#fff" />
           </View>
           <View style={{ alignItems: 'center' }}>
-            <ThemedText style={styles.uploadTitle}>Take a photo or upload</ThemedText>
-            <ThemedText style={styles.uploadSubtitle}>AI will auto-detect the item and remove the background</ThemedText>
+            <ThemedText style={styles.uploadTitle}>{id ? 'Replace photo' : 'Take a photo or upload'}</ThemedText>
+            <ThemedText style={styles.uploadSubtitle}>
+              {id ? 'Upload a new photo to replace the current one' : 'AI will auto-detect the item and remove the background'}
+            </ThemedText>
           </View>
           <View style={styles.uploadButtonsRow}>
             <Pressable style={styles.cameraButton} onPress={handleTakePhoto}>
@@ -126,21 +199,25 @@ export default function AddItemScreen() {
         </View>
 
         {/* Image Preview / AI Detection Mockup */}
-        {imageUri && (
+        {displayImage && (
           <View style={styles.previewCard}>
             <View style={styles.previewHeader}>
               <View style={styles.sparkleIcon}>
                 <Sparkles size={12} color="#fff" />
               </View>
-              <ThemedText style={styles.previewHeaderText}>AI DETECTED</ThemedText>
+              <ThemedText style={styles.previewHeaderText}>
+                {id && !imageUri ? 'CURRENT IMAGE' : 'AI DETECTED'}
+              </ThemedText>
             </View>
             <View style={styles.previewRow}>
               <View style={styles.previewImageContainer}>
-                <Image source={{ uri: imageUri }} style={styles.previewImage} contentFit="cover" />
+                <Image source={{ uri: displayImage }} style={styles.previewImage} contentFit="cover" />
               </View>
               <View style={styles.previewDetails}>
-                <ThemedText style={styles.previewName}>{name || 'New Item'}</ThemedText>
-                <ThemedText style={styles.previewSubtext}>Ready to be added to your closet</ThemedText>
+                <ThemedText style={styles.previewName}>{name || 'Item'}</ThemedText>
+                <ThemedText style={styles.previewSubtext}>
+                  {id && imageUri ? 'Will replace the current photo upon saving' : (id ? 'This is your current photo' : 'Ready to be added to your closet')}
+                </ThemedText>
               </View>
             </View>
           </View>
@@ -163,13 +240,21 @@ export default function AddItemScreen() {
 
           <View style={styles.formGroup}>
             <ThemedText style={styles.label}>Category</ThemedText>
-            <TextInput
-              style={styles.input}
-              placeholder="e.g. Outerwear"
-              placeholderTextColor={FuchsiaColors.mist}
-              value={category}
-              onChangeText={setCategory}
-            />
+            <Pressable 
+              style={[styles.input, { justifyContent: 'center' }]} 
+              onPress={() => {
+                const parentCat = CLOTHING_CATEGORIES.find(c => c.main === category || c.subs.includes(category || ''))?.main || null;
+                setExpandedCategory(parentCat);
+                setShowCategoryModal(true);
+              }}
+            >
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <ThemedText style={{ color: category ? FuchsiaColors.ink : FuchsiaColors.mist, fontSize: 14 }}>
+                  {category || 'Select a category'}
+                </ThemedText>
+                <ChevronDown size={20} color={FuchsiaColors.slate} />
+              </View>
+            </Pressable>
           </View>
 
           <View style={styles.row}>
@@ -239,10 +324,95 @@ export default function AddItemScreen() {
           {isLoading ? (
             <ActivityIndicator color="#fff" />
           ) : (
-            <ThemedText style={styles.saveButtonText}>Save to Closet</ThemedText>
+            <ThemedText style={styles.saveButtonText}>{id ? 'Save Changes' : 'Save to Closet'}</ThemedText>
           )}
         </Pressable>
       </View>
+
+      {/* Manual Android Keyboard Spacer */}
+      {Platform.OS === 'android' && <View style={{ height: keyboardHeight }} />}
+      {/* Category Selection Modal */}
+      <Modal
+        visible={showCategoryModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowCategoryModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { paddingBottom: insets.bottom || 24 }]}>
+            <View style={styles.modalHeader}>
+              <ThemedText style={styles.modalTitle}>Select Category</ThemedText>
+              <Pressable onPress={() => setShowCategoryModal(false)} style={styles.modalCloseButton}>
+                <X size={20} color={FuchsiaColors.slate} />
+              </Pressable>
+            </View>
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.modalScrollContent}>
+              {CLOTHING_CATEGORIES.map((section) => {
+                const isExpanded = expandedCategory === section.main;
+                const hasSubs = section.subs.length > 0;
+
+                return (
+                  <View key={section.main} style={styles.categorySection}>
+                    <Pressable 
+                      style={styles.categoryItem}
+                      onPress={() => {
+                        if (hasSubs) {
+                          setExpandedCategory(isExpanded ? null : section.main);
+                        } else {
+                          setCategory(section.main);
+                          setShowCategoryModal(false);
+                        }
+                      }}
+                    >
+                      <ThemedText style={[styles.categoryMainText, category === section.main && styles.categorySelectedText]}>
+                        {section.main}
+                      </ThemedText>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                        {category === section.main && !hasSubs && <Check size={18} color={FuchsiaColors.deep} />}
+                        {hasSubs && (isExpanded ? <ChevronUp size={20} color={FuchsiaColors.slate} /> : <ChevronDown size={20} color={FuchsiaColors.slate} />)}
+                      </View>
+                    </Pressable>
+                    
+                    {hasSubs && isExpanded && (
+                      <View style={styles.subCategoryContainer}>
+                        <Pressable 
+                          style={styles.categoryItem}
+                          onPress={() => {
+                            setCategory(section.main);
+                            setShowCategoryModal(false);
+                          }}
+                        >
+                          <ThemedText style={[styles.categorySubText, category === section.main && styles.categorySelectedText]}>
+                            General {section.main}
+                          </ThemedText>
+                          {category === section.main && <Check size={18} color={FuchsiaColors.deep} />}
+                        </Pressable>
+
+                        {section.subs.map((sub) => (
+                          <Pressable 
+                            key={sub} 
+                            style={styles.categoryItem}
+                            onPress={() => {
+                              setCategory(sub);
+                              setShowCategoryModal(false);
+                            }}
+                          >
+                            <ThemedText style={[styles.categorySubText, category === sub && styles.categorySelectedText]}>
+                              {sub}
+                            </ThemedText>
+                            {category === sub && <Check size={18} color={FuchsiaColors.deep} />}
+                          </Pressable>
+                        ))}
+                      </View>
+                    )}
+                  </View>
+                );
+              })}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
     </KeyboardAvoidingView>
   );
 }
@@ -509,5 +679,69 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#fff',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.4)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    maxHeight: '80%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 24,
+    paddingVertical: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: FuchsiaColors.cloud,
+  },
+  modalTitle: {
+    fontFamily: FuchsiaFonts.heading,
+    fontSize: 18,
+    fontWeight: '600',
+    color: FuchsiaColors.ink,
+  },
+  modalCloseButton: {
+    padding: 4,
+  },
+  modalScrollContent: {
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+  },
+  categorySection: {
+    marginBottom: 8,
+  },
+  categoryItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+  },
+  subCategoryContainer: {
+    marginLeft: 16,
+    borderLeftWidth: 1,
+    borderLeftColor: FuchsiaColors.mist,
+    paddingLeft: 16,
+    marginTop: 4,
+  },
+  categoryMainText: {
+    fontFamily: FuchsiaFonts.heading,
+    fontSize: 16,
+    fontWeight: '600',
+    color: FuchsiaColors.ink,
+  },
+  categorySubText: {
+    fontFamily: FuchsiaFonts.body,
+    fontSize: 15,
+    color: FuchsiaColors.slate,
+  },
+  categorySelectedText: {
+    color: FuchsiaColors.deep,
+    fontWeight: '700',
   },
 });
