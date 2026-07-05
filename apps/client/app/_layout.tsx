@@ -75,6 +75,7 @@ export default function RootLayout() {
         <Stack.Screen name="add-outfit" options={{ headerShown: false, presentation: 'modal' }} />
         <Stack.Screen name="add-wardrobe" options={{ headerShown: false, presentation: 'modal' }} />
         <Stack.Screen name="item/[id]" options={{ headerShown: false }} />
+        <Stack.Screen name="wardrobe/[id]" options={{ headerShown: false }} />
       </Stack>
       <StatusBar style="auto" />
     </ThemeProvider>

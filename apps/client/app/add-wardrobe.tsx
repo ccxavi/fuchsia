@@ -1,23 +1,46 @@
-import { View, StyleSheet, TextInput, Pressable, KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator } from 'react-native';
+import { View, StyleSheet, TextInput, Pressable, KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator, DeviceEventEmitter } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useState } from 'react';
-import { router } from 'expo-router';
-import { ArrowLeft, Image as ImageIcon, Upload, Calendar, X } from 'lucide-react-native';
+import { useState, useEffect } from 'react';
+import { router, useLocalSearchParams } from 'expo-router';
+import { ArrowLeft, Image as ImageIcon, Upload, Calendar, X, Camera } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
 import { Image } from 'expo-image';
 
 import { ThemedText } from '@/components/themed-text';
 import { FuchsiaColors, FuchsiaFonts } from '@/constants/theme';
-import { createWardrobe } from '@/api/client';
+import { createWardrobe, getWardrobe, updateWardrobe } from '@/api/client';
 
 export default function AddWardrobeScreen() {
   const insets = useSafeAreaInsets();
+  const { id } = useLocalSearchParams<{ id: string }>();
+  const isEditing = !!id;
+
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [name, setName] = useState('');
   
   const [isLoading, setIsLoading] = useState(false);
+  const [isFetching, setIsFetching] = useState(isEditing);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    async function loadData() {
+      if (!id) return;
+      try {
+        const data = await getWardrobe(id);
+        setName(data.name);
+        if (data.image_url) {
+          setImageUri(data.image_url);
+        }
+      } catch (err) {
+        console.error('Failed to load wardrobe', err);
+        setError('Failed to load wardrobe data');
+      } finally {
+        setIsFetching(false);
+      }
+    }
+    loadData();
+  }, [id]);
 
   const handlePickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -49,20 +72,7 @@ export default function AddWardrobeScreen() {
     if (!result.canceled) setImageUri(result.assets[0].uri);
   };
 
-  const pickImage = () => {
-    import('react-native').then(({ Alert }) => {
-      Alert.alert(
-        'Cover Photo',
-        'Choose a photo source',
-        [
-          { text: 'Take Photo', onPress: handleTakePhoto },
-          { text: 'Choose from Gallery', onPress: handlePickImage },
-          { text: 'Cancel', style: 'cancel' },
-        ],
-        { cancelable: true }
-      );
-    });
-  };
+
 
   const handleSave = async () => {
     if (!name.trim()) {
@@ -74,18 +84,38 @@ export default function AddWardrobeScreen() {
     setError('');
     
     try {
-      await createWardrobe({
-        name: name.trim(),
-        quantity: 0,
-        imageUri: imageUri || undefined,
-      });
+      if (isEditing) {
+        // If imageUri is a remote URL (starts with http), it means it hasn't changed.
+        // We only send imageUri if it's a new local file.
+        const isNewImage = imageUri && !imageUri.startsWith('http');
+        
+        await updateWardrobe(id, {
+          name: name.trim(),
+          imageUri: isNewImage ? imageUri : undefined,
+        });
+        DeviceEventEmitter.emit('wardrobeUpdated', id);
+      } else {
+        await createWardrobe({
+          name: name.trim(),
+          quantity: 0,
+          imageUri: imageUri || undefined,
+        });
+      }
       router.back();
     } catch (err: any) {
-      setError(err.message || 'Failed to create wardrobe');
+      setError(err.message || 'Failed to save wardrobe');
     } finally {
       setIsLoading(false);
     }
   };
+
+  if (isFetching) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color={FuchsiaColors.vibrant} />
+      </View>
+    );
+  }
 
   return (
     <KeyboardAvoidingView 
@@ -96,7 +126,7 @@ export default function AddWardrobeScreen() {
         <Pressable onPress={() => router.back()} style={styles.backButton}>
           <ArrowLeft size={20} color={FuchsiaColors.slate} />
         </Pressable>
-        <ThemedText style={styles.headerTitle}>New Wardrobe</ThemedText>
+        <ThemedText style={styles.headerTitle}>{isEditing ? 'Edit Wardrobe' : 'New Wardrobe'}</ThemedText>
         <View style={{ width: 40 }} />
       </View>
 
@@ -119,10 +149,16 @@ export default function AddWardrobeScreen() {
               <ThemedText style={styles.uploadTitle}>Cover Photo</ThemedText>
               <ThemedText style={styles.uploadSubtitle}>Add a photo to represent this wardrobe or trip</ThemedText>
             </View>
-            <Pressable style={styles.uploadButton} onPress={pickImage}>
-              <Upload size={16} color={FuchsiaColors.ink} style={{ marginRight: 8 }} />
-              <ThemedText style={styles.uploadButtonText}>Upload</ThemedText>
-            </Pressable>
+            <View style={styles.uploadButtonsRow}>
+              <Pressable style={styles.cameraButton} onPress={handleTakePhoto}>
+                <Camera size={16} color="#fff" style={{ marginRight: 8 }} />
+                <ThemedText style={styles.cameraButtonText}>Camera</ThemedText>
+              </Pressable>
+              <Pressable style={styles.galleryButton} onPress={handlePickImage}>
+                <ImageIcon size={16} color={FuchsiaColors.ink} style={{ marginRight: 8 }} />
+                <ThemedText style={styles.galleryButtonText}>Gallery</ThemedText>
+              </Pressable>
+            </View>
           </View>
         )}
 
@@ -266,17 +302,36 @@ const styles = StyleSheet.create({
     marginTop: 4,
     textAlign: 'center',
   },
-  uploadButton: {
+  uploadButtonsRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 8,
+  },
+  cameraButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: FuchsiaColors.deep,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    minHeight: 40,
+  },
+  cameraButtonText: {
+    fontFamily: FuchsiaFonts.body,
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  galleryButton: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#fff',
     borderWidth: 1,
     borderColor: FuchsiaColors.mist,
     borderRadius: 12,
-    paddingHorizontal: 24,
+    paddingHorizontal: 16,
     minHeight: 40,
   },
-  uploadButtonText: {
+  galleryButtonText: {
     fontFamily: FuchsiaFonts.body,
     fontSize: 14,
     fontWeight: '600',

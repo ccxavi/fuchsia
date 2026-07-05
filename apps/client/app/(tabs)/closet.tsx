@@ -216,7 +216,10 @@ export default function ClosetScreen() {
       renderItem={({ item }) => {
         const imageUrl = (item as any).image_url;
         return (
-          <Pressable style={styles.wardrobeCard}>
+          <Pressable 
+            style={styles.wardrobeCard}
+            onPress={() => router.push(`/wardrobe/${item.id}`)}
+          >
             {imageUrl ? (
               <View style={styles.wardrobeImage}>
                 <Image 
