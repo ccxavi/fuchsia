@@ -117,3 +117,19 @@ class WardrobeResponse(BaseModel):
     image_url: str | None
     created_at: datetime
     updated_at: datetime
+
+
+class OutfitResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    user_id: str
+    name: str
+    is_ai_generated: bool
+    image_url: str | None
+    created_at: datetime
+    updated_at: datetime
+
+
+class OutfitWithItemsResponse(OutfitResponse):
+    clothing_items: list[ClothingItemResponse] = []

@@ -1,9 +1,13 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
 from uuid import uuid4
 
+if TYPE_CHECKING:
+    from app.models.clothing_item import ClothingItem
+
 from sqlalchemy import Boolean, ForeignKey, String
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, TimestampMixin
 
@@ -30,4 +34,14 @@ class Outfit(TimestampMixin, Base):
         Boolean,
         nullable=False,
         default=False,
+    )
+    image_url: Mapped[str | None] = mapped_column(
+        String(500),
+        nullable=True,
+    )
+    
+    clothing_items: Mapped[list["ClothingItem"]] = relationship(
+        "ClothingItem",
+        secondary="outfit_items",
+        back_populates="outfits",
     )
