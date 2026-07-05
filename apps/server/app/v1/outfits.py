@@ -118,13 +118,16 @@ async def update_outfit(
     outfit_id: str,
     name: Annotated[str | None, Form()] = None,
     is_ai_generated: Annotated[bool | None, Form()] = None,
+    wardrobe_ids: Annotated[list[str] | None, Form()] = None,
     image: Annotated[UploadFile | None, File()] = None,
     user: AuthenticatedUser = Depends(get_current_authenticated_user),
     credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
     db: Session = Depends(get_db_session),
 ):
     outfit = db.scalar(
-        select(Outfit).where(
+        select(Outfit)
+        .options(selectinload(Outfit.clothing_items), selectinload(Outfit.wardrobes))
+        .where(
             Outfit.id == outfit_id, Outfit.user_id == user.user.id
         )
     )
@@ -136,6 +139,26 @@ async def update_outfit(
     if is_ai_generated is not None:
         outfit.is_ai_generated = is_ai_generated
         
+    if wardrobe_ids is not None:
+        if wardrobe_ids:
+            wardrobes = db.scalars(
+                select(Wardrobe)
+                .options(selectinload(Wardrobe.clothing_items))
+                .where(
+                    Wardrobe.id.in_(wardrobe_ids),
+                    Wardrobe.user_id == user.user.id
+                )
+            ).all()
+            outfit.wardrobes = list(wardrobes)
+            
+            # Sync clothes to new wardrobes
+            for w in wardrobes:
+                for c in outfit.clothing_items:
+                    if c not in w.clothing_items:
+                        w.clothing_items.append(c)
+        else:
+            outfit.wardrobes = []
+            
     if image:
         if not image.content_type.startswith("image/"):
             raise HTTPException(status_code=400, detail="File must be an image")
