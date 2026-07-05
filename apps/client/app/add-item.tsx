@@ -9,7 +9,7 @@ import { Image } from 'expo-image';
 import { ThemedText } from '@/components/themed-text';
 import { FuchsiaColors, FuchsiaFonts } from '@/constants/theme';
 import { CLOTHING_CATEGORIES } from '@/constants/categories';
-import { createClothingItem, updateClothingItem, getClothingItem } from '@/api/client';
+import { createClothingItem, updateClothingItem, getClothingItem, getWardrobes, WardrobeResponse } from '@/api/client';
 
 export default function AddOrEditItemScreen() {
   const { id } = useLocalSearchParams<{ id?: string }>();
@@ -20,10 +20,11 @@ export default function AddOrEditItemScreen() {
   const [name, setName] = useState('');
   const [category, setCategory] = useState('');
   const [color, setColor] = useState('');
-  const [season, setSeason] = useState('');
   
-  const [tags, setTags] = useState<string[]>(['Casual', 'Denim']);
-  const [tagInput, setTagInput] = useState('');
+  const [wardrobes, setWardrobes] = useState<WardrobeResponse[]>([]);
+  const [selectedWardrobeIds, setSelectedWardrobeIds] = useState<string[]>([]);
+  
+
   
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
@@ -36,6 +37,11 @@ export default function AddOrEditItemScreen() {
     if (id) {
       fetchItem();
     }
+    
+    // Fetch wardrobes for the selector
+    getWardrobes()
+      .then(setWardrobes)
+      .catch(err => console.error('Failed to fetch wardrobes:', err));
   }, [id]);
 
   const fetchItem = async () => {
@@ -45,8 +51,6 @@ export default function AddOrEditItemScreen() {
       setCategory(data.category || '');
       setColor(data.color || '');
       setOriginalImage(data.image_url || null);
-      if (data.brand) setSeason(data.brand);
-      setTags([]); // Clear default tags if editing
     } catch (err: any) {
       setError('Failed to fetch item details.');
     } finally {
@@ -112,7 +116,6 @@ export default function AddOrEditItemScreen() {
           name: name.trim(),
           category: category.trim() || undefined,
           color: color.trim() || undefined,
-          brand: season.trim() || undefined,
           imageUri: imageUri || undefined,
         });
         DeviceEventEmitter.emit('itemUpdated', updatedItem);
@@ -121,7 +124,7 @@ export default function AddOrEditItemScreen() {
           name: name.trim(),
           category: category.trim() || undefined,
           color: color.trim() || undefined,
-          brand: season.trim() || undefined,
+          wardrobe_ids: selectedWardrobeIds.length > 0 ? selectedWardrobeIds : undefined,
           imageUri: imageUri || undefined,
         });
       }
@@ -133,17 +136,7 @@ export default function AddOrEditItemScreen() {
     }
   };
 
-  const removeTag = (tagToRemove: string) => {
-    setTags(tags.filter(t => t !== tagToRemove));
-  };
 
-  const addTag = () => {
-    const newTag = tagInput.trim();
-    if (newTag && !tags.includes(newTag)) {
-      setTags([...tags, newTag]);
-    }
-    setTagInput('');
-  };
 
   if (isFetching) {
     return (
@@ -257,54 +250,64 @@ export default function AddOrEditItemScreen() {
             </Pressable>
           </View>
 
-          <View style={styles.row}>
-            <View style={[styles.formGroup, { flex: 1, marginRight: 6 }]}>
-              <ThemedText style={styles.label}>Color</ThemedText>
-              <TextInput
-                style={styles.input}
-                placeholder="e.g. Blue"
-                placeholderTextColor={FuchsiaColors.mist}
-                value={color}
-                onChangeText={setColor}
-              />
-            </View>
-            
-            <View style={[styles.formGroup, { flex: 1, marginLeft: 6 }]}>
-              <ThemedText style={styles.label}>Season</ThemedText>
-              <TextInput
-                style={styles.input}
-                placeholder="e.g. All seasons"
-                placeholderTextColor={FuchsiaColors.mist}
-                value={season}
-                onChangeText={setSeason}
-              />
-            </View>
-          </View>
-
-          {/* Tags */}
           <View style={styles.formGroup}>
-            <ThemedText style={styles.label}>Tags</ThemedText>
-            <View style={styles.tagsContainer}>
-              {tags.map((tag) => (
-                <View key={tag} style={styles.tagPill}>
-                  <ThemedText style={styles.tagText}>{tag}</ThemedText>
-                  <Pressable onPress={() => removeTag(tag)} style={{ marginLeft: 4, padding: 2 }}>
-                    <X size={12} color={FuchsiaColors.deep} />
-                  </Pressable>
-                </View>
-              ))}
-              <TextInput
-                style={styles.tagInput}
-                placeholder="Add tag..."
-                placeholderTextColor={FuchsiaColors.slate}
-                value={tagInput}
-                onChangeText={setTagInput}
-                onSubmitEditing={addTag}
-                returnKeyType="done"
-                blurOnSubmit={false}
-              />
-            </View>
+            <ThemedText style={styles.label}>Color</ThemedText>
+            <TextInput
+              style={styles.input}
+              placeholder="e.g. Blue"
+              placeholderTextColor={FuchsiaColors.mist}
+              value={color}
+              onChangeText={setColor}
+            />
           </View>
+          
+          {/* Wardrobes Selector */}
+          {wardrobes.length > 0 && (
+            <View style={styles.formGroup}>
+              <ThemedText style={styles.label}>Add to Wardrobe(s)</ThemedText>
+              <ScrollView 
+                horizontal 
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ gap: 8, paddingVertical: 4 }}
+              >
+                {wardrobes.map((w) => {
+                  const isSelected = selectedWardrobeIds.includes(w.id);
+                  return (
+                    <Pressable
+                      key={w.id}
+                      style={[
+                        styles.wardrobeCard,
+                        isSelected && styles.wardrobeCardSelected
+                      ]}
+                      onPress={() => {
+                        if (isSelected) {
+                          setSelectedWardrobeIds(prev => prev.filter(id => id !== w.id));
+                        } else {
+                          setSelectedWardrobeIds(prev => [...prev, w.id]);
+                        }
+                      }}
+                    >
+                      {w.image_url ? (
+                        <Image source={{ uri: w.image_url }} style={StyleSheet.absoluteFillObject} contentFit="cover" />
+                      ) : (
+                        <View style={[StyleSheet.absoluteFillObject, { backgroundColor: FuchsiaColors.mist }]} />
+                      )}
+                      <View style={styles.wardrobeCardOverlay}>
+                        <ThemedText style={styles.wardrobeCardText} numberOfLines={2}>{w.name}</ThemedText>
+                      </View>
+                      {isSelected && (
+                        <View style={styles.wardrobeCardCheckmark}>
+                          <Check size={12} color="#fff" />
+                        </View>
+                      )}
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+            </View>
+          )}
+
+
 
           {error ? <ThemedText style={styles.errorText}>{error}</ThemedText> : null}
         </View>
@@ -614,40 +617,41 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: FuchsiaColors.ink,
   },
-  tagsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-    minHeight: 44,
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: FuchsiaColors.mist,
+
+  wardrobeCard: {
+    width: 150,
+    height: 100,
+    borderRadius: 18,
+    overflow: 'hidden',
+    backgroundColor: FuchsiaColors.cloud,
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  wardrobeCardSelected: {
+    borderColor: FuchsiaColors.deep,
+  },
+  wardrobeCardOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(26, 26, 46, 0.4)',
+    justifyContent: 'flex-end',
+    padding: 10,
+  },
+  wardrobeCardText: {
+    fontFamily: FuchsiaFonts.heading,
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  wardrobeCardCheckmark: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    width: 24,
+    height: 24,
     borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    backgroundColor: FuchsiaColors.deep,
     alignItems: 'center',
-  },
-  tagPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: FuchsiaColors.blush,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 999,
-  },
-  tagText: {
-    fontFamily: FuchsiaFonts.body,
-    fontSize: 12,
-    fontWeight: '500',
-    color: FuchsiaColors.deep,
-  },
-  tagInput: {
-    flex: 1,
-    minWidth: 80,
-    fontFamily: FuchsiaFonts.body,
-    fontSize: 12,
-    color: FuchsiaColors.ink,
-    padding: 0,
+    justifyContent: 'center',
   },
   errorText: {
     fontFamily: FuchsiaFonts.body,

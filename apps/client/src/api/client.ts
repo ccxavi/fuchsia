@@ -142,6 +142,7 @@ export type WardrobeResponse = {
   user_id: string;
   name: string;
   quantity: number;
+  image_url?: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -150,15 +151,80 @@ export async function getWardrobes(): Promise<WardrobeResponse[]> {
   return apiFetch<WardrobeResponse[]>('/wardrobes');
 }
 
+export async function getWardrobe(id: string): Promise<WardrobeResponse> {
+  return apiFetch<WardrobeResponse>(`/wardrobes/${id}`);
+}
+
+export async function getWardrobeClothingItems(wardrobeId: string): Promise<ClothingItemResponse[]> {
+  return apiFetch<ClothingItemResponse[]>(`/wardrobes/${wardrobeId}/clothing-items`);
+}
+
 export type WardrobeCreateRequest = {
   name: string;
   quantity?: number;
+  imageUri?: string;
 };
 
-export async function createWardrobe(payload: WardrobeCreateRequest): Promise<WardrobeResponse> {
-  return apiFetch<WardrobeResponse>('/wardrobes', {
+export async function createWardrobe(data: WardrobeCreateRequest): Promise<WardrobeResponse> {
+  const formData = new FormData();
+  formData.append('name', data.name);
+  
+  if (data.quantity !== undefined) {
+    formData.append('quantity', String(data.quantity));
+  }
+
+  if (data.imageUri) {
+    const filename = data.imageUri.split('/').pop() || 'image.jpg';
+    const match = /\.(\w+)$/.exec(filename);
+    let type = 'image/jpeg';
+    if (match) {
+      const ext = match[1].toLowerCase();
+      if (ext === 'jpg') type = 'image/jpeg';
+      else type = `image/${ext}`;
+    }
+    // @ts-ignore
+    formData.append('image', { uri: data.imageUri, name: filename, type });
+  }
+
+  return apiFetch<WardrobeResponse>('/wardrobes/', {
     method: 'POST',
-    body: JSON.stringify(payload),
+    body: formData,
+  });
+}
+
+export type WardrobeUpdateRequest = {
+  name?: string;
+  quantity?: number;
+  imageUri?: string;
+};
+
+export async function updateWardrobe(id: string, data: WardrobeUpdateRequest): Promise<WardrobeResponse> {
+  const formData = new FormData();
+  if (data.name !== undefined) formData.append('name', data.name);
+  if (data.quantity !== undefined) formData.append('quantity', String(data.quantity));
+
+  if (data.imageUri) {
+    const filename = data.imageUri.split('/').pop() || 'image.jpg';
+    const match = /\.(\w+)$/.exec(filename);
+    let type = 'image/jpeg';
+    if (match) {
+      const ext = match[1].toLowerCase();
+      if (ext === 'jpg') type = 'image/jpeg';
+      else type = `image/${ext}`;
+    }
+    // @ts-ignore
+    formData.append('image', { uri: data.imageUri, name: filename, type });
+  }
+
+  return apiFetch<WardrobeResponse>(`/wardrobes/${id}`, {
+    method: 'PATCH',
+    body: formData,
+  });
+}
+
+export async function deleteWardrobe(id: string): Promise<void> {
+  return apiFetch<void>(`/wardrobes/${id}`, {
+    method: 'DELETE',
   });
 }
 
