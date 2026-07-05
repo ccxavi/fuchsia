@@ -10,7 +10,8 @@ from app.core.auth import AuthenticatedUser, bearer_scheme, get_current_authenti
 from app.db.session import get_db_session
 from app.models.wardrobe import Wardrobe
 from app.services.supabase_storage import upload_file_to_supabase
-from app.v1.schemas import ClothingItemResponse, WardrobeResponse
+from app.v1.schemas import ClothingItemResponse, WardrobeResponse, WardrobeWithDetailsResponse, OutfitResponse
+from sqlalchemy.orm import selectinload
 
 router = APIRouter()
 
@@ -63,14 +64,16 @@ def get_wardrobes(
     return wardrobes
 
 
-@router.get("/{wardrobe_id}", response_model=WardrobeResponse)
+@router.get("/{wardrobe_id}", response_model=WardrobeWithDetailsResponse)
 def get_wardrobe(
     wardrobe_id: str,
     user: Annotated[AuthenticatedUser, Depends(get_current_authenticated_user)],
     db: Annotated[Session, Depends(get_db_session)],
 ):
     wardrobe = db.scalar(
-        select(Wardrobe).where(
+        select(Wardrobe)
+        .options(selectinload(Wardrobe.clothing_items), selectinload(Wardrobe.outfits))
+        .where(
             Wardrobe.id == wardrobe_id, Wardrobe.user_id == user.user.id
         )
     )
@@ -156,4 +159,23 @@ def get_wardrobe_clothing_items(
         raise HTTPException(status_code=404, detail="Wardrobe not found")
         
     return wardrobe.clothing_items
+
+
+@router.get("/{wardrobe_id}/outfits", response_model=list[OutfitResponse])
+def get_wardrobe_outfits(
+    wardrobe_id: str,
+    user: Annotated[AuthenticatedUser, Depends(get_current_authenticated_user)],
+    db: Annotated[Session, Depends(get_db_session)],
+):
+    wardrobe = db.scalar(
+        select(Wardrobe)
+        .options(selectinload(Wardrobe.outfits))
+        .where(
+            Wardrobe.id == wardrobe_id, Wardrobe.user_id == user.user.id
+        )
+    )
+    if not wardrobe:
+        raise HTTPException(status_code=404, detail="Wardrobe not found")
+        
+    return wardrobe.outfits
 

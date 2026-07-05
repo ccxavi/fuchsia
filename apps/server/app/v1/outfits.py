@@ -10,8 +10,9 @@ from app.core.auth import AuthenticatedUser, bearer_scheme, get_current_authenti
 from app.db.session import get_db_session
 from app.models.outfit import Outfit
 from app.models.clothing_item import ClothingItem
+from app.models.wardrobe import Wardrobe
 from app.services.supabase_storage import upload_file_to_supabase
-from app.v1.schemas import OutfitResponse, OutfitWithItemsResponse
+from app.v1.schemas import OutfitResponse, OutfitWithItemsResponse, OutfitWithWardrobesResponse
 
 router = APIRouter()
 
@@ -21,6 +22,7 @@ async def create_outfit(
     name: Annotated[str, Form(...)],
     is_ai_generated: Annotated[bool, Form()] = False,
     clothing_item_ids: Annotated[list[str], Form()] = [],
+    wardrobe_ids: Annotated[list[str], Form()] = [],
     image: Annotated[UploadFile | None, File()] = None,
     user: AuthenticatedUser = Depends(get_current_authenticated_user),
     credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
@@ -50,6 +52,7 @@ async def create_outfit(
     )
     
     # If clothing items were provided, link them
+    clothes = []
     if clothing_item_ids:
         # Fetch the actual clothing items to ensure they exist and belong to the user
         clothes = db.scalars(
@@ -59,6 +62,22 @@ async def create_outfit(
             )
         ).all()
         db_outfit.clothing_items.extend(clothes)
+
+    if wardrobe_ids:
+        wardrobes = db.scalars(
+            select(Wardrobe)
+            .options(selectinload(Wardrobe.clothing_items))
+            .where(
+                Wardrobe.id.in_(wardrobe_ids),
+                Wardrobe.user_id == user.user.id
+            )
+        ).all()
+        db_outfit.wardrobes.extend(wardrobes)
+        
+        for w in wardrobes:
+            for c in clothes:
+                if c not in w.clothing_items:
+                    w.clothing_items.append(c)
 
     db.add(db_outfit)
     db.commit()
@@ -77,16 +96,16 @@ def get_outfits(
     return outfits
 
 
-@router.get("/{outfit_id}", response_model=OutfitWithItemsResponse)
+@router.get("/{outfit_id}", response_model=OutfitWithWardrobesResponse)
 def get_outfit(
     outfit_id: str,
     user: Annotated[AuthenticatedUser, Depends(get_current_authenticated_user)],
     db: Annotated[Session, Depends(get_db_session)],
 ):
-    # Use selectinload to eagerly load clothing_items and avoid N+1 queries
+    # Use selectinload to eagerly load clothing_items and wardrobes and avoid N+1 queries
     outfit = db.scalar(
         select(Outfit)
-        .options(selectinload(Outfit.clothing_items))
+        .options(selectinload(Outfit.clothing_items), selectinload(Outfit.wardrobes))
         .where(Outfit.id == outfit_id, Outfit.user_id == user.user.id)
     )
     if not outfit:
@@ -214,4 +233,71 @@ def remove_clothing_item_from_outfit(
 
     db.commit()
     db.refresh(outfit)
+    return outfit
+
+
+@router.post("/{outfit_id}/wardrobes/{wardrobe_id}", response_model=OutfitWithWardrobesResponse)
+def add_outfit_to_wardrobe(
+    outfit_id: str,
+    wardrobe_id: str,
+    user: Annotated[AuthenticatedUser, Depends(get_current_authenticated_user)],
+    db: Annotated[Session, Depends(get_db_session)],
+):
+    outfit = db.scalar(
+        select(Outfit)
+        .options(selectinload(Outfit.clothing_items), selectinload(Outfit.wardrobes))
+        .where(Outfit.id == outfit_id, Outfit.user_id == user.user.id)
+    )
+    if not outfit:
+        raise HTTPException(status_code=404, detail="Outfit not found")
+
+    wardrobe = db.scalar(
+        select(Wardrobe)
+        .options(selectinload(Wardrobe.clothing_items))
+        .where(Wardrobe.id == wardrobe_id, Wardrobe.user_id == user.user.id)
+    )
+    if not wardrobe:
+        raise HTTPException(status_code=404, detail="Wardrobe not found")
+
+    if wardrobe not in outfit.wardrobes:
+        outfit.wardrobes.append(wardrobe)
+        
+    # Sync clothes
+    for c in outfit.clothing_items:
+        if c not in wardrobe.clothing_items:
+            wardrobe.clothing_items.append(c)
+
+    db.commit()
+    db.refresh(outfit)
+    return outfit
+
+
+@router.delete("/{outfit_id}/wardrobes/{wardrobe_id}", response_model=OutfitWithWardrobesResponse)
+def remove_outfit_from_wardrobe(
+    outfit_id: str,
+    wardrobe_id: str,
+    user: Annotated[AuthenticatedUser, Depends(get_current_authenticated_user)],
+    db: Annotated[Session, Depends(get_db_session)],
+):
+    outfit = db.scalar(
+        select(Outfit)
+        .options(selectinload(Outfit.clothing_items), selectinload(Outfit.wardrobes))
+        .where(Outfit.id == outfit_id, Outfit.user_id == user.user.id)
+    )
+    if not outfit:
+        raise HTTPException(status_code=404, detail="Outfit not found")
+
+    wardrobe = db.scalar(
+        select(Wardrobe).where(Wardrobe.id == wardrobe_id, Wardrobe.user_id == user.user.id)
+    )
+    if not wardrobe:
+        raise HTTPException(status_code=404, detail="Wardrobe not found")
+
+    if wardrobe in outfit.wardrobes:
+        outfit.wardrobes.remove(wardrobe)
+        db.commit()
+        db.refresh(outfit)
+    else:
+        raise HTTPException(status_code=404, detail="Outfit not in wardrobe")
+
     return outfit

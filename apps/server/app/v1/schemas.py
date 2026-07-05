@@ -133,3 +133,12 @@ class OutfitResponse(BaseModel):
 
 class OutfitWithItemsResponse(OutfitResponse):
     clothing_items: list[ClothingItemResponse] = []
+
+
+class OutfitWithWardrobesResponse(OutfitWithItemsResponse):
+    wardrobes: list[WardrobeResponse] = []
+
+
+class WardrobeWithDetailsResponse(WardrobeResponse):
+    clothing_items: list[ClothingItemResponse] = []
+    outfits: list[OutfitResponse] = []
