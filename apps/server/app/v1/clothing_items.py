@@ -11,7 +11,8 @@ from app.db.session import get_db_session
 from app.models.clothing_item import ClothingItem
 from app.models.wardrobe import Wardrobe
 from app.services.supabase_storage import upload_file_to_supabase
-from app.v1.schemas import ClothingItemResponse
+from app.v1.schemas import ClothingItemResponse, ClothingItemWithWardrobesResponse
+from sqlalchemy.orm import selectinload
 
 router = APIRouter()
 
@@ -121,14 +122,16 @@ def get_clothing_items(
     return items
 
 
-@router.get("/{item_id}", response_model=ClothingItemResponse)
+@router.get("/{item_id}", response_model=ClothingItemWithWardrobesResponse)
 def get_clothing_item(
     item_id: str,
     user: AuthenticatedUser = Depends(get_current_authenticated_user),
     db: Session = Depends(get_db_session),
 ):
     item = db.scalar(
-        select(ClothingItem).where(
+        select(ClothingItem)
+        .options(selectinload(ClothingItem.wardrobes))
+        .where(
             ClothingItem.id == item_id, ClothingItem.user_id == user.user.id
         )
     )
@@ -145,13 +148,16 @@ async def update_clothing_item(
     color: Annotated[str | None, Form()] = None,
     brand: Annotated[str | None, Form()] = None,
     is_favorite: Annotated[bool | None, Form()] = None,
+    wardrobe_ids: Annotated[list[str] | None, Form()] = None,
     image: Annotated[UploadFile | None, File()] = None,
     user: AuthenticatedUser = Depends(get_current_authenticated_user),
     credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
     db: Session = Depends(get_db_session),
 ):
     item = db.scalar(
-        select(ClothingItem).where(
+        select(ClothingItem)
+        .options(selectinload(ClothingItem.wardrobes))
+        .where(
             ClothingItem.id == item_id, ClothingItem.user_id == user.user.id
         )
     )
@@ -168,6 +174,18 @@ async def update_clothing_item(
         item.brand = brand
     if is_favorite is not None:
         item.is_favorite = is_favorite
+        
+    if wardrobe_ids is not None:
+        if wardrobe_ids:
+            wardrobes = db.scalars(
+                select(Wardrobe).where(
+                    Wardrobe.id.in_(wardrobe_ids),
+                    Wardrobe.user_id == user.user.id
+                )
+            ).all()
+            item.wardrobes = list(wardrobes)
+        else:
+            item.wardrobes = []
         
     if image:
         if not image.content_type.startswith("image/"):

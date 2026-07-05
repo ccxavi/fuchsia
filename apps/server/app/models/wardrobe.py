@@ -5,6 +5,7 @@ from uuid import uuid4
 
 if TYPE_CHECKING:
     from app.models.clothing_item import ClothingItem
+    from app.models.outfit import Outfit
 
 from sqlalchemy import ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -43,5 +44,11 @@ class Wardrobe(TimestampMixin, Base):
     clothing_items: Mapped[list["ClothingItem"]] = relationship(
         "ClothingItem",
         secondary="clothing_item_wardrobes",
+        back_populates="wardrobes",
+    )
+    
+    outfits: Mapped[list["Outfit"]] = relationship(
+        "Outfit",
+        secondary="outfit_wardrobes",
         back_populates="wardrobes",
     )
