@@ -6,6 +6,8 @@ from uuid import uuid4
 if TYPE_CHECKING:
     from app.models.clothing_item import ClothingItem
     from app.models.wardrobe import Wardrobe
+    from app.models.calendar_outfit import CalendarOutfit
+    from app.models.outfit_image import OutfitImage
 
 from sqlalchemy import Boolean, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -51,6 +53,19 @@ class Outfit(TimestampMixin, Base):
         "Wardrobe",
         secondary="outfit_wardrobes",
         back_populates="outfits",
+    )
+    
+    calendar_outfits: Mapped[list["CalendarOutfit"]] = relationship(
+        "CalendarOutfit",
+        back_populates="outfit",
+        cascade="all, delete-orphan",
+    )
+    
+    images: Mapped[list["OutfitImage"]] = relationship(
+        "OutfitImage",
+        back_populates="outfit",
+        cascade="all, delete-orphan",
+        order_by="desc(OutfitImage.created_at)",
     )
     
     @property

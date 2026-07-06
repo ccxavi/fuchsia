@@ -6,6 +6,7 @@ from app.models.outfit import Outfit
 from app.models.outfit_wardrobe import OutfitWardrobe
 from app.models.outfit_item import OutfitItem
 from app.models.calendar_outfit import CalendarOutfit
+from app.models.outfit_image import OutfitImage
 
 __all__ = [
     "User",
@@ -16,4 +17,5 @@ __all__ = [
     "OutfitWardrobe",
     "OutfitItem",
     "CalendarOutfit",
+    "OutfitImage",
 ]
