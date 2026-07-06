@@ -49,8 +49,7 @@ async def create_outfit(
     db_outfit = Outfit(
         user_id=user.user.id,
         name=name,
-        is_ai_generated=is_ai_generated,
-        image_url=image_url
+        is_ai_generated=is_ai_generated
     )
     
     # If clothing items were provided, link them
@@ -83,6 +82,16 @@ async def create_outfit(
 
     db.add(db_outfit)
     db.commit()
+    
+    if image_url:
+        db_image = OutfitImage(
+            outfit_id=db_outfit.id,
+            image_url=image_url,
+            date=datetime.date.today()
+        )
+        db.add(db_image)
+        db.commit()
+        
     db.refresh(db_outfit)
     return db_outfit
 
@@ -185,7 +194,12 @@ async def update_outfit(
             content_type=image.content_type,
             access_token=credentials.credentials,
         )
-        outfit.image_url = image_url
+        db_image = OutfitImage(
+            outfit_id=outfit.id,
+            image_url=image_url,
+            date=datetime.date.today()
+        )
+        db.add(db_image)
 
     db.commit()
     db.refresh(outfit)
