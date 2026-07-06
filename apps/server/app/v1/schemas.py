@@ -1,5 +1,4 @@
-from datetime import datetime
-
+import datetime
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
@@ -10,8 +9,8 @@ class AuthenticatedUserResponse(BaseModel):
     supabase_user_id: str
     email: str | None
     display_name: str | None = None
-    created_at: datetime
-    updated_at: datetime
+    created_at: datetime.datetime
+    updated_at: datetime.datetime
 
 
 class AuthMeResponse(BaseModel):
@@ -71,7 +70,7 @@ class SupabaseAuthUserResponse(BaseModel):
     email: str | None
     role: str | None
     aud: str | None
-    created_at: datetime | None
+    created_at: datetime.datetime | None
 
 
 class AuthSessionResponse(BaseModel):
@@ -95,8 +94,8 @@ class ClothingItemResponse(BaseModel):
     is_favorite: bool
     wardrobes_count: int
     outfits_count: int
-    created_at: datetime
-    updated_at: datetime
+    created_at: datetime.datetime
+    updated_at: datetime.datetime
 
 
 class WardrobeCreateRequest(BaseModel):
@@ -116,8 +115,8 @@ class WardrobeResponse(BaseModel):
     clothing_items_count: int
     outfits_count: int
     image_url: str | None
-    created_at: datetime
-    updated_at: datetime
+    created_at: datetime.datetime
+    updated_at: datetime.datetime
 
 
 class OutfitResponse(BaseModel):
@@ -130,8 +129,8 @@ class OutfitResponse(BaseModel):
     image_url: str | None
     clothing_items_count: int
     wardrobes_count: int
-    created_at: datetime
-    updated_at: datetime
+    created_at: datetime.datetime
+    updated_at: datetime.datetime
 
 
 class OutfitWithItemsResponse(OutfitResponse):
@@ -149,3 +148,30 @@ class WardrobeWithDetailsResponse(WardrobeResponse):
 
 class ClothingItemWithWardrobesResponse(ClothingItemResponse):
     wardrobes: list[WardrobeResponse] = []
+
+
+class CalendarOutfitCreateRequest(BaseModel):
+    outfit_id: str
+    date: datetime.date
+    notes: str | None = None
+
+
+class CalendarOutfitUpdateRequest(BaseModel):
+    date: datetime.date | None = None
+    notes: str | None = None
+
+
+class CalendarOutfitResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    user_id: str
+    outfit_id: str
+    date: datetime.date
+    notes: str | None
+    created_at: datetime.datetime
+    updated_at: datetime.datetime
+
+
+class CalendarOutfitWithOutfitResponse(CalendarOutfitResponse):
+    outfit: OutfitResponse

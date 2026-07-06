@@ -4,7 +4,11 @@ import datetime
 from uuid import uuid4
 
 from sqlalchemy import Date, ForeignKey, String, Text
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from app.models.outfit import Outfit
 
 from app.db.base import Base, TimestampMixin
 
@@ -36,4 +40,9 @@ class CalendarOutfit(TimestampMixin, Base):
     notes: Mapped[str | None] = mapped_column(
         Text,
         nullable=True,
+    )
+    
+    outfit: Mapped["Outfit"] = relationship(
+        "Outfit",
+        back_populates="calendar_outfits",
     )
