@@ -160,6 +160,14 @@ export type OutfitResponse = {
   updated_at: string;
 };
 
+export type OutfitWithItemsResponse = OutfitResponse & {
+  clothing_items: ClothingItemResponse[];
+};
+
+export type OutfitWithWardrobesResponse = OutfitWithItemsResponse & {
+  wardrobes: WardrobeResponse[];
+};
+
 export type WardrobeWithDetailsResponse = WardrobeResponse & {
   clothing_items: ClothingItemResponse[];
   outfits: OutfitResponse[];
@@ -371,6 +379,112 @@ export async function addItemToWardrobe(itemId: string, wardrobeId: string): Pro
 
 export async function removeItemFromWardrobe(itemId: string, wardrobeId: string): Promise<void> {
   return apiFetch<void>(`/clothing-items/${itemId}/wardrobes/${wardrobeId}`, {
+    method: 'DELETE',
+  });
+}
+
+// ── Outfit API ──────────────────────────────────────────────────────────────
+
+export async function getOutfits(): Promise<OutfitWithItemsResponse[]> {
+  return apiFetch<OutfitWithItemsResponse[]>('/outfits');
+}
+
+export async function getOutfit(id: string): Promise<OutfitWithWardrobesResponse> {
+  return apiFetch<OutfitWithWardrobesResponse>(`/outfits/${id}`);
+}
+
+export type OutfitCreateRequest = {
+  name: string;
+  clothing_item_ids?: string[];
+  wardrobe_ids?: string[];
+  imageUri?: string;
+};
+
+export async function createOutfit(data: OutfitCreateRequest): Promise<OutfitResponse> {
+  const formData = new FormData();
+  formData.append('name', data.name);
+
+  if (data.clothing_item_ids && data.clothing_item_ids.length > 0) {
+    data.clothing_item_ids.forEach(id => formData.append('clothing_item_ids', id));
+  }
+
+  if (data.wardrobe_ids && data.wardrobe_ids.length > 0) {
+    data.wardrobe_ids.forEach(id => formData.append('wardrobe_ids', id));
+  }
+
+  if (data.imageUri) {
+    const filename = data.imageUri.split('/').pop() || 'image.jpg';
+    const match = /\.(\w+)$/.exec(filename);
+    let type = 'image/jpeg';
+    if (match) {
+      const ext = match[1].toLowerCase();
+      if (ext === 'jpg') type = 'image/jpeg';
+      else type = `image/${ext}`;
+    }
+    // @ts-ignore
+    formData.append('image', { uri: data.imageUri, name: filename, type });
+  }
+
+  return apiFetch<OutfitResponse>('/outfits', {
+    method: 'POST',
+    body: formData,
+  });
+}
+
+export type OutfitUpdateRequest = {
+  name?: string;
+  wardrobe_ids?: string[];
+  imageUri?: string;
+};
+
+export async function updateOutfit(id: string, data: OutfitUpdateRequest): Promise<OutfitResponse> {
+  const formData = new FormData();
+  if (data.name !== undefined) formData.append('name', data.name);
+
+  if (data.wardrobe_ids !== undefined) {
+    if (data.wardrobe_ids.length === 0) {
+      formData.append('wardrobe_ids', '');
+    } else {
+      data.wardrobe_ids.forEach(id => formData.append('wardrobe_ids', id));
+    }
+  }
+
+  if (data.imageUri) {
+    const filename = data.imageUri.split('/').pop() || 'image.jpg';
+    const match = /\.(\w+)$/.exec(filename);
+    let type = 'image/jpeg';
+    if (match) {
+      const ext = match[1].toLowerCase();
+      if (ext === 'jpg') type = 'image/jpeg';
+      else type = `image/${ext}`;
+    }
+    // @ts-ignore
+    formData.append('image', { uri: data.imageUri, name: filename, type });
+  }
+
+  return apiFetch<OutfitResponse>(`/outfits/${id}`, {
+    method: 'PATCH',
+    body: formData,
+  });
+}
+
+export async function deleteOutfit(id: string): Promise<void> {
+  return apiFetch<void>(`/outfits/${id}`, {
+    method: 'DELETE',
+  });
+}
+
+export async function addItemToOutfit(outfitId: string, clothingItemId: string): Promise<OutfitWithItemsResponse> {
+  const formData = new FormData();
+  formData.append('clothing_item_id', clothingItemId);
+  return apiFetch<OutfitWithItemsResponse>(`/outfits/${outfitId}/items`, {
+    method: 'POST',
+    body: formData,
+  });
+}
+
+export async function removeItemFromOutfit(outfitId: string, clothingItemId: string): Promise<OutfitWithItemsResponse> {
+  return apiFetch<OutfitWithItemsResponse>(`/outfits/${outfitId}/items/${clothingItemId}`, {
     method: 'DELETE',
   });
 }
