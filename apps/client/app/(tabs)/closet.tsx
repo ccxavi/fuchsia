@@ -9,7 +9,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 
 import { FuchsiaColors, FuchsiaFonts } from '@/constants/theme';
 import { CLOTHING_CATEGORIES } from '@/constants/categories';
-import { getClothingItems, getWardrobes, ClothingItemResponse, WardrobeResponse } from '@/api/client';
+import { getClothingItems, getWardrobes, getWardrobeClothingItems, ClothingItemResponse, WardrobeResponse } from '@/api/client';
 
 // Dummy Data mapped to prototype assets
 const OUTFITS = [
@@ -47,7 +47,19 @@ export default function ClosetScreen() {
         console.error('Failed to fetch wardrobes:', err);
         return [];
       });
-      setWardrobes(fetchedWardrobes);
+      
+      // Temporarily fetch item count per wardrobe until backend is updated
+      const wardrobesWithCounts = await Promise.all(
+        fetchedWardrobes.map(async (w) => {
+          try {
+            const items = await getWardrobeClothingItems(w.id);
+            return { ...w, quantity: items.length };
+          } catch (e) {
+            return w;
+          }
+        })
+      );
+      setWardrobes(wardrobesWithCounts);
 
       const fetchedItems = await getClothingItems().catch(err => {
         console.error('Failed to fetch items:', err);
@@ -182,27 +194,33 @@ export default function ClosetScreen() {
   );
 
   const renderOutfits = () => (
-    <FlatList
-      data={filteredOutfits}
-      keyExtractor={(item) => item.id}
-      numColumns={2}
-      columnWrapperStyle={styles.gridRow}
-      contentContainerStyle={[styles.listContent, filteredOutfits.length === 0 && { flex: 1 }]}
-      showsVerticalScrollIndicator={false}
-      refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor={FuchsiaColors.vibrant} />}
-      ListEmptyComponent={() => renderEmptyState("Your stylish outfits will appear here!\nTap the + below to create one.")}
-      renderItem={({ item }) => (
-        <Pressable style={[styles.gridItem, { width: itemWidth, flex: 0 }]}>
-          <View style={styles.imageContainer}>
-            <Image source={item.image} style={styles.image} contentFit="cover" />
-          </View>
-          <View style={styles.itemInfo}>
-            <Text style={styles.itemTitle} numberOfLines={1}>{item.title}</Text>
-            <Text style={styles.itemSubtitle}>{item.items}</Text>
-          </View>
-        </Pressable>
-      )}
-    />
+    <View style={styles.flex1}>
+      <View style={styles.statsBanner}>
+        <Text style={styles.statsCount}>{filteredOutfits.length} outfits</Text>
+        <Text style={styles.statsLabel}>All outfits</Text>
+      </View>
+      <FlatList
+        data={filteredOutfits}
+        keyExtractor={(item) => item.id}
+        numColumns={2}
+        columnWrapperStyle={styles.gridRow}
+        contentContainerStyle={[styles.listContent, filteredOutfits.length === 0 && { flex: 1 }]}
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor={FuchsiaColors.vibrant} />}
+        ListEmptyComponent={() => renderEmptyState("Your stylish outfits will appear here!\nTap the + below to create one.")}
+        renderItem={({ item }) => (
+          <Pressable style={[styles.gridItem, { width: itemWidth, flex: 0 }]}>
+            <View style={styles.imageContainer}>
+              <Image source={item.image} style={styles.image} contentFit="cover" />
+            </View>
+            <View style={styles.itemInfo}>
+              <Text style={styles.itemTitle} numberOfLines={1}>{item.title}</Text>
+              <Text style={styles.itemSubtitle}>{item.items}</Text>
+            </View>
+          </Pressable>
+        )}
+      />
+    </View>
   );
 
   const renderWardrobe = () => (
@@ -232,7 +250,7 @@ export default function ClosetScreen() {
                   style={[StyleSheet.absoluteFillObject, styles.wardrobeGradient]}
                 >
                   <Text style={styles.wardrobeTitle}>{item.name}</Text>
-                  <Text style={styles.wardrobeSubtitle}>{item.quantity} Items</Text>
+                  <Text style={styles.wardrobeSubtitle}>{OUTFITS.length} Outfits · {item.quantity} Items</Text>
                 </LinearGradient>
               </View>
             ) : (
@@ -247,7 +265,7 @@ export default function ClosetScreen() {
                   style={styles.wardrobeGradient}
                 >
                   <Text style={styles.wardrobeTitle}>{item.name}</Text>
-                  <Text style={styles.wardrobeSubtitle}>{item.quantity} Items</Text>
+                  <Text style={styles.wardrobeSubtitle}>{OUTFITS.length} Outfits · {item.quantity} Items</Text>
                 </LinearGradient>
               </LinearGradient>
             )}
