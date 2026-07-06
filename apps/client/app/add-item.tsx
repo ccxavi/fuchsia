@@ -51,6 +51,9 @@ export default function AddOrEditItemScreen() {
       setCategory(data.category || '');
       setColor(data.color || '');
       setOriginalImage(data.image_url || null);
+      if (data.wardrobes && data.wardrobes.length > 0) {
+        setSelectedWardrobeIds(data.wardrobes.map(w => w.id));
+      }
     } catch (err: any) {
       setError('Failed to fetch item details.');
     } finally {
@@ -116,6 +119,7 @@ export default function AddOrEditItemScreen() {
           name: name.trim(),
           category: category.trim() || undefined,
           color: color.trim() || undefined,
+          wardrobe_ids: selectedWardrobeIds,
           imageUri: imageUri || undefined,
         });
         DeviceEventEmitter.emit('itemUpdated', updatedItem);

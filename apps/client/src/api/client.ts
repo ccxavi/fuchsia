@@ -237,16 +237,22 @@ export type ClothingItemResponse = {
   brand: string | null;
   image_url: string | null;
   is_favorite: boolean;
+  wardrobes_count: number;
+  outfits_count: number;
   created_at: string;
   updated_at: string;
+};
+
+export type ClothingItemWithWardrobesResponse = ClothingItemResponse & {
+  wardrobes: WardrobeResponse[];
 };
 
 export async function getClothingItems(): Promise<ClothingItemResponse[]> {
   return apiFetch<ClothingItemResponse[]>('/clothing-items');
 }
 
-export async function getClothingItem(id: string): Promise<ClothingItemResponse> {
-  return apiFetch<ClothingItemResponse>(`/clothing-items/${id}`);
+export async function getClothingItem(id: string): Promise<ClothingItemWithWardrobesResponse> {
+  return apiFetch<ClothingItemWithWardrobesResponse>(`/clothing-items/${id}`);
 }
 
 export async function deleteClothingItem(id: string): Promise<void> {
@@ -300,6 +306,7 @@ export type ClothingItemUpdateRequest = {
   color?: string;
   brand?: string;
   is_favorite?: boolean;
+  wardrobe_ids?: string[];
   imageUri?: string;
 };
 
@@ -310,6 +317,14 @@ export async function updateClothingItem(id: string, data: ClothingItemUpdateReq
   if (data.color !== undefined) formData.append('color', data.color);
   if (data.brand !== undefined) formData.append('brand', data.brand);
   if (data.is_favorite !== undefined) formData.append('is_favorite', String(data.is_favorite));
+
+  if (data.wardrobe_ids !== undefined) {
+    if (data.wardrobe_ids.length === 0) {
+      formData.append('wardrobe_ids', '');
+    } else {
+      data.wardrobe_ids.forEach(id => formData.append('wardrobe_ids', id));
+    }
+  }
 
   if (data.imageUri) {
     const filename = data.imageUri.split('/').pop() || 'image.jpg';
