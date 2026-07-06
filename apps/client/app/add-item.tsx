@@ -12,7 +12,7 @@ import { CLOTHING_CATEGORIES } from '@/constants/categories';
 import { createClothingItem, updateClothingItem, getClothingItem, getWardrobes, WardrobeResponse } from '@/api/client';
 
 export default function AddOrEditItemScreen() {
-  const { id } = useLocalSearchParams<{ id?: string }>();
+  const { id, wardrobeId } = useLocalSearchParams<{ id?: string, wardrobeId?: string }>();
   const insets = useSafeAreaInsets();
   
   const [imageUri, setImageUri] = useState<string | null>(null);
@@ -22,7 +22,9 @@ export default function AddOrEditItemScreen() {
   const [color, setColor] = useState('');
   
   const [wardrobes, setWardrobes] = useState<WardrobeResponse[]>([]);
-  const [selectedWardrobeIds, setSelectedWardrobeIds] = useState<string[]>([]);
+  const [selectedWardrobeIds, setSelectedWardrobeIds] = useState<string[]>(
+    wardrobeId ? [wardrobeId as string] : []
+  );
   
 
   
