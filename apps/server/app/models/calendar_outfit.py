@@ -9,6 +9,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from app.models.outfit import Outfit
+    from app.models.outfit_image import OutfitImage
 
 from app.db.base import Base, TimestampMixin
 
@@ -45,4 +46,12 @@ class CalendarOutfit(TimestampMixin, Base):
     outfit: Mapped["Outfit"] = relationship(
         "Outfit",
         back_populates="calendar_outfits",
+    )
+    
+    day_images: Mapped[list["OutfitImage"]] = relationship(
+        "OutfitImage",
+        primaryjoin="and_(CalendarOutfit.outfit_id == OutfitImage.outfit_id, CalendarOutfit.date == OutfitImage.date)",
+        foreign_keys="[OutfitImage.outfit_id]",
+        viewonly=True,
+        order_by="desc(OutfitImage.created_at)"
     )

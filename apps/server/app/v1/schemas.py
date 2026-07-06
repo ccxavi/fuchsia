@@ -133,8 +133,19 @@ class OutfitResponse(BaseModel):
     updated_at: datetime.datetime
 
 
+class OutfitImageResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    outfit_id: str
+    image_url: str
+    date: datetime.date | None
+    created_at: datetime.datetime
+
+
 class OutfitWithItemsResponse(OutfitResponse):
     clothing_items: list[ClothingItemResponse] = []
+    images: list[OutfitImageResponse] = []
 
 
 class OutfitWithWardrobesResponse(OutfitWithItemsResponse):
@@ -175,3 +186,4 @@ class CalendarOutfitResponse(BaseModel):
 
 class CalendarOutfitWithOutfitResponse(CalendarOutfitResponse):
     outfit: OutfitResponse
+    day_images: list[OutfitImageResponse] = []

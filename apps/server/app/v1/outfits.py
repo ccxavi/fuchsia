@@ -1,4 +1,5 @@
 from typing import Annotated
+import datetime
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
@@ -11,8 +12,9 @@ from app.db.session import get_db_session
 from app.models.outfit import Outfit
 from app.models.clothing_item import ClothingItem
 from app.models.wardrobe import Wardrobe
+from app.models.outfit_image import OutfitImage
 from app.services.supabase_storage import upload_file_to_supabase
-from app.v1.schemas import OutfitResponse, OutfitWithItemsResponse, OutfitWithWardrobesResponse
+from app.v1.schemas import OutfitResponse, OutfitWithItemsResponse, OutfitWithWardrobesResponse, OutfitImageResponse
 
 router = APIRouter()
 
@@ -104,10 +106,14 @@ def get_outfit(
     user: Annotated[AuthenticatedUser, Depends(get_current_authenticated_user)],
     db: Annotated[Session, Depends(get_db_session)],
 ):
-    # Use selectinload to eagerly load clothing_items and wardrobes and avoid N+1 queries
+    # Use selectinload to eagerly load clothing_items, wardrobes, and images and avoid N+1 queries
     outfit = db.scalar(
         select(Outfit)
-        .options(selectinload(Outfit.clothing_items), selectinload(Outfit.wardrobes))
+        .options(
+            selectinload(Outfit.clothing_items), 
+            selectinload(Outfit.wardrobes),
+            selectinload(Outfit.images)
+        )
         .where(Outfit.id == outfit_id, Outfit.user_id == user.user.id)
     )
     if not outfit:
@@ -326,3 +332,68 @@ def remove_outfit_from_wardrobe(
         raise HTTPException(status_code=404, detail="Outfit not in wardrobe")
 
     return outfit
+
+
+@router.post("/{outfit_id}/images", status_code=status.HTTP_201_CREATED, response_model=OutfitImageResponse)
+async def add_outfit_image(
+    outfit_id: str,
+    image: Annotated[UploadFile, File(...)],
+    date: Annotated[datetime.date | None, Form()] = None,
+    user: AuthenticatedUser = Depends(get_current_authenticated_user),
+    credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
+    db: Session = Depends(get_db_session),
+):
+    outfit = db.scalar(
+        select(Outfit).where(Outfit.id == outfit_id, Outfit.user_id == user.user.id)
+    )
+    if not outfit:
+        raise HTTPException(status_code=404, detail="Outfit not found")
+
+    if not image.content_type.startswith("image/"):
+        raise HTTPException(status_code=400, detail="File must be an image")
+        
+    file_ext = image.filename.split(".")[-1] if image.filename and "." in image.filename else "jpg"
+    file_path = f"{user.user.supabase_user_id}/{uuid4()}.{file_ext}"
+    
+    image_url = await upload_file_to_supabase(
+        bucket_name="user_outfits_img",
+        file_path=file_path,
+        file=image.file,
+        content_type=image.content_type,
+        access_token=credentials.credentials,
+    )
+
+    db_image = OutfitImage(
+        outfit_id=outfit.id,
+        image_url=image_url,
+        date=date
+    )
+    db.add(db_image)
+    
+    # Also update the outfit's cover image
+    outfit.image_url = image_url
+    
+    db.commit()
+    db.refresh(db_image)
+    return db_image
+
+
+@router.delete("/images/{image_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_outfit_image(
+    image_id: str,
+    user: Annotated[AuthenticatedUser, Depends(get_current_authenticated_user)],
+    db: Annotated[Session, Depends(get_db_session)],
+):
+    outfit_image = db.scalar(
+        select(OutfitImage)
+        .join(Outfit)
+        .where(
+            OutfitImage.id == image_id,
+            Outfit.user_id == user.user.id
+        )
+    )
+    if not outfit_image:
+        raise HTTPException(status_code=404, detail="Outfit image not found")
+
+    db.delete(outfit_image)
+    db.commit()
