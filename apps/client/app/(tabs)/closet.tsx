@@ -9,7 +9,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 
 import { FuchsiaColors, FuchsiaFonts } from '@/constants/theme';
 import { CLOTHING_CATEGORIES } from '@/constants/categories';
-import { getClothingItems, getWardrobes, getWardrobeClothingItems, ClothingItemResponse, WardrobeResponse } from '@/api/client';
+import { getClothingItems, getWardrobes, ClothingItemResponse, WardrobeResponse } from '@/api/client';
 
 // Dummy Data mapped to prototype assets
 const OUTFITS = [
@@ -47,19 +47,7 @@ export default function ClosetScreen() {
         console.error('Failed to fetch wardrobes:', err);
         return [];
       });
-      
-      // Temporarily fetch item count per wardrobe until backend is updated
-      const wardrobesWithCounts = await Promise.all(
-        fetchedWardrobes.map(async (w) => {
-          try {
-            const items = await getWardrobeClothingItems(w.id);
-            return { ...w, quantity: items.length };
-          } catch (e) {
-            return w;
-          }
-        })
-      );
-      setWardrobes(wardrobesWithCounts);
+      setWardrobes(fetchedWardrobes);
 
       const fetchedItems = await getClothingItems().catch(err => {
         console.error('Failed to fetch items:', err);
@@ -250,7 +238,7 @@ export default function ClosetScreen() {
                   style={[StyleSheet.absoluteFillObject, styles.wardrobeGradient]}
                 >
                   <Text style={styles.wardrobeTitle}>{item.name}</Text>
-                  <Text style={styles.wardrobeSubtitle}>{OUTFITS.length} Outfits · {item.quantity} Items</Text>
+                  <Text style={styles.wardrobeSubtitle}>{item.outfits_count} Outfits · {item.clothing_items_count} Items</Text>
                 </LinearGradient>
               </View>
             ) : (
@@ -265,7 +253,7 @@ export default function ClosetScreen() {
                   style={styles.wardrobeGradient}
                 >
                   <Text style={styles.wardrobeTitle}>{item.name}</Text>
-                  <Text style={styles.wardrobeSubtitle}>{OUTFITS.length} Outfits · {item.quantity} Items</Text>
+                  <Text style={styles.wardrobeSubtitle}>{item.outfits_count} Outfits · {item.clothing_items_count} Items</Text>
                 </LinearGradient>
               </LinearGradient>
             )}
