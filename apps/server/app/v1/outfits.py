@@ -91,7 +91,9 @@ def get_outfits(
     db: Annotated[Session, Depends(get_db_session)],
 ):
     outfits = db.scalars(
-        select(Outfit).where(Outfit.user_id == user.user.id)
+        select(Outfit)
+        .options(selectinload(Outfit.clothing_items), selectinload(Outfit.wardrobes))
+        .where(Outfit.user_id == user.user.id)
     ).all()
     return outfits
 

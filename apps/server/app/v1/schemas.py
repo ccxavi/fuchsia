@@ -93,6 +93,8 @@ class ClothingItemResponse(BaseModel):
     brand: str | None
     image_url: str | None
     is_favorite: bool
+    wardrobes_count: int
+    outfits_count: int
     created_at: datetime
     updated_at: datetime
 
@@ -126,6 +128,8 @@ class OutfitResponse(BaseModel):
     name: str
     is_ai_generated: bool
     image_url: str | None
+    clothing_items_count: int
+    wardrobes_count: int
     created_at: datetime
     updated_at: datetime
 

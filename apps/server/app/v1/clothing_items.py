@@ -117,7 +117,9 @@ def get_clothing_items(
     db: Session = Depends(get_db_session),
 ):
     items = db.scalars(
-        select(ClothingItem).where(ClothingItem.user_id == user.user.id)
+        select(ClothingItem)
+        .options(selectinload(ClothingItem.wardrobes), selectinload(ClothingItem.outfits))
+        .where(ClothingItem.user_id == user.user.id)
     ).all()
     return items
 
