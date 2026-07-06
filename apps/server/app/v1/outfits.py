@@ -87,14 +87,18 @@ async def create_outfit(
     return db_outfit
 
 
-@router.get("/", response_model=list[OutfitResponse])
+@router.get("/", response_model=list[OutfitWithItemsResponse])
 def get_outfits(
     user: Annotated[AuthenticatedUser, Depends(get_current_authenticated_user)],
     db: Annotated[Session, Depends(get_db_session)],
 ):
     outfits = db.scalars(
         select(Outfit)
-        .options(selectinload(Outfit.clothing_items), selectinload(Outfit.wardrobes))
+        .options(
+            selectinload(Outfit.clothing_items), 
+            selectinload(Outfit.wardrobes),
+            selectinload(Outfit.images)
+        )
         .where(Outfit.user_id == user.user.id)
     ).all()
     return outfits
@@ -369,10 +373,6 @@ async def add_outfit_image(
         date=date
     )
     db.add(db_image)
-    
-    # Also update the outfit's cover image
-    outfit.image_url = image_url
-    
     db.commit()
     db.refresh(db_image)
     return db_image
