@@ -126,7 +126,6 @@ class OutfitResponse(BaseModel):
     user_id: str
     name: str
     is_ai_generated: bool
-    image_url: str | None
     clothing_items_count: int
     wardrobes_count: int
     created_at: datetime.datetime
@@ -187,3 +186,10 @@ class CalendarOutfitResponse(BaseModel):
 class CalendarOutfitWithOutfitResponse(CalendarOutfitResponse):
     outfit: OutfitResponse
     day_images: list[OutfitImageResponse] = []
+
+
+class WeatherResponse(BaseModel):
+    temperature: float
+    description: str
+    icon_url: str
+    city: str
