@@ -160,8 +160,17 @@ export type OutfitResponse = {
   updated_at: string;
 };
 
+export type OutfitImageResponse = {
+  id: string;
+  outfit_id: string;
+  image_url: string;
+  date: string | null;
+  created_at: string;
+};
+
 export type OutfitWithItemsResponse = OutfitResponse & {
   clothing_items: ClothingItemResponse[];
+  images?: OutfitImageResponse[];
 };
 
 export type OutfitWithWardrobesResponse = OutfitWithItemsResponse & {

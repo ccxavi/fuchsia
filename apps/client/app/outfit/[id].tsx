@@ -3,10 +3,11 @@ import { useLocalSearchParams, router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useState, useEffect } from 'react';
 import { Image } from 'expo-image';
-import { ArrowLeft, MoreVertical, Edit2, Trash2, Layers } from 'lucide-react-native';
+import { ArrowLeft, MoreVertical, Edit2, Trash2, Layers, Camera, X } from 'lucide-react-native';
+import * as ImagePicker from 'expo-image-picker';
 
 import { FuchsiaColors, FuchsiaFonts } from '@/constants/theme';
-import { getOutfit, deleteOutfit, OutfitWithWardrobesResponse } from '@/api/client';
+import { getOutfit, deleteOutfit, updateOutfit, OutfitWithWardrobesResponse } from '@/api/client';
 
 export default function OutfitDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -17,6 +18,8 @@ export default function OutfitDetailScreen() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [menuVisible, setMenuVisible] = useState(false);
   const [deleteAlertVisible, setDeleteAlertVisible] = useState(false);
+  const [focusedPhotoId, setFocusedPhotoId] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -39,6 +42,9 @@ export default function OutfitDetailScreen() {
     try {
       const data = await getOutfit(id!);
       setOutfit(data);
+      if (data.images && data.images.length > 0 && !focusedPhotoId) {
+        setFocusedPhotoId(data.images[data.images.length - 1].id);
+      }
     } catch (err) {
       console.error('Failed to fetch outfit:', err);
       router.back();
@@ -50,6 +56,33 @@ export default function OutfitDetailScreen() {
   const handleDelete = () => {
     setMenuVisible(false);
     setDeleteAlertVisible(true);
+  };
+
+  const handleAddPhoto = async () => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets[0].uri) {
+        setIsUploading(true);
+        await updateOutfit(id!, { imageUri: result.assets[0].uri });
+        
+        // After upload, re-fetch outfit so the new image appears in the array
+        const updatedData = await getOutfit(id!);
+        setOutfit(updatedData);
+        if (updatedData.images && updatedData.images.length > 0) {
+          // Auto-focus the newly added image (usually the last one added, depending on backend sort, let's just focus the last one)
+          setFocusedPhotoId(updatedData.images[updatedData.images.length - 1].id);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to upload photo:', err);
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   const confirmDelete = async () => {
@@ -180,19 +213,80 @@ export default function OutfitDetailScreen() {
           </View>
         </View>
 
-        {/* Outfit Image */}
-        {outfit.image_url && (
-          <View style={styles.outfitImageSection}>
-            <View style={styles.outfitImageContainer}>
-              <Image
-                source={{ uri: outfit.image_url }}
-                style={StyleSheet.absoluteFillObject}
-                contentFit="cover"
-                transition={300}
-              />
-            </View>
+        {/* My Photos */}
+        <View style={styles.card}>
+          <View style={styles.myPhotosHeader}>
+            <Text style={styles.cardLabel}>MY PHOTOS</Text>
+            <Text style={styles.myPhotosCount}>
+              {outfit.images ? outfit.images.length : 0} photos
+            </Text>
           </View>
-        )}
+          
+          {/* Main Focus Image */}
+          {outfit.images && outfit.images.length > 0 && focusedPhotoId ? (
+            <View style={styles.mainFocusContainer}>
+              {outfit.images.map(img => (
+                img.id === focusedPhotoId && (
+                  <View key={img.id} style={StyleSheet.absoluteFillObject}>
+                    <Image
+                      source={{ uri: img.image_url }}
+                      style={StyleSheet.absoluteFillObject}
+                      contentFit="cover"
+                      transition={300}
+                    />
+                    {img.date && (
+                      <View style={styles.mainFocusDateBadge}>
+                        <Text style={styles.mainFocusDateText}>
+                          {new Date(img.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                )
+              ))}
+            </View>
+          ) : null}
+
+          {/* Thumbnail Carousel */}
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.thumbnailCarousel}
+          >
+            {/* Add Photo Button */}
+            <Pressable
+              style={styles.addPhotoBtn}
+              onPress={handleAddPhoto}
+              disabled={isUploading}
+            >
+              {isUploading ? (
+                <ActivityIndicator size="small" color={FuchsiaColors.slate} />
+              ) : (
+                <>
+                  <Camera size={16} color={FuchsiaColors.slate} />
+                  <Text style={styles.addPhotoBtnText}>Add</Text>
+                </>
+              )}
+            </Pressable>
+
+            {/* Existing Photos */}
+            {outfit.images && outfit.images.map((img) => {
+              const isFocused = img.id === focusedPhotoId;
+              return (
+                <Pressable
+                  key={img.id}
+                  style={[styles.thumbnailBtn, isFocused && styles.thumbnailBtnFocused]}
+                  onPress={() => setFocusedPhotoId(img.id)}
+                >
+                  <Image source={{ uri: img.image_url }} style={StyleSheet.absoluteFillObject} contentFit="cover" />
+                  {isFocused && (
+                    <View style={styles.thumbnailOverlay} />
+                  )}
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+        </View>
 
         {/* All Pieces */}
         <View style={styles.card}>
@@ -455,16 +549,92 @@ const styles = StyleSheet.create({
   // Outfit image
   outfitImageSection: {
     paddingHorizontal: 20,
-    marginBottom: 16,
+    marginBottom: 24,
   },
   outfitImageContainer: {
-    aspectRatio: 4 / 5,
     width: '100%',
-    borderRadius: 16,
+    aspectRatio: 4 / 5,
+    borderRadius: 20,
     overflow: 'hidden',
+    backgroundColor: FuchsiaColors.cloud,
     borderWidth: 1,
     borderColor: FuchsiaColors.mist,
+  },
+  myPhotosHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  myPhotosCount: {
+    fontFamily: FuchsiaFonts.body,
+    fontSize: 10,
+    fontWeight: '500',
+    color: FuchsiaColors.slate,
+  },
+  mainFocusContainer: {
+    width: '100%',
+    aspectRatio: 4 / 5,
+    borderRadius: 16,
+    overflow: 'hidden',
     backgroundColor: FuchsiaColors.cloud,
+    borderWidth: 1,
+    borderColor: FuchsiaColors.mist,
+    marginBottom: 12,
+  },
+  mainFocusDateBadge: {
+    position: 'absolute',
+    bottom: 12,
+    left: 12,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  mainFocusDateText: {
+    fontFamily: FuchsiaFonts.body,
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#fff',
+  },
+  thumbnailCarousel: {
+    gap: 8,
+    paddingBottom: 4,
+  },
+  addPhotoBtn: {
+    width: 64,
+    height: 64,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: FuchsiaColors.mist,
+    borderStyle: 'dashed',
+    backgroundColor: 'rgba(253, 242, 248, 0.5)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+  },
+  addPhotoBtnText: {
+    fontFamily: FuchsiaFonts.body,
+    fontSize: 8,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    color: FuchsiaColors.slate,
+  },
+  thumbnailBtn: {
+    width: 64,
+    height: 64,
+    borderRadius: 12,
+    overflow: 'hidden',
+    borderWidth: 2,
+    borderColor: 'transparent',
+    backgroundColor: FuchsiaColors.cloud,
+  },
+  thumbnailBtnFocused: {
+    borderColor: FuchsiaColors.vibrant,
+  },
+  thumbnailOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.1)',
   },
   // Card sections
   card: {
