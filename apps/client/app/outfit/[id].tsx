@@ -206,7 +206,11 @@ export default function OutfitDetailScreen() {
               <Text style={styles.emptyItemsText}>No items in this outfit yet</Text>
             </View>
           ) : (
-            <View style={styles.itemsList}>
+            <ScrollView 
+              style={[styles.itemsList, { maxHeight: 290 }]}
+              nestedScrollEnabled={true}
+              showsVerticalScrollIndicator={true}
+            >
               {outfit.clothing_items.map((item, index) => (
                 <Pressable
                   key={item.id}
@@ -238,7 +242,7 @@ export default function OutfitDetailScreen() {
                   </View>
                 </Pressable>
               ))}
-            </View>
+            </ScrollView>
           )}
         </View>
 
