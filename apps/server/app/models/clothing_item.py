@@ -64,3 +64,11 @@ class ClothingItem(TimestampMixin, Base):
         secondary="outfit_items",
         back_populates="clothing_items",
     )
+    
+    @property
+    def wardrobes_count(self) -> int:
+        return len(self.wardrobes)
+        
+    @property
+    def outfits_count(self) -> int:
+        return len(self.outfits)

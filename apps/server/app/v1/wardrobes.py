@@ -19,7 +19,6 @@ router = APIRouter()
 @router.post("/", status_code=status.HTTP_201_CREATED, response_model=WardrobeResponse)
 async def create_wardrobe(
     name: Annotated[str, Form(...)],
-    quantity: Annotated[int, Form()] = 0,
     image: Annotated[UploadFile | None, File()] = None,
     user: AuthenticatedUser = Depends(get_current_authenticated_user),
     credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
@@ -44,7 +43,6 @@ async def create_wardrobe(
     db_wardrobe = Wardrobe(
         user_id=user.user.id,
         name=name,
-        quantity=quantity,
         image_url=image_url
     )
     db.add(db_wardrobe)
@@ -59,7 +57,9 @@ def get_wardrobes(
     db: Annotated[Session, Depends(get_db_session)],
 ):
     wardrobes = db.scalars(
-        select(Wardrobe).where(Wardrobe.user_id == user.user.id)
+        select(Wardrobe)
+        .options(selectinload(Wardrobe.clothing_items), selectinload(Wardrobe.outfits))
+        .where(Wardrobe.user_id == user.user.id)
     ).all()
     return wardrobes
 
@@ -86,7 +86,6 @@ def get_wardrobe(
 async def update_wardrobe(
     wardrobe_id: str,
     name: Annotated[str | None, Form()] = None,
-    quantity: Annotated[int | None, Form()] = None,
     image: Annotated[UploadFile | None, File()] = None,
     user: AuthenticatedUser = Depends(get_current_authenticated_user),
     credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
@@ -102,8 +101,6 @@ async def update_wardrobe(
 
     if name is not None:
         wardrobe.name = name
-    if quantity is not None:
-        wardrobe.quantity = quantity
         
     if image:
         if not image.content_type.startswith("image/"):

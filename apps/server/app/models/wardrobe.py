@@ -31,11 +31,6 @@ class Wardrobe(TimestampMixin, Base):
         String(255),
         nullable=False,
     )
-    quantity: Mapped[int] = mapped_column(
-        Integer,
-        nullable=False,
-        default=0,
-    )
     image_url: Mapped[str | None] = mapped_column(
         String(500),
         nullable=True,
@@ -52,3 +47,11 @@ class Wardrobe(TimestampMixin, Base):
         secondary="outfit_wardrobes",
         back_populates="wardrobes",
     )
+    
+    @property
+    def clothing_items_count(self) -> int:
+        return len(self.clothing_items)
+        
+    @property
+    def outfits_count(self) -> int:
+        return len(self.outfits)

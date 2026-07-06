@@ -93,18 +93,18 @@ class ClothingItemResponse(BaseModel):
     brand: str | None
     image_url: str | None
     is_favorite: bool
+    wardrobes_count: int
+    outfits_count: int
     created_at: datetime
     updated_at: datetime
 
 
 class WardrobeCreateRequest(BaseModel):
     name: str = Field(..., min_length=1, max_length=255)
-    quantity: int = Field(default=0)
 
 
 class WardrobeUpdateRequest(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=255)
-    quantity: int | None = Field(default=None)
 
 
 class WardrobeResponse(BaseModel):
@@ -113,7 +113,8 @@ class WardrobeResponse(BaseModel):
     id: str
     user_id: str
     name: str
-    quantity: int
+    clothing_items_count: int
+    outfits_count: int
     image_url: str | None
     created_at: datetime
     updated_at: datetime
@@ -127,6 +128,8 @@ class OutfitResponse(BaseModel):
     name: str
     is_ai_generated: bool
     image_url: str | None
+    clothing_items_count: int
+    wardrobes_count: int
     created_at: datetime
     updated_at: datetime
 
