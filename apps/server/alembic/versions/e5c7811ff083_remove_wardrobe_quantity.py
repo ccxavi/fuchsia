@@ -1,7 +1,7 @@
 """remove wardrobe quantity column
 
 Revision ID: e5c7811ff083
-Revises: d4b660ff9871
+Revises: 6274d3b2f48a
 Create Date: 2026-07-05 21:00:00.000000
 
 """
@@ -11,7 +11,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision = 'e5c7811ff083'
-down_revision = 'd4b660ff9871'
+down_revision = '6274d3b2f48a'
 branch_labels = None
 depends_on = None
 
