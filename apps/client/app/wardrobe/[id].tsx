@@ -7,20 +7,14 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { ArrowLeft, MoreHorizontal, Calendar, Plus, Trash2, Edit2 } from 'lucide-react-native';
 
 import { FuchsiaColors, FuchsiaFonts } from '@/constants/theme';
-import { getWardrobe, getWardrobeClothingItems, deleteWardrobe, WardrobeResponse, ClothingItemResponse } from '@/api/client';
-
-const MOCK_OUTFITS = [
-  { id: '1', title: 'Tokyo Streets', items: 3, image: require('@/assets/images/prototype/fit_street_style_1782795298638.png') },
-  { id: '2', title: 'Kyoto Temples', items: 4, image: require('@/assets/images/prototype/fit_casual_hoodie_1782802276628.png') },
-];
+import { getWardrobe, deleteWardrobe, WardrobeWithDetailsResponse } from '@/api/client';
 
 export default function WardrobeDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
 
-  const [wardrobe, setWardrobe] = useState<WardrobeResponse | null>(null);
-  const [items, setItems] = useState<ClothingItemResponse[]>([]);
+  const [wardrobe, setWardrobe] = useState<WardrobeWithDetailsResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isDeleting, setIsDeleting] = useState(false);
   const [menuVisible, setMenuVisible] = useState(false);
@@ -30,12 +24,8 @@ export default function WardrobeDetailScreen() {
     async function loadData() {
       if (!id) return;
       try {
-        const [wardrobeData, itemsData] = await Promise.all([
-          getWardrobe(id as string),
-          getWardrobeClothingItems(id as string)
-        ]);
+        const wardrobeData = await getWardrobe(id as string);
         setWardrobe(wardrobeData);
-        setItems(itemsData);
       } catch (err) {
         console.error('Failed to load wardrobe details', err);
       } finally {
@@ -165,7 +155,7 @@ export default function WardrobeDetailScreen() {
                 <Calendar size={14} color="rgba(255,255,255,0.8)" />
                 <Text style={styles.heroStatText}>{formattedDate}</Text>
               </View>
-              <Text style={styles.heroStatText}> ·  {MOCK_OUTFITS.length} Outfits  ·  {items.length} Items</Text>
+              <Text style={styles.heroStatText}> ·  {wardrobe.outfits.length} Outfits  ·  {wardrobe.clothing_items.length} Items</Text>
             </View>
           </View>
         </View>
@@ -174,37 +164,54 @@ export default function WardrobeDetailScreen() {
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Planned Outfits</Text>
-            <Pressable>
-              <Text style={styles.sectionAction}>See All</Text>
-            </Pressable>
           </View>
 
-          <ScrollView 
-            horizontal 
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.carouselContainer}
-            snapToInterval={160 + 16}
-            decelerationRate="fast"
-          >
-            {MOCK_OUTFITS.map(outfit => (
-              <Pressable key={outfit.id} style={styles.outfitCard}>
-                <View style={styles.outfitImageContainer}>
-                  <Image source={outfit.image} style={StyleSheet.absoluteFillObject} contentFit="cover" />
-                </View>
-                <View style={styles.outfitInfo}>
-                  <Text style={styles.outfitTitle} numberOfLines={1}>{outfit.title}</Text>
-                  <Text style={styles.outfitSubtitle}>{outfit.items} Items</Text>
-                </View>
-              </Pressable>
-            ))}
-            
-            <View style={styles.outfitCard}>
-              <Pressable style={styles.addOutfitButton}>
+          {wardrobe.outfits.length === 0 ? (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyTitle}>No outfits planned yet</Text>
+              <Text style={styles.emptySubtitle}>Mix and match your packed items to create beautiful outfits.</Text>
+              <Pressable 
+                style={styles.dashedCircleButton}
+                onPress={() => router.push({ pathname: '/add-outfit', params: { wardrobeId: wardrobe.id } })}
+              >
                 <Plus size={24} color={FuchsiaColors.slate} />
-                <Text style={styles.addOutfitText}>Add Outfit</Text>
               </Pressable>
             </View>
-          </ScrollView>
+          ) : (
+            <ScrollView 
+              horizontal 
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.carouselContainer}
+              snapToInterval={160 + 16}
+              decelerationRate="fast"
+            >
+              {wardrobe.outfits.map(outfit => (
+                <Pressable key={outfit.id} style={styles.outfitCard}>
+                  <View style={styles.outfitImageContainer}>
+                    {outfit.image_url ? (
+                      <Image source={{ uri: outfit.image_url }} style={StyleSheet.absoluteFillObject} contentFit="cover" />
+                    ) : (
+                      <View style={[StyleSheet.absoluteFillObject, { backgroundColor: FuchsiaColors.mist }]} />
+                    )}
+                  </View>
+                  <View style={styles.outfitInfo}>
+                    <Text style={styles.outfitTitle} numberOfLines={1}>{outfit.name}</Text>
+                    <Text style={styles.outfitSubtitle}>{outfit.clothing_items_count} Items</Text>
+                  </View>
+                </Pressable>
+              ))}
+              
+              <View style={styles.outfitCard}>
+                <Pressable 
+                  style={styles.addOutfitButton}
+                  onPress={() => router.push({ pathname: '/add-outfit', params: { wardrobeId: wardrobe.id } })}
+                >
+                  <Plus size={24} color={FuchsiaColors.slate} />
+                  <Text style={styles.addOutfitText}>Add Outfit</Text>
+                </Pressable>
+              </View>
+            </ScrollView>
+          )}
         </View>
 
         <View style={styles.divider} />
@@ -213,19 +220,22 @@ export default function WardrobeDetailScreen() {
         <View style={[styles.section, { paddingBottom: (insets.bottom || 24) + 20 }]}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Packed Items</Text>
-            <Pressable>
-              <Text style={styles.sectionAction}>Filters</Text>
-            </Pressable>
           </View>
 
-          {items.length === 0 ? (
+          {wardrobe.clothing_items.length === 0 ? (
             <View style={styles.emptyState}>
               <Text style={styles.emptyTitle}>No items packed yet</Text>
               <Text style={styles.emptySubtitle}>Start adding clothes to this wardrobe from your closet or create new ones.</Text>
+              <Pressable 
+                style={styles.dashedCircleButton}
+                onPress={() => router.push(`/wardrobe/${wardrobe.id}/select-items`)}
+              >
+                <Plus size={24} color={FuchsiaColors.slate} />
+              </Pressable>
             </View>
           ) : (
             <View style={styles.gridContainer}>
-              {items.map(item => (
+              {wardrobe.clothing_items.map(item => (
                 <Pressable 
                   key={item.id} 
                   style={[styles.itemCard, { width: itemWidth }]}
@@ -248,6 +258,16 @@ export default function WardrobeDetailScreen() {
                   </View>
                 </Pressable>
               ))}
+              <Pressable 
+                style={[
+                  styles.addOutfitButton, 
+                  { width: itemWidth, height: itemWidth * 1.25, aspectRatio: undefined }
+                ]}
+                onPress={() => router.push(`/wardrobe/${wardrobe.id}/select-items`)}
+              >
+                <Plus size={24} color={FuchsiaColors.slate} />
+                <Text style={styles.addOutfitText}>Add Item</Text>
+              </Pressable>
             </View>
           )}
         </View>
@@ -598,5 +618,16 @@ const styles = StyleSheet.create({
     color: FuchsiaColors.slate,
     textAlign: 'center',
     paddingHorizontal: 24,
+  },
+  dashedCircleButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    borderWidth: 2,
+    borderColor: FuchsiaColors.mist,
+    borderStyle: 'dashed',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 16,
   }
 });

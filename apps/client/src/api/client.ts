@@ -148,12 +148,29 @@ export type WardrobeResponse = {
   updated_at: string;
 };
 
+export type OutfitResponse = {
+  id: string;
+  user_id: string;
+  name: string;
+  is_ai_generated: boolean;
+  image_url?: string | null;
+  clothing_items_count: number;
+  wardrobes_count: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type WardrobeWithDetailsResponse = WardrobeResponse & {
+  clothing_items: ClothingItemResponse[];
+  outfits: OutfitResponse[];
+};
+
 export async function getWardrobes(): Promise<WardrobeResponse[]> {
   return apiFetch<WardrobeResponse[]>('/wardrobes');
 }
 
-export async function getWardrobe(id: string): Promise<WardrobeResponse> {
-  return apiFetch<WardrobeResponse>(`/wardrobes/${id}`);
+export async function getWardrobe(id: string): Promise<WardrobeWithDetailsResponse> {
+  return apiFetch<WardrobeWithDetailsResponse>(`/wardrobes/${id}`);
 }
 
 export async function getWardrobeClothingItems(wardrobeId: string): Promise<ClothingItemResponse[]> {
@@ -328,5 +345,17 @@ export async function updateClothingItem(id: string, data: ClothingItemUpdateReq
   return apiFetch<ClothingItemResponse>(`/clothing-items/${id}`, {
     method: 'PATCH',
     body: formData,
+  });
+}
+
+export async function addItemToWardrobe(itemId: string, wardrobeId: string): Promise<ClothingItemResponse> {
+  return apiFetch<ClothingItemResponse>(`/clothing-items/${itemId}/wardrobes/${wardrobeId}`, {
+    method: 'POST',
+  });
+}
+
+export async function removeItemFromWardrobe(itemId: string, wardrobeId: string): Promise<void> {
+  return apiFetch<void>(`/clothing-items/${itemId}/wardrobes/${wardrobeId}`, {
+    method: 'DELETE',
   });
 }
