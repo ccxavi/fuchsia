@@ -89,6 +89,56 @@ export default function WardrobeDetailScreen() {
 
   return (
     <View style={styles.container}>
+      {/* Fixed Navigation Buttons */}
+      <Pressable 
+        style={[styles.heroButton, { top: insets.top + 16, left: 20 }]} 
+        onPress={() => router.back()}
+      >
+        <ArrowLeft size={20} color={FuchsiaColors.slate} />
+      </Pressable>
+
+      <Pressable 
+        style={[styles.heroButton, { top: insets.top + 16, right: 20 }]}
+        onPress={() => setMenuVisible(!menuVisible)}
+      >
+        {isDeleting ? <ActivityIndicator size="small" color={FuchsiaColors.slate} /> : <MoreHorizontal size={20} color={FuchsiaColors.slate} />}
+      </Pressable>
+
+      {/* Dropdown Menu Backdrop */}
+      {menuVisible && (
+        <Pressable 
+          style={[StyleSheet.absoluteFill, { zIndex: 100 }]}
+          onPress={() => setMenuVisible(false)} 
+        />
+      )}
+
+      {/* Custom Dropdown Menu UI */}
+      {menuVisible && (
+        <View style={[styles.dropdownMenu, { top: insets.top + 16 + 48 }]}>
+          <Pressable 
+            style={({ pressed }) => [styles.dropdownItem, pressed && styles.dropdownItemPressed]} 
+            onPress={() => {
+              setMenuVisible(false);
+              router.push({ pathname: '/add-wardrobe', params: { id } });
+            }}
+          >
+            <Edit2 size={16} color={FuchsiaColors.slate} />
+            <Text style={styles.dropdownItemText}>Edit Wardrobe</Text>
+          </Pressable>
+          <View style={styles.dropdownDivider} />
+          <Pressable 
+            style={({ pressed }) => [styles.dropdownItem, pressed && styles.dropdownItemPressed]} 
+            onPress={() => {
+              setMenuVisible(false);
+              handleDelete();
+            }}
+          >
+            <Trash2 size={16} color="#E11D48" />
+            <Text style={[styles.dropdownItemText, { color: '#E11D48' }]}>Delete Wardrobe</Text>
+          </Pressable>
+        </View>
+      )}
+
       <ScrollView style={styles.container} bounces={false} showsVerticalScrollIndicator={false}>
         {/* Hero Header */}
         <View style={styles.heroSection}>
@@ -107,55 +157,6 @@ export default function WardrobeDetailScreen() {
             colors={['rgba(26,26,46,0.9)', 'rgba(26,26,46,0.3)', 'rgba(26,26,46,0.4)']}
             style={StyleSheet.absoluteFillObject}
           />
-
-          <Pressable 
-            style={[styles.heroButton, { top: insets.top + 16, left: 20 }]} 
-            onPress={() => router.back()}
-          >
-            <ArrowLeft size={20} color={FuchsiaColors.slate} />
-          </Pressable>
-
-          <Pressable 
-            style={[styles.heroButton, { top: insets.top + 16, right: 20 }]}
-            onPress={() => setMenuVisible(!menuVisible)}
-          >
-            {isDeleting ? <ActivityIndicator size="small" color={FuchsiaColors.slate} /> : <MoreHorizontal size={20} color={FuchsiaColors.slate} />}
-          </Pressable>
-
-          {/* Dropdown Menu Backdrop */}
-          {menuVisible && (
-            <Pressable 
-              style={[StyleSheet.absoluteFill, { zIndex: 100 }]}
-              onPress={() => setMenuVisible(false)} 
-            />
-          )}
-
-          {/* Custom Dropdown Menu UI */}
-          {menuVisible && (
-            <View style={[styles.dropdownMenu, { top: insets.top + 16 + 48 }]}>
-              <Pressable 
-                style={({ pressed }) => [styles.dropdownItem, pressed && styles.dropdownItemPressed]} 
-                onPress={() => {
-                  setMenuVisible(false);
-                  router.push({ pathname: '/add-wardrobe', params: { id } });
-                }}
-              >
-                <Edit2 size={16} color={FuchsiaColors.slate} />
-                <Text style={styles.dropdownItemText}>Edit Wardrobe</Text>
-              </Pressable>
-              <View style={styles.dropdownDivider} />
-              <Pressable 
-                style={({ pressed }) => [styles.dropdownItem, pressed && styles.dropdownItemPressed]} 
-                onPress={() => {
-                  setMenuVisible(false);
-                  handleDelete();
-                }}
-              >
-                <Trash2 size={16} color="#E11D48" />
-                <Text style={[styles.dropdownItemText, { color: '#E11D48' }]}>Delete Wardrobe</Text>
-              </Pressable>
-            </View>
-          )}
 
           <View style={styles.heroContent}>
             <Text style={styles.heroTitle}>{wardrobe.name}</Text>
