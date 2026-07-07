@@ -1,10 +1,10 @@
-import { View, Text, StyleSheet, Pressable, ScrollView, ActivityIndicator, useWindowDimensions, DeviceEventEmitter } from 'react-native';
+import { View, Text, StyleSheet, Pressable, ScrollView, ActivityIndicator, useWindowDimensions, DeviceEventEmitter, Modal } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useState, useEffect } from 'react';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
-import { ArrowLeft, MoreHorizontal, Calendar, Plus, Trash2, Edit2 } from 'lucide-react-native';
+import { ArrowLeft, MoreHorizontal, Calendar, Plus, Trash2, Edit2, X, Layers } from 'lucide-react-native';
 
 import { FuchsiaColors, FuchsiaFonts } from '@/constants/theme';
 import { getWardrobe, deleteWardrobe, WardrobeWithDetailsResponse, OutfitWithItemsResponse } from '@/api/client';
@@ -19,6 +19,7 @@ export default function WardrobeDetailScreen() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [menuVisible, setMenuVisible] = useState(false);
   const [deleteAlertVisible, setDeleteAlertVisible] = useState(false);
+  const [addOutfitActionSheetVisible, setAddOutfitActionSheetVisible] = useState(false);
 
   useEffect(() => {
     async function loadData() {
@@ -262,7 +263,7 @@ export default function WardrobeDetailScreen() {
               <Text style={styles.emptySubtitle}>Mix and match your packed items to create beautiful outfits.</Text>
               <Pressable 
                 style={styles.dashedCircleButton}
-                onPress={() => router.push({ pathname: '/add-outfit', params: { wardrobeId: wardrobe.id } })}
+                onPress={() => setAddOutfitActionSheetVisible(true)}
               >
                 <Plus size={24} color={FuchsiaColors.slate} />
               </Pressable>
@@ -294,7 +295,7 @@ export default function WardrobeDetailScreen() {
               <View style={styles.outfitCard}>
                 <Pressable 
                   style={styles.addOutfitButton}
-                  onPress={() => router.push({ pathname: '/add-outfit', params: { wardrobeId: wardrobe.id } })}
+                  onPress={() => setAddOutfitActionSheetVisible(true)}
                 >
                   <Plus size={24} color={FuchsiaColors.slate} />
                   <Text style={styles.addOutfitText}>Add Outfit</Text>
@@ -391,6 +392,61 @@ export default function WardrobeDetailScreen() {
           </View>
         </View>
       )}
+
+      {/* Add Outfit Action Sheet */}
+      <Modal
+        visible={addOutfitActionSheetVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setAddOutfitActionSheetVisible(false)}
+      >
+        <View style={styles.actionSheetOverlay}>
+          <Pressable style={StyleSheet.absoluteFillObject} onPress={() => setAddOutfitActionSheetVisible(false)} />
+          <View style={[styles.actionSheetContent, { paddingBottom: Math.max(insets.bottom, 24) }]}>
+            <View style={styles.actionSheetHeader}>
+              <Text style={styles.actionSheetTitle}>Add Outfit</Text>
+              <Pressable 
+                style={styles.actionSheetCloseButton} 
+                onPress={() => setAddOutfitActionSheetVisible(false)}
+              >
+                <X size={20} color={FuchsiaColors.slate} />
+              </Pressable>
+            </View>
+            
+            <Pressable 
+              style={styles.actionSheetOption}
+              onPress={() => {
+                setAddOutfitActionSheetVisible(false);
+                router.push(`/wardrobe/${wardrobe.id}/select-outfits`);
+              }}
+            >
+              <View style={styles.actionSheetOptionIcon}>
+                <Layers size={24} color={FuchsiaColors.deep} />
+              </View>
+              <View style={styles.actionSheetOptionTextContainer}>
+                <Text style={styles.actionSheetOptionTitle}>Select Existing</Text>
+                <Text style={styles.actionSheetOptionSubtitle}>Choose from your closet</Text>
+              </View>
+            </Pressable>
+
+            <Pressable 
+              style={styles.actionSheetOption}
+              onPress={() => {
+                setAddOutfitActionSheetVisible(false);
+                router.push({ pathname: '/add-outfit', params: { wardrobeId: wardrobe.id } });
+              }}
+            >
+              <View style={styles.actionSheetOptionIcon}>
+                <Plus size={24} color={FuchsiaColors.vibrant} />
+              </View>
+              <View style={styles.actionSheetOptionTextContainer}>
+                <Text style={styles.actionSheetOptionTitle}>Create New</Text>
+                <Text style={styles.actionSheetOptionSubtitle}>Build an outfit for this trip</Text>
+              </View>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -677,7 +733,7 @@ const styles = StyleSheet.create({
     fontFamily: FuchsiaFonts.body,
     fontSize: 10,
     fontWeight: '600',
-    color: FuchsiaColors.slate,
+    color: FuchsiaColors.ink,
   },
   itemInfo: {
     paddingHorizontal: 4,
@@ -719,5 +775,76 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 16,
+  },
+  actionSheetOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'flex-end',
+  },
+  actionSheetContent: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 20,
+    paddingTop: 24,
+  },
+  actionSheetHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 20,
+  },
+  actionSheetTitle: {
+    fontFamily: FuchsiaFonts.heading,
+    fontSize: 20,
+    fontWeight: '600',
+    color: FuchsiaColors.ink,
+  },
+  actionSheetCloseButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: FuchsiaColors.cloud,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  actionSheetOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 16,
+    backgroundColor: FuchsiaColors.cloud,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  actionSheetOptionIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    backgroundColor: '#fff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  actionSheetOptionTextContainer: {
+    flex: 1,
+  },
+  actionSheetOptionTitle: {
+    fontFamily: FuchsiaFonts.heading,
+    fontSize: 16,
+    fontWeight: '600',
+    color: FuchsiaColors.ink,
+    marginBottom: 4,
+  },
+  actionSheetOptionSubtitle: {
+    fontFamily: FuchsiaFonts.body,
+    fontSize: 13,
+    color: FuchsiaColors.slate,
   }
 });

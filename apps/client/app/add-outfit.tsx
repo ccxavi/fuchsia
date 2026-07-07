@@ -16,6 +16,7 @@ import {
   getOutfit,
   getClothingItems,
   getWardrobes,
+  getWardrobeClothingItems,
   ClothingItemResponse,
   WardrobeResponse,
 } from '@/api/client';
@@ -55,10 +56,16 @@ export default function AddOrEditOutfitScreen() {
     getWardrobes()
       .then(setWardrobes)
       .catch(err => console.error('Failed to fetch wardrobes:', err));
-    getClothingItems()
-      .then(setAllItems)
-      .catch(err => console.error('Failed to fetch items:', err));
-  }, [id]);
+    if (wardrobeId) {
+      getWardrobeClothingItems(wardrobeId as string)
+        .then(setAllItems)
+        .catch(err => console.error('Failed to fetch wardrobe items:', err));
+    } else {
+      getClothingItems()
+        .then(setAllItems)
+        .catch(err => console.error('Failed to fetch items:', err));
+    }
+  }, [id, wardrobeId]);
 
   const fetchOutfit = async () => {
     try {
