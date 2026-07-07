@@ -7,6 +7,7 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import { useState, useEffect, useCallback } from 'react';
 import * as Location from 'expo-location';
+import { jwtDecode } from 'jwt-decode';
 import { getMe } from '@/api/client';
 
 import { ThemedText } from '@/components/themed-text';
@@ -89,6 +90,17 @@ export default function HomeScreen() {
         const data = await getMe();
         if (data?.user?.display_name) {
           setUserName(data.user.display_name.split(' ')[0]);
+        } else {
+          const token = await SecureStore.getItemAsync('access_token');
+          if (token) {
+            try {
+              const decoded: any = jwtDecode(token);
+              const fallbackName = decoded?.user_metadata?.full_name || decoded?.user_metadata?.name || decoded?.email?.split('@')[0] || 'there';
+              setUserName(fallbackName.split(' ')[0]);
+            } catch (e) {
+              console.error('Failed to decode token:', e);
+            }
+          }
         }
       } catch (error) {
         console.error('Error fetching user name from API:', error);
