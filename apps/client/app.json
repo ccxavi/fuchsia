@@ -40,7 +40,13 @@
         }
       ],
       "expo-secure-store",
-      "expo-build-properties"
+      "expo-build-properties",
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Allow Fuchsia to use your location to provide accurate weather-based outfit recommendations."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

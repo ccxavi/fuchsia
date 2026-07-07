@@ -6,6 +6,7 @@ import { Sparkles, Lightbulb, Palette, LogOut } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import { useState, useEffect } from 'react';
+import * as Location from 'expo-location';
 import { getMe } from '@/api/client';
 
 import { ThemedText } from '@/components/themed-text';
@@ -17,6 +18,28 @@ export default function HomeScreen() {
 
   const [userName, setUserName] = useState<string>('there');
   const [greetingTime, setGreetingTime] = useState<string>('Good morning');
+
+  const [weatherData, setWeatherData] = useState<{
+    temperature: number;
+    conditionCode: number;
+    city: string;
+    loading: boolean;
+  }>({ temperature: 0, conditionCode: 0, city: 'Loading...', loading: true });
+
+  const getWeatherInfo = (code: number) => {
+    if (code === 0) return { emoji: '☀️', text: 'Clear' };
+    if (code === 1) return { emoji: '🌤️', text: 'Mostly clear' };
+    if (code === 2) return { emoji: '⛅', text: 'Partly cloudy' };
+    if (code === 3) return { emoji: '☁️', text: 'Overcast' };
+    if (code === 45 || code === 48) return { emoji: '🌫️', text: 'Fog' };
+    if (code >= 51 && code <= 67) return { emoji: '🌧️', text: 'Rain' };
+    if (code >= 71 && code <= 77) return { emoji: '❄️', text: 'Snow' };
+    if (code >= 80 && code <= 82) return { emoji: '🌦️', text: 'Rain showers' };
+    if (code >= 95) return { emoji: '⛈️', text: 'Thunderstorms' };
+    return { emoji: '🌡️', text: 'Unknown' };
+  };
+
+  const currentDate = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
 
   useEffect(() => {
     const hour = new Date().getHours();
@@ -35,7 +58,49 @@ export default function HomeScreen() {
       }
     };
     
+    const fetchWeather = async () => {
+      try {
+        let { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== 'granted') {
+          setWeatherData(prev => ({ ...prev, loading: false, city: 'Location Denied' }));
+          return;
+        }
+
+        let location = await Location.getCurrentPositionAsync({});
+        const lat = location.coords.latitude;
+        const lon = location.coords.longitude;
+
+        let city = 'Unknown City';
+        try {
+          let geocode = await Location.reverseGeocodeAsync({ latitude: lat, longitude: lon });
+          if (geocode && geocode.length > 0) {
+            city = geocode[0].city || geocode[0].region || 'Unknown City';
+          }
+        } catch (e) {
+          // ignore reverse geocode errors
+        }
+
+        const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true`);
+        const json = await res.json();
+        
+        if (json.current_weather) {
+          setWeatherData({
+            temperature: json.current_weather.temperature,
+            conditionCode: json.current_weather.weathercode,
+            city,
+            loading: false,
+          });
+        } else {
+          setWeatherData(prev => ({ ...prev, loading: false, city: 'Weather Error' }));
+        }
+      } catch (error) {
+        console.error('Error fetching weather:', error);
+        setWeatherData(prev => ({ ...prev, loading: false, city: 'Weather Error' }));
+      }
+    };
+
     fetchUser();
+    fetchWeather();
   }, []);
 
   const handleLogout = async () => {
@@ -65,17 +130,27 @@ export default function HomeScreen() {
             colors={['#FEF3C7', '#FFEDD5']}
             style={styles.weatherIconBg}
           >
-            <ThemedText style={styles.weatherEmoji}>⛅</ThemedText>
+            <ThemedText style={styles.weatherEmoji}>
+              {weatherData.loading ? '⏳' : getWeatherInfo(weatherData.conditionCode).emoji}
+            </ThemedText>
           </LinearGradient>
           <View style={styles.weatherTextContainer}>
-            <ThemedText style={styles.weatherDate}>Saturday, June 28</ThemedText>
-            <ThemedText style={styles.weatherDetails}>32°C Partly cloudy · Cebu City</ThemedText>
+            <ThemedText style={styles.weatherDate}>{currentDate}</ThemedText>
+            <ThemedText style={styles.weatherDetails}>
+              {weatherData.loading 
+                ? 'Fetching local weather...' 
+                : `${Math.round(weatherData.temperature)}°C ${getWeatherInfo(weatherData.conditionCode).text} · ${weatherData.city}`}
+            </ThemedText>
           </View>
           <View style={styles.weatherTags}>
             <View style={styles.weatherTag}>
-              <ThemedText style={styles.weatherTagText}>Hot</ThemedText>
+              <ThemedText style={styles.weatherTagText}>
+                {weatherData.loading ? '...' : (weatherData.temperature > 25 ? 'Hot' : weatherData.temperature < 15 ? 'Cold' : 'Mild')}
+              </ThemedText>
             </View>
-            <ThemedText style={styles.weatherSubTag}>Light fabrics</ThemedText>
+            <ThemedText style={styles.weatherSubTag}>
+              {weatherData.loading ? '...' : (weatherData.temperature > 25 ? 'Light fabrics' : weatherData.temperature < 15 ? 'Layers needed' : 'Perfect weather')}
+            </ThemedText>
           </View>
         </View>
 
