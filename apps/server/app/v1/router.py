@@ -13,6 +13,8 @@ router.include_router(
     tags=["auth"],
 )
 router.include_router(
+    chat.router,
+    tags=["chat"],
     clothing_items.router,
     prefix="/clothing-items",
     tags=["clothing-items"],
