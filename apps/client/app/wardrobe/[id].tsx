@@ -276,7 +276,11 @@ export default function WardrobeDetailScreen() {
               decelerationRate="fast"
             >
               {wardrobe.outfits.map(outfit => (
-                <Pressable key={outfit.id} style={styles.outfitCard}>
+                <Pressable 
+                  key={outfit.id} 
+                  style={styles.outfitCard}
+                  onPress={() => router.push(`/outfit/${outfit.id}`)}
+                >
                   <View style={styles.outfitImageContainer}>
                     {renderOutfitImage(outfit)}
                   </View>
