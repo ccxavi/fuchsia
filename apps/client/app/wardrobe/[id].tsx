@@ -7,7 +7,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { ArrowLeft, MoreHorizontal, Calendar, Plus, Trash2, Edit2 } from 'lucide-react-native';
 
 import { FuchsiaColors, FuchsiaFonts } from '@/constants/theme';
-import { getWardrobe, deleteWardrobe, WardrobeWithDetailsResponse } from '@/api/client';
+import { getWardrobe, deleteWardrobe, WardrobeWithDetailsResponse, OutfitWithItemsResponse } from '@/api/client';
 
 export default function WardrobeDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -76,6 +76,96 @@ export default function WardrobeDetailScreen() {
 
   const dateObj = new Date(wardrobe.created_at);
   const formattedDate = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+
+  const renderOutfitImage = (item: OutfitWithItemsResponse) => {
+    const items = item.clothing_items || [];
+    
+    // If user uploaded a custom image, prioritize it over the 2x2 grid collage
+    if (item.images && item.images.length > 0) {
+      const coverImage = item.images[0];
+      return <Image source={{ uri: coverImage.image_url }} style={StyleSheet.absoluteFillObject} contentFit="cover" />;
+    }
+
+    if (items.length === 0) {
+      return (
+        <LinearGradient
+          colors={['#D4145A', '#86003C']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={[StyleSheet.absoluteFillObject, { alignItems: 'center', justifyContent: 'center' }]}
+        >
+          <Text style={{ fontFamily: FuchsiaFonts.heading, fontSize: 14, color: '#fff', textAlign: 'center', paddingHorizontal: 8 }} numberOfLines={2}>{item.name}</Text>
+        </LinearGradient>
+      );
+    }
+
+    if (items.length === 1) {
+      return (
+        <View style={[{ flex: 1, backgroundColor: FuchsiaColors.mist }]}>
+          <Image source={{ uri: items[0].image_url || '' }} style={StyleSheet.absoluteFillObject} contentFit="cover" />
+        </View>
+      );
+    }
+
+    if (items.length === 2) {
+      return (
+        <View style={{ flex: 1, flexDirection: 'row' }}>
+          <View style={{ flex: 1, borderRightWidth: 1, borderColor: '#fff', backgroundColor: FuchsiaColors.mist }}>
+            <Image source={{ uri: items[0].image_url || '' }} style={{ flex: 1 }} contentFit="cover" />
+          </View>
+          <View style={{ flex: 1, borderLeftWidth: 1, borderColor: '#fff', backgroundColor: FuchsiaColors.mist }}>
+            <Image source={{ uri: items[1].image_url || '' }} style={{ flex: 1 }} contentFit="cover" />
+          </View>
+        </View>
+      );
+    }
+
+    if (items.length === 3) {
+      return (
+        <View style={{ flex: 1 }}>
+          <View style={{ flex: 1, borderBottomWidth: 1, borderColor: '#fff', backgroundColor: FuchsiaColors.mist }}>
+            <Image source={{ uri: items[0].image_url || '' }} style={{ flex: 1 }} contentFit="cover" />
+          </View>
+          <View style={{ flex: 1, flexDirection: 'row', borderTopWidth: 1, borderColor: '#fff' }}>
+            <View style={{ flex: 1, borderRightWidth: 1, borderColor: '#fff', backgroundColor: FuchsiaColors.mist }}>
+              <Image source={{ uri: items[1].image_url || '' }} style={{ flex: 1 }} contentFit="cover" />
+            </View>
+            <View style={{ flex: 1, borderLeftWidth: 1, borderColor: '#fff', backgroundColor: FuchsiaColors.mist }}>
+              <Image source={{ uri: items[2].image_url || '' }} style={{ flex: 1 }} contentFit="cover" />
+            </View>
+          </View>
+        </View>
+      );
+    }
+
+    // 4 or more items
+    const extraCount = items.length - 3;
+    return (
+      <View style={{ flex: 1 }}>
+        <View style={{ flex: 1, flexDirection: 'row', borderBottomWidth: 1, borderColor: '#fff' }}>
+          <View style={{ flex: 1, borderRightWidth: 1, borderColor: '#fff', backgroundColor: FuchsiaColors.mist }}>
+            <Image source={{ uri: items[0].image_url || '' }} style={{ flex: 1 }} contentFit="cover" />
+          </View>
+          <View style={{ flex: 1, borderLeftWidth: 1, borderColor: '#fff', backgroundColor: FuchsiaColors.mist }}>
+            <Image source={{ uri: items[1].image_url || '' }} style={{ flex: 1 }} contentFit="cover" />
+          </View>
+        </View>
+        <View style={{ flex: 1, flexDirection: 'row', borderTopWidth: 1, borderColor: '#fff' }}>
+          <View style={{ flex: 1, borderRightWidth: 1, borderColor: '#fff', backgroundColor: FuchsiaColors.mist }}>
+            <Image source={{ uri: items[2].image_url || '' }} style={{ flex: 1 }} contentFit="cover" />
+          </View>
+          <View style={{ flex: 1, borderLeftWidth: 1, borderColor: '#fff', backgroundColor: FuchsiaColors.mist }}>
+            <Image source={{ uri: items[3].image_url || '' }} style={{ flex: 1 }} contentFit="cover" />
+            {items.length > 4 && (
+              <View style={{ ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center' }}>
+                <Text style={{ fontFamily: FuchsiaFonts.heading, fontSize: 16, color: '#fff', fontWeight: 'bold' }}>+{extraCount}</Text>
+              </View>
+            )}
+          </View>
+        </View>
+      </View>
+    );
+  };
 
   return (
     <View style={styles.container}>
@@ -188,11 +278,7 @@ export default function WardrobeDetailScreen() {
               {wardrobe.outfits.map(outfit => (
                 <Pressable key={outfit.id} style={styles.outfitCard}>
                   <View style={styles.outfitImageContainer}>
-                    {outfit.image_url ? (
-                      <Image source={{ uri: outfit.image_url }} style={StyleSheet.absoluteFillObject} contentFit="cover" />
-                    ) : (
-                      <View style={[StyleSheet.absoluteFillObject, { backgroundColor: FuchsiaColors.mist }]} />
-                    )}
+                    {renderOutfitImage(outfit)}
                   </View>
                   <View style={styles.outfitInfo}>
                     <Text style={styles.outfitTitle} numberOfLines={1}>{outfit.name}</Text>
