@@ -153,7 +153,7 @@ class OutfitWithWardrobesResponse(OutfitWithItemsResponse):
 
 class WardrobeWithDetailsResponse(WardrobeResponse):
     clothing_items: list[ClothingItemResponse] = []
-    outfits: list[OutfitResponse] = []
+    outfits: list[OutfitWithItemsResponse] = []
 
 
 class ClothingItemWithWardrobesResponse(ClothingItemResponse):
