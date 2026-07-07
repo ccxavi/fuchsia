@@ -3,9 +3,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Sparkles, Lightbulb, Palette, LogOut } from 'lucide-react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import * as Location from 'expo-location';
 import { getMe } from '@/api/client';
 
@@ -77,9 +77,10 @@ export default function HomeScreen() {
 
   const currentDate = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
 
-  useEffect(() => {
-    const hour = new Date().getHours();
-    if (hour < 12) setGreetingTime('Good morning');
+  useFocusEffect(
+    useCallback(() => {
+      const hour = new Date().getHours();
+      if (hour < 12) setGreetingTime('Good morning');
     else if (hour < 18) setGreetingTime('Good afternoon');
     else setGreetingTime('Good evening');
 
@@ -137,7 +138,8 @@ export default function HomeScreen() {
 
     fetchUser();
     fetchWeather();
-  }, []);
+  }, [])
+  );
 
   const handleLogout = async () => {
     await SecureStore.deleteItemAsync('access_token');
