@@ -64,8 +64,11 @@ export default function HomeScreen() {
   }>({ temperature: 0, conditionCode: 0, city: 'Loading...', loading: true });
 
   const getWeatherInfo = (code: number) => {
-    if (code === 0) return { emoji: '☀️', text: 'Clear' };
-    if (code === 1) return { emoji: '🌤️', text: 'Mostly clear' };
+    const hour = new Date().getHours();
+    const isNight = hour < 6 || hour >= 18;
+
+    if (code === 0) return { emoji: isNight ? '🌙' : '☀️', text: 'Clear' };
+    if (code === 1) return { emoji: isNight ? '🌙' : '🌤️', text: 'Mostly clear' };
     if (code === 2) return { emoji: '⛅', text: 'Partly cloudy' };
     if (code === 3) return { emoji: '☁️', text: 'Overcast' };
     if (code === 45 || code === 48) return { emoji: '🌫️', text: 'Fog' };
@@ -77,13 +80,16 @@ export default function HomeScreen() {
   };
 
   const getWeatherTag = (code: number, temp: number) => {
+    const hour = new Date().getHours();
+    const isNight = hour < 6 || hour >= 18;
+
     if ((code >= 51 && code <= 67) || (code >= 80 && code <= 82)) return { tag: 'Rainy', subTag: 'Bring an umbrella' };
     if (code >= 71 && code <= 77) return { tag: 'Snowy', subTag: 'Bundle up' };
     if (code >= 95) return { tag: 'Stormy', subTag: 'Stay safe indoors' };
     
-    if (temp > 25) return { tag: 'Hot', subTag: 'Light fabrics' };
-    if (temp < 15) return { tag: 'Cold', subTag: 'Layers needed' };
-    return { tag: 'Mild', subTag: 'Perfect weather' };
+    if (temp > 25) return { tag: isNight ? 'Warm night' : 'Hot', subTag: 'Light fabrics' };
+    if (temp < 15) return { tag: isNight ? 'Cold night' : 'Cold', subTag: 'Layers needed' };
+    return { tag: isNight ? 'Clear night' : 'Mild', subTag: 'Perfect weather' };
   };
 
   const currentDate = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
