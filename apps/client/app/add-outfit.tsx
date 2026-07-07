@@ -17,6 +17,8 @@ import {
   getClothingItems,
   getWardrobes,
   getWardrobeClothingItems,
+  addItemToOutfit,
+  removeItemFromOutfit,
   ClothingItemResponse,
   WardrobeResponse,
 } from '@/api/client';
@@ -28,6 +30,7 @@ export default function AddOrEditOutfitScreen() {
 
   const [name, setName] = useState('');
   const [selectedItems, setSelectedItems] = useState<ClothingItemResponse[]>([]);
+  const [initialItemIds, setInitialItemIds] = useState<Set<string>>(new Set());
   const [wardrobes, setWardrobes] = useState<WardrobeResponse[]>([]);
   const [selectedWardrobeIds, setSelectedWardrobeIds] = useState<string[]>(
     wardrobeId ? [wardrobeId as string] : []
@@ -35,6 +38,7 @@ export default function AddOrEditOutfitScreen() {
 
   const [allItems, setAllItems] = useState<ClothingItemResponse[]>([]);
   const [showItemPicker, setShowItemPicker] = useState(false);
+  const [showCartModal, setShowCartModal] = useState(false);
   const [pickerSelectedIds, setPickerSelectedIds] = useState<Set<string>>(new Set());
 
   // Item Picker state
@@ -43,7 +47,6 @@ export default function AddOrEditOutfitScreen() {
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [showCartModal, setShowCartModal] = useState(false);
 
   const [isLoading, setIsLoading] = useState(false);
   const [isFetching, setIsFetching] = useState(!!id);
@@ -72,6 +75,7 @@ export default function AddOrEditOutfitScreen() {
       const data = await getOutfit(id!);
       setName(data.name || '');
       setSelectedItems(data.clothing_items || []);
+      setInitialItemIds(new Set(data.clothing_items?.map(i => i.id) || []));
       if (data.wardrobes && data.wardrobes.length > 0) {
         setSelectedWardrobeIds(data.wardrobes.map(w => w.id));
       }
@@ -96,10 +100,21 @@ export default function AddOrEditOutfitScreen() {
           name: name.trim(),
           wardrobe_ids: selectedWardrobeIds,
         });
-        // We do not manage outfit items inside the patch currently.
-        // The backend updateOutfit doesn't take clothing_item_ids right now.
-        // But we are focusing on the UI here.
-        DeviceEventEmitter.emit('outfitUpdated', updatedOutfit);
+        
+        // Handle Item additions/removals
+        const currentItemIds = new Set(selectedItems.map(i => i.id));
+        const addedItems = [...currentItemIds].filter(itemId => !initialItemIds.has(itemId));
+        const removedItems = [...initialItemIds].filter(itemId => !currentItemIds.has(itemId));
+
+        const itemPromises: Promise<any>[] = [];
+        for (const itemId of addedItems) itemPromises.push(addItemToOutfit(id, itemId));
+        for (const itemId of removedItems) itemPromises.push(removeItemFromOutfit(id, itemId));
+
+        if (itemPromises.length > 0) {
+          await Promise.all(itemPromises);
+        }
+
+        DeviceEventEmitter.emit('outfitUpdated', id);
         DeviceEventEmitter.emit('showGlobalToast', 'Outfit updated successfully');
       } else {
         await createOutfit({
@@ -234,24 +249,20 @@ export default function AddOrEditOutfitScreen() {
                     <View style={[StyleSheet.absoluteFillObject, { backgroundColor: FuchsiaColors.cloud }]} />
                   )}
                 </View>
-                {!id && (
                   <Pressable
                     style={styles.removeItemButton}
                     onPress={() => removeSelectedItem(item.id)}
                   >
                     <X size={10} color={FuchsiaColors.slate} />
                   </Pressable>
-                )}
               </View>
             ))}
 
             {/* Add Item Button */}
-            {!id && (
               <Pressable style={styles.addItemButton} onPress={openItemPicker}>
                 <Plus size={24} color={FuchsiaColors.slate} />
                 <ThemedText style={styles.addItemText}>Add Item</ThemedText>
               </Pressable>
-            )}
           </ScrollView>
         </View>
 
@@ -366,7 +377,14 @@ export default function AddOrEditOutfitScreen() {
                   Select Items
                 </Text>
               </View>
-              <View style={{ width: 40 }} />
+              <Pressable onPress={() => setShowCartModal(true)} style={styles.iconButton}>
+                <ShoppingBag size={20} color={FuchsiaColors.ink} />
+                {pickerSelectedIds.size > 0 && (
+                  <View style={styles.headerCartBadge}>
+                    <Text style={styles.headerCartBadgeText}>{pickerSelectedIds.size}</Text>
+                  </View>
+                )}
+              </Pressable>
             </View>
 
             <View style={styles.searchRow}>
@@ -450,20 +468,7 @@ export default function AddOrEditOutfitScreen() {
               <View style={{ height: (insets.bottom || 24) + 40 }} />
             </ScrollView>
             
-            {selectedCount > 0 && (
-              <Animated.View 
-                entering={FadeInDown.duration(250)} 
-                exiting={FadeOutDown.duration(250)}
-                style={[styles.cartFabWrapper, { bottom: (insets.bottom || 24) + 16 }]}
-              >
-                <Pressable style={styles.cartFab} onPress={() => setShowCartModal(true)}>
-                  <ShoppingBag size={20} color="white" />
-                  <View style={styles.cartBadge}>
-                    <Text style={styles.cartBadgeText}>{selectedCount}</Text>
-                  </View>
-                </Pressable>
-              </Animated.View>
-            )}
+
             
             <Animated.View 
               layout={Layout.duration(250)}
@@ -482,6 +487,7 @@ export default function AddOrEditOutfitScreen() {
           </View>
         </View>
       </Modal>
+
 
       {/* Cart Modal inside Picker */}
       <Modal
@@ -537,7 +543,7 @@ export default function AddOrEditOutfitScreen() {
                   style={styles.cartSaveButton}
                 >
                   <Text style={styles.cartSaveButtonText}>
-                    Add {pickerSelectedIds.size} {pickerSelectedIds.size === 1 ? 'Item' : 'Items'}
+                    Add to Outfit
                   </Text>
                 </LinearGradient>
               </Pressable>
@@ -707,6 +713,8 @@ const styles = StyleSheet.create({
   itemsRow: {
     gap: 16,
     paddingRight: 20,
+    paddingTop: 12,
+    paddingBottom: 8,
   },
   selectedItemCard: {
     width: 96,
@@ -900,6 +908,26 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: FuchsiaColors.ink,
+  },
+  headerCartBadge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    backgroundColor: FuchsiaColors.vibrant,
+    borderRadius: 10,
+    minWidth: 18,
+    height: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+    borderWidth: 1.5,
+    borderColor: '#fff',
+  },
+  headerCartBadgeText: {
+    fontFamily: FuchsiaFonts.body,
+    fontSize: 9,
+    fontWeight: '700',
+    color: '#fff',
   },
   searchRow: {},
   searchContainer: {

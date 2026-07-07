@@ -1,39 +1,39 @@
-import { View, Text, StyleSheet, Pressable, ScrollView, ActivityIndicator, DeviceEventEmitter, TextInput } from 'react-native';
+import { View, Text, StyleSheet, Pressable, ScrollView, ActivityIndicator, DeviceEventEmitter, TextInput, Alert } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useState, useEffect } from 'react';
 import { Image } from 'expo-image';
-import { ArrowLeft, Edit2, Trash2, Layers, Camera, X, Check, Plus, MoreHorizontal } from 'lucide-react-native';
+import { ArrowLeft, Edit2, Trash2, Layers, Camera, X, Check, Plus, MoreHorizontal, Info } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
 
 import { FuchsiaColors, FuchsiaFonts } from '@/constants/theme';
-import { getOutfit, deleteOutfit, updateOutfit, deleteOutfitImage, removeItemFromOutfit, removeWardrobeFromOutfit, OutfitWithWardrobesResponse } from '@/api/client';
+import { getOutfit, deleteOutfit, updateOutfit, deleteOutfitImage, addItemToOutfit, removeItemFromOutfit, addWardrobeToOutfit, removeWardrobeFromOutfit, OutfitWithWardrobesResponse } from '@/api/client';
 
 export default function OutfitDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const insets = useSafeAreaInsets();
 
+  // Outfit State
   const [outfit, setOutfit] = useState<OutfitWithWardrobesResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isDeleting, setIsDeleting] = useState(false);
   const [menuVisible, setMenuVisible] = useState(false);
   const [deleteAlertVisible, setDeleteAlertVisible] = useState(false);
+  const [infoAlertVisible, setInfoAlertVisible] = useState(false);
+  const [photoToDelete, setPhotoToDelete] = useState<string | null>(null);
+  const [isDeletingPhoto, setIsDeletingPhoto] = useState(false);
   const [focusedPhotoId, setFocusedPhotoId] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
-  
-  // Edit Mode State
-  const [isEditMode, setIsEditMode] = useState(false);
-  const [editableName, setEditableName] = useState('');
 
   useEffect(() => {
     if (id) {
       fetchOutfit();
     }
 
-    const subscription = DeviceEventEmitter.addListener('outfitUpdated', (updatedOutfit) => {
-      if (updatedOutfit && updatedOutfit.id === id) {
-        // Re-fetch to get full data with clothing_items
+    const subscription = DeviceEventEmitter.addListener('outfitUpdated', (payload) => {
+      const updatedId = typeof payload === 'string' ? payload : payload?.id;
+      if (updatedId === id) {
         fetchOutfit();
       }
     });
@@ -47,7 +47,6 @@ export default function OutfitDetailScreen() {
     try {
       const data = await getOutfit(id!);
       setOutfit(data);
-      setEditableName(data.name);
       if (data.images && data.images.length > 0 && !focusedPhotoId) {
         setFocusedPhotoId(data.images[0].id);
       }
@@ -103,47 +102,24 @@ export default function OutfitDetailScreen() {
     }
   };
 
-  const toggleEditMode = async () => {
-    if (!outfit) return;
-
-    if (isEditMode) {
-      // Save changes
-      if (editableName.trim() !== outfit.name && editableName.trim() !== '') {
-        try {
-          setIsLoading(true); // show loader during save
-          await updateOutfit(id!, { name: editableName.trim() });
-          await fetchOutfit();
-          DeviceEventEmitter.emit('showGlobalToast', 'Changes saved successfully');
-        } catch (err) {
-          console.error('Failed to update outfit name:', err);
-        } finally {
-          setIsLoading(false);
-        }
-      } else {
-        DeviceEventEmitter.emit('showGlobalToast', 'Changes saved successfully');
-      }
-    }
-    setIsEditMode(!isEditMode);
+  const promptDeleteImage = (imageId: string) => {
+    setPhotoToDelete(imageId);
   };
 
-  const handleDeleteImage = async (imageId: string) => {
+  const confirmDeletePhoto = async () => {
+    if (!photoToDelete) return;
+    setIsDeletingPhoto(true);
     try {
-      await deleteOutfitImage(imageId);
-      if (focusedPhotoId === imageId) {
+      await deleteOutfitImage(photoToDelete);
+      if (focusedPhotoId === photoToDelete) {
         setFocusedPhotoId(null);
       }
       await fetchOutfit();
+      setPhotoToDelete(null);
     } catch (err) {
       console.error('Failed to delete image:', err);
-    }
-  };
-
-  const handleRemoveItem = async (itemId: string) => {
-    try {
-      await removeItemFromOutfit(id!, itemId);
-      await fetchOutfit();
-    } catch (err) {
-      console.error('Failed to remove item from outfit:', err);
+    } finally {
+      setIsDeletingPhoto(false);
     }
   };
 
@@ -167,21 +143,13 @@ export default function OutfitDetailScreen() {
         <Pressable onPress={() => router.back()} style={styles.headerButton}>
           <ArrowLeft size={18} color={FuchsiaColors.slate} />
         </Pressable>
-        <Text style={styles.headerTitle}>{isEditMode ? 'Edit Outfit' : 'Outfit Detail'}</Text>
+        <Text style={styles.headerTitle}>Outfit Detail</Text>
         <Pressable 
-          onPress={() => {
-            if (isEditMode) {
-              toggleEditMode();
-            } else {
-              setMenuVisible(true);
-            }
-          }} 
-          style={[styles.headerButton, isEditMode && styles.headerButtonActive]}
+          onPress={() => setMenuVisible(true)} 
+          style={styles.headerButton}
         >
           {isDeleting ? (
             <ActivityIndicator size="small" color={FuchsiaColors.slate} />
-          ) : isEditMode ? (
-            <Check size={18} color={FuchsiaColors.vibrant} />
           ) : (
             <MoreHorizontal size={18} color={FuchsiaColors.slate} />
           )}
@@ -203,7 +171,18 @@ export default function OutfitDetailScreen() {
             style={({ pressed }) => [styles.dropdownItem, pressed && styles.dropdownItemPressed]}
             onPress={() => {
               setMenuVisible(false);
-              toggleEditMode();
+              handleAddPhoto();
+            }}
+          >
+            <Camera size={16} color={FuchsiaColors.slate} />
+            <Text style={styles.dropdownItemText}>Add Photo</Text>
+          </Pressable>
+          <View style={styles.dropdownDivider} />
+          <Pressable
+            style={({ pressed }) => [styles.dropdownItem, pressed && styles.dropdownItemPressed]}
+            onPress={() => {
+              setMenuVisible(false);
+              router.push(`/add-outfit?id=${outfit.id}`);
             }}
           >
             <Edit2 size={16} color={FuchsiaColors.slate} />
@@ -217,6 +196,38 @@ export default function OutfitDetailScreen() {
             <Trash2 size={16} color="#E11D48" />
             <Text style={[styles.dropdownItemText, { color: '#E11D48' }]}>Delete Outfit</Text>
           </Pressable>
+        </View>
+      )}
+
+      {/* Photo Delete Confirmation */}
+      {photoToDelete && (
+        <View style={styles.alertOverlay}>
+          <View style={styles.alertBox}>
+            <Text style={styles.alertTitle}>Delete this photo?</Text>
+            <Text style={styles.alertMessage}>
+              Are you sure you want to remove this photo from the outfit?
+            </Text>
+            <View style={styles.alertButtonsRow}>
+              <Pressable
+                style={styles.alertCancelButton}
+                onPress={() => setPhotoToDelete(null)}
+                disabled={isDeletingPhoto}
+              >
+                <Text style={styles.alertCancelText}>Keep it</Text>
+              </Pressable>
+              <Pressable
+                style={styles.alertDeleteButton}
+                onPress={confirmDeletePhoto}
+                disabled={isDeletingPhoto}
+              >
+                {isDeletingPhoto ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Text style={styles.alertDeleteText}>Delete</Text>
+                )}
+              </Pressable>
+            </View>
+          </View>
         </View>
       )}
 
@@ -252,6 +263,26 @@ export default function OutfitDetailScreen() {
         </View>
       )}
 
+      {/* Info Tip Alert */}
+      {infoAlertVisible && (
+        <View style={styles.alertOverlay}>
+          <View style={styles.alertBox}>
+            <Text style={styles.alertTitle}>Managing Photos</Text>
+            <Text style={styles.alertMessage}>
+              To delete a photo, simply tap and hold on the photo you wish to remove.
+            </Text>
+            <View style={styles.alertButtonsRow}>
+              <Pressable
+                style={[styles.alertCancelButton, { backgroundColor: FuchsiaColors.vibrant, borderColor: FuchsiaColors.vibrant }]}
+                onPress={() => setInfoAlertVisible(false)}
+              >
+                <Text style={[styles.alertCancelText, { color: '#fff' }]}>Got it</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      )}
+
       <ScrollView
         bounces={false}
         showsVerticalScrollIndicator={false}
@@ -260,16 +291,7 @@ export default function OutfitDetailScreen() {
         {/* Outfit Name */}
         <View style={styles.nameSection}>
           <View style={{ flex: 1, paddingRight: 16 }}>
-            {isEditMode ? (
-              <TextInput
-                style={styles.outfitNameInput}
-                value={editableName}
-                onChangeText={setEditableName}
-                placeholder="Outfit Name"
-              />
-            ) : (
-              <Text style={styles.outfitName} numberOfLines={1}>{outfit.name}</Text>
-            )}
+            <Text style={styles.outfitName} numberOfLines={1}>{outfit.name}</Text>
           </View>
           <Text style={styles.outfitSubtitle}>
             {outfit.is_ai_generated ? 'AI Curated  ·  ' : ''}
@@ -280,7 +302,17 @@ export default function OutfitDetailScreen() {
         {/* My Photos */}
         <View style={styles.card}>
           <View style={styles.myPhotosHeader}>
-            <Text style={styles.cardLabel}>MY PHOTOS</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Text style={[styles.cardLabel, { marginBottom: 0 }]}>MY PHOTOS</Text>
+              {outfit.images && outfit.images.length > 0 && (
+                <Pressable 
+                  onPress={() => setInfoAlertVisible(true)} 
+                  hitSlop={8}
+                >
+                  <Info size={14} color={FuchsiaColors.slate} />
+                </Pressable>
+              )}
+            </View>
             <Text style={styles.myPhotosCount}>
               {outfit.images ? outfit.images.length : 0} photos
             </Text>
@@ -291,7 +323,11 @@ export default function OutfitDetailScreen() {
             <View style={styles.mainFocusContainer}>
               {outfit.images.map(img => (
                 img.id === focusedPhotoId && (
-                  <View key={img.id} style={StyleSheet.absoluteFillObject}>
+                  <Pressable 
+                    key={img.id} 
+                    style={StyleSheet.absoluteFillObject}
+                    onLongPress={() => promptDeleteImage(img.id)}
+                  >
                     <Image
                       source={{ uri: img.image_url }}
                       style={StyleSheet.absoluteFillObject}
@@ -305,7 +341,7 @@ export default function OutfitDetailScreen() {
                         </Text>
                       </View>
                     )}
-                  </View>
+                  </Pressable>
                 )
               ))}
             </View>
@@ -313,44 +349,18 @@ export default function OutfitDetailScreen() {
 
           {/* Thumbnail Carousel or Empty State */}
           {!outfit.images || outfit.images.length === 0 ? (
-            <Pressable 
-              style={styles.emptyPhotosContainer}
-              onPress={isEditMode ? handleAddPhoto : undefined}
-              disabled={isUploading || !isEditMode}
-            >
-              {isUploading ? (
-                <ActivityIndicator size="small" color={FuchsiaColors.slate} />
-              ) : (
-                <Text style={styles.emptyPhotosText}>
-                  {isEditMode 
-                    ? "No photos yet. Tap here to add a photo!" 
-                    : "No photos yet. Tap Edit to add photos of you wearing this outfit."}
-                </Text>
-              )}
-            </Pressable>
+            <View style={styles.emptyPhotosContainer}>
+              <Text style={styles.emptyPhotosText}>
+                No photos yet. You can add one from the menu!
+              </Text>
+            </View>
           ) : (
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.thumbnailCarousel}
             >
-              {/* Add Photo Button (Only visible in edit mode) */}
-              {isEditMode && (
-                <Pressable
-                  style={styles.addPhotoBtn}
-                  onPress={handleAddPhoto}
-                  disabled={isUploading}
-                >
-                  {isUploading ? (
-                    <ActivityIndicator size="small" color={FuchsiaColors.slate} />
-                  ) : (
-                    <>
-                      <Camera size={16} color={FuchsiaColors.slate} />
-                      <Text style={styles.addPhotoBtnText}>Add</Text>
-                    </>
-                  )}
-                </Pressable>
-              )}
+              {/* Existing Photos */}
 
               {/* Existing Photos */}
               {outfit.images && outfit.images.map((img) => {
@@ -360,18 +370,11 @@ export default function OutfitDetailScreen() {
                     key={img.id}
                     style={[styles.thumbnailBtn, isFocused && styles.thumbnailBtnFocused]}
                     onPress={() => setFocusedPhotoId(img.id)}
+                    onLongPress={() => promptDeleteImage(img.id)}
                   >
                     <Image source={{ uri: img.image_url }} style={StyleSheet.absoluteFillObject} contentFit="cover" />
                     {isFocused && (
                       <View style={styles.thumbnailOverlay} />
-                    )}
-                    {isEditMode && (
-                      <Pressable 
-                        style={styles.photoDeleteBtn}
-                        onPress={() => handleDeleteImage(img.id)}
-                      >
-                        <X size={10} color="#fff" />
-                      </Pressable>
                     )}
                   </Pressable>
                 );
@@ -423,39 +426,18 @@ export default function OutfitDetailScreen() {
                     <Text style={styles.itemName}>{item.name}</Text>
                     <Text style={styles.itemCategory}>{item.category || 'Item'}</Text>
                   </View>
-                  {isEditMode ? (
-                    <Pressable 
-                      style={styles.itemDeleteBtn}
-                      onPress={() => handleRemoveItem(item.id)}
-                    >
-                      <Trash2 size={16} color={FuchsiaColors.vibrant} />
-                    </Pressable>
-                  ) : (
-                    <View style={styles.itemBadge}>
-                      <Text style={styles.itemBadgeText}>{item.category || 'Item'}</Text>
-                    </View>
-                  )}
+                  <View style={styles.itemBadge}>
+                    <Text style={styles.itemBadgeText}>{item.category || 'Item'}</Text>
+                  </View>
                 </Pressable>
               ))}
             </ScrollView>
           )}
-          
-          {isEditMode && (
-            <Pressable 
-              style={styles.addMoreItemsBtn}
-              onPress={() => router.push(`/outfit/${outfit.id}/select-items`)}
-            >
-              <Plus size={16} color={FuchsiaColors.slate} />
-              <Text style={styles.addMoreItemsText}>Add More Items</Text>
-            </Pressable>
-          )}
         </View>
 
-        {/* Wardrobes */}
-        {(isEditMode || (outfit.wardrobes && outfit.wardrobes.length > 0)) && (
-          <View style={[styles.card, { paddingRight: 0 }]}>
+        <View style={[styles.card, { paddingRight: 0 }]}>
             <View style={[styles.myPhotosHeader, { paddingRight: 20 }]}>
-              <Text style={styles.cardLabel}>In Wardrobes</Text>
+              <Text style={[styles.cardLabel, { marginBottom: 0 }]}>In Wardrobes</Text>
             </View>
 
             {(!outfit.wardrobes || outfit.wardrobes.length === 0) ? (
@@ -470,58 +452,30 @@ export default function OutfitDetailScreen() {
                 contentContainerStyle={styles.wardrobesCarousel}
               >
                 {outfit.wardrobes.map(w => (
-                  <Pressable
-                    key={w.id}
-                    style={styles.wardrobeCard}
-                    onPress={() => router.push(`/wardrobe/${w.id}`)}
-                  >
-                    {w.image_url ? (
-                      <Image source={{ uri: w.image_url }} style={StyleSheet.absoluteFillObject} contentFit="cover" />
-                    ) : (
-                      <LinearGradient
-                        colors={['#D4145A', '#86003C']}
-                        style={StyleSheet.absoluteFillObject}
-                      />
-                    )}
+                  <View key={w.id} style={{ position: 'relative', marginRight: 12 }}>
+                    <Pressable
+                      style={styles.wardrobeCard}
+                      onPress={() => router.push(`/wardrobe/${w.id}`)}
+                    >
+                      {w.image_url ? (
+                        <Image source={{ uri: w.image_url }} style={StyleSheet.absoluteFillObject} contentFit="cover" />
+                      ) : (
+                        <LinearGradient
+                          colors={['#D4145A', '#86003C']}
+                          style={StyleSheet.absoluteFillObject}
+                        />
+                      )}
                     <LinearGradient
                       colors={['transparent', 'rgba(0,0,0,0.8)']}
                       style={styles.wardrobeCardGradient}
                     />
                     <Text style={styles.wardrobeCardName} numberOfLines={2}>{w.name}</Text>
-                    {isEditMode && (
-                      <Pressable 
-                        style={styles.photoDeleteBtn}
-                        onPress={async () => {
-                          try {
-                            setIsLoading(true);
-                            await removeWardrobeFromOutfit(outfit.id, w.id);
-                            DeviceEventEmitter.emit('outfitUpdated', outfit.id);
-                            fetchOutfit();
-                          } catch (err) {
-                            console.error('Failed to remove wardrobe from outfit', err);
-                            setIsLoading(false);
-                          }
-                        }}
-                      >
-                        <X size={10} color="#fff" />
-                      </Pressable>
-                    )}
                   </Pressable>
+                </View>
                 ))}
               </ScrollView>
             )}
-            
-            {isEditMode && (
-              <Pressable 
-                style={[styles.addMoreItemsBtn, { marginRight: 20, marginTop: 16 }]}
-                onPress={() => router.push(`/outfit/${outfit.id}/select-wardrobes`)}
-              >
-                <Plus size={16} color={FuchsiaColors.slate} />
-                <Text style={styles.addMoreItemsText}>Add to Wardrobes</Text>
-              </Pressable>
-            )}
           </View>
-        )}
 
         {/* Wear History */}
         <View style={styles.card}>
@@ -818,7 +772,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   emptyPhotosContainer: {
-    paddingVertical: 32,
+    width: '100%',
+    aspectRatio: 4 / 5,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#fff',
