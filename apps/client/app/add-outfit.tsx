@@ -1106,7 +1106,14 @@ const styles = StyleSheet.create({
     color: FuchsiaColors.ink,
   },
   modalCloseButton: {
-    padding: 4,
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: FuchsiaColors.mist,
+    backgroundColor: '#fff',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   modalScrollContent: {
     paddingHorizontal: 24,
