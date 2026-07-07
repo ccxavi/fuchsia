@@ -3,7 +3,7 @@ import { useLocalSearchParams, router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useState, useEffect } from 'react';
 import { Image } from 'expo-image';
-import { ArrowLeft, Trash2, Palette, Sun, RefreshCcw, Upload, Plus, MoreHorizontal, Edit2 } from 'lucide-react-native';
+import { ArrowLeft, Trash2, Palette, Folder, Layers, Upload, Plus, MoreHorizontal, Edit2 } from 'lucide-react-native';
 
 import { FuchsiaColors, FuchsiaFonts } from '@/constants/theme';
 import { getClothingItem, deleteClothingItem, ClothingItemResponse } from '@/api/client';
@@ -175,10 +175,8 @@ export default function ItemDetailScreen() {
           <View style={styles.titleRow}>
             <View style={styles.titleLeft}>
               <Text style={styles.title}>{item.name}</Text>
-              {item.brand ? (
+              {!!item.brand && (
                 <Text style={styles.brandText}>{item.brand}</Text>
-              ) : (
-                <Text style={styles.brandText}>Unbranded</Text>
               )}
             </View>
             <View style={styles.categoryBadge}>
@@ -197,17 +195,21 @@ export default function ItemDetailScreen() {
             </View>
             <View style={styles.statCard}>
               <View style={styles.statHeader}>
-                <Sun size={16} color={FuchsiaColors.slate} />
-                <Text style={styles.statLabel}>Season</Text>
+                <Layers size={16} color={FuchsiaColors.slate} />
+                <Text style={styles.statLabel}>Outfits</Text>
               </View>
-              <Text style={styles.statValue}>All Seasons</Text>
+              <Text style={styles.statValue}>
+                {item.outfits_count} {item.outfits_count === 1 ? 'outfit' : 'outfits'}
+              </Text>
             </View>
             <View style={styles.statCard}>
               <View style={styles.statHeader}>
-                <RefreshCcw size={16} color={FuchsiaColors.slate} />
-                <Text style={styles.statLabel}>Worn</Text>
+                <Folder size={16} color={FuchsiaColors.slate} />
+                <Text style={styles.statLabel}>Wardrobes</Text>
               </View>
-              <Text style={styles.statValue}>0 times</Text>
+              <Text style={styles.statValue}>
+                {item.wardrobes_count} {item.wardrobes_count === 1 ? 'wardrobe' : 'wardrobes'}
+              </Text>
             </View>
             <View style={styles.statCard}>
               <View style={styles.statHeader}>
@@ -222,9 +224,6 @@ export default function ItemDetailScreen() {
           <View style={styles.styledInSection}>
             <View style={styles.styledInHeader}>
               <Text style={styles.styledInTitle}>Styled In</Text>
-              <Pressable>
-                <Text style={styles.seeAllText}>See All</Text>
-              </Pressable>
             </View>
             <ScrollView 
               horizontal 
