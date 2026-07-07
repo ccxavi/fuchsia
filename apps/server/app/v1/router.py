@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from app.v1 import auth, clothing_items, health, wardrobes, outfits, calendar, weather
+from app.v1 import auth, chat, clothing_items, health, wardrobes, outfits, calendar, weather
 
 router = APIRouter()
 
@@ -15,6 +15,8 @@ router.include_router(
 router.include_router(
     chat.router,
     tags=["chat"],
+)
+router.include_router(
     clothing_items.router,
     prefix="/clothing-items",
     tags=["clothing-items"],
