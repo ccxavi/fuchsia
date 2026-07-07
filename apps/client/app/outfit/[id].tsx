@@ -256,28 +256,22 @@ export default function OutfitDetailScreen() {
       >
         {/* Outfit Name */}
         <View style={styles.nameSection}>
-          {isEditMode ? (
-            <TextInput
-              style={styles.outfitNameInput}
-              value={editableName}
-              onChangeText={setEditableName}
-              placeholder="Outfit Name"
-            />
-          ) : (
-            <Text style={styles.outfitName}>{outfit.name}</Text>
-          )}
-          <View style={styles.tagsRow}>
-            {outfit.is_ai_generated && (
-              <View style={styles.tag}>
-                <Text style={styles.tagText}>AI Curated</Text>
-              </View>
+          <View style={{ flex: 1, paddingRight: 16 }}>
+            {isEditMode ? (
+              <TextInput
+                style={styles.outfitNameInput}
+                value={editableName}
+                onChangeText={setEditableName}
+                placeholder="Outfit Name"
+              />
+            ) : (
+              <Text style={styles.outfitName} numberOfLines={1}>{outfit.name}</Text>
             )}
-            <View style={styles.tag}>
-              <Text style={styles.tagText}>
-                {outfit.clothing_items.length} {outfit.clothing_items.length === 1 ? 'Item' : 'Items'}
-              </Text>
-            </View>
           </View>
+          <Text style={styles.outfitSubtitle}>
+            {outfit.is_ai_generated ? 'AI Curated  ·  ' : ''}
+            {outfit.clothing_items.length} {outfit.clothing_items.length === 1 ? 'Item' : 'Items'}
+          </Text>
         </View>
 
         {/* My Photos */}
@@ -386,9 +380,7 @@ export default function OutfitDetailScreen() {
         {/* All Pieces */}
         <View style={styles.card}>
           <View style={styles.myPhotosHeader}>
-            <Text style={styles.cardLabel}>
-              {outfit.clothing_items.length} {outfit.clothing_items.length === 1 ? 'Item' : 'Items'}
-            </Text>
+            <Text style={styles.cardLabel}>ITEMS</Text>
           </View>
 
           {outfit.clothing_items.length === 0 ? (
@@ -692,40 +684,33 @@ const styles = StyleSheet.create({
   // Name section
   nameSection: {
     paddingHorizontal: 20,
-    marginBottom: 16,
+    marginBottom: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   outfitName: {
     fontFamily: FuchsiaFonts.heading,
-    fontSize: 22,
+    fontSize: 26,
+    fontWeight: '700',
     color: FuchsiaColors.ink,
   },
   outfitNameInput: {
     fontFamily: FuchsiaFonts.heading,
-    fontSize: 28,
+    fontSize: 26,
     fontWeight: '700',
-    color: FuchsiaColors.deep,
-    marginBottom: 8,
-    borderBottomWidth: 2,
-    borderBottomColor: FuchsiaColors.vibrant,
-    paddingVertical: 4,
+    color: FuchsiaColors.ink,
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: FuchsiaColors.mist,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
   },
-  tagsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-    marginTop: 8,
-  },
-  tag: {
-    backgroundColor: '#FDF2F8',
-    borderRadius: 100,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-  },
-  tagText: {
+  outfitSubtitle: {
     fontFamily: FuchsiaFonts.body,
-    fontSize: 10,
-    fontWeight: '600',
-    color: FuchsiaColors.deep,
+    fontSize: 14,
+    color: FuchsiaColors.slate,
   },
   // Outfit image
   outfitImageSection: {
