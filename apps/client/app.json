@@ -23,7 +23,7 @@
     },
     "web": {
       "output": "static",
-      "favicon": "./assets/images/fuchsia.ico"
+      "favicon": "./assets/images/fuchsia.png"
     },
     "plugins": [
       "expo-router",
@@ -40,14 +40,23 @@
         }
       ],
       "expo-secure-store",
-      "expo-build-properties"
+      "expo-build-properties",
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Allow Fuchsia to use your location to provide accurate weather-based outfit recommendations."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
     },
     "extra": {
-      "router": {}
+      "router": {},
+      "eas": {
+        "projectId": "5b8768d2-34e8-44b0-be6a-63c2343b6aa8"
+      }
     }
   }
 }

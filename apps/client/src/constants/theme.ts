@@ -9,23 +9,25 @@ const tintColorLight = '#0B0B0D';
 const tintColorDark = '#fff';
 
 export const FuchsiaColors = {
-  ink: '#0B0B0D',
-  charcoal: '#18181B',
-  slate: '#2A2A31',
-  fog: '#A1A1AA',
-  mist: '#D4D4D8',
-  cloud: '#F4F4F5',
-  paper: '#FAFAFA',
+  deep: "#86003C",
+  vibrant: "#D4145A",
+  soft: "#F472B6",
+  blush: "#FDF2F8",
+  ink: "#1A1A2E",
+  slate: "#4A4A68",
+  mist: "#E5E5EF",
+  cloud: "#F8F8FC",
+  paper: "#FEFEFE",
 };
 
 /** Dark gradient: from-zinc-950 via-zinc-900 to-zinc-700 */
 export const FuchsiaGradient = ['#09090B', '#18181B', '#3F3F46'] as const;
 
 export const FuchsiaFonts = {
-  heading: 'Syne_600SemiBold',
-  body: 'Manrope_400Regular',
-  bodySemiBold: 'Manrope_600SemiBold',
-  data: 'IBMPlexMono_600SemiBold',
+  heading: 'Outfit_600SemiBold',
+  body: 'Inter_400Regular',
+  bodySemiBold: 'Inter_600SemiBold',
+  data: 'DMMono_500Medium',
 };
 
 export const Colors = {
