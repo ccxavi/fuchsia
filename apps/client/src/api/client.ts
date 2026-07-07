@@ -492,8 +492,26 @@ export async function addItemToOutfit(outfitId: string, clothingItemId: string):
   });
 }
 
-export async function removeItemFromOutfit(outfitId: string, clothingItemId: string): Promise<OutfitWithItemsResponse> {
-  return apiFetch<OutfitWithItemsResponse>(`/outfits/${outfitId}/items/${clothingItemId}`, {
+export async function removeItemFromOutfit(outfitId: string, itemId: string): Promise<OutfitWithItemsResponse> {
+  return apiFetch<OutfitWithItemsResponse>(`/outfits/${outfitId}/items/${itemId}`, {
+    method: 'DELETE',
+  });
+}
+
+export async function addWardrobeToOutfit(outfitId: string, wardrobeId: string): Promise<OutfitWithWardrobesResponse> {
+  return apiFetch<OutfitWithWardrobesResponse>(`/outfits/${outfitId}/wardrobes/${wardrobeId}`, {
+    method: 'POST',
+  });
+}
+
+export async function removeWardrobeFromOutfit(outfitId: string, wardrobeId: string): Promise<OutfitWithWardrobesResponse> {
+  return apiFetch<OutfitWithWardrobesResponse>(`/outfits/${outfitId}/wardrobes/${wardrobeId}`, {
+    method: 'DELETE',
+  });
+}
+
+export async function deleteOutfitImage(imageId: string): Promise<void> {
+  return apiFetch<void>(`/outfits/images/${imageId}`, {
     method: 'DELETE',
   });
 }

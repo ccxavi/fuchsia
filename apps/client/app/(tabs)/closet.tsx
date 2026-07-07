@@ -181,7 +181,7 @@ export default function ClosetScreen() {
     
     // If user uploaded a custom image, prioritize it over the 2x2 grid collage
     if (item.images && item.images.length > 0) {
-      const coverImage = item.images[item.images.length - 1];
+      const coverImage = item.images[0];
       return <Image source={{ uri: coverImage.image_url }} style={styles.image} contentFit="cover" />;
     }
 

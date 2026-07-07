@@ -528,7 +528,7 @@ export default function AddOrEditOutfitScreen() {
                   style={styles.cartSaveButton}
                 >
                   <Text style={styles.cartSaveButtonText}>
-                    Confirm Selection
+                    Add {pickerSelectedIds.size} {pickerSelectedIds.size === 1 ? 'Item' : 'Items'}
                   </Text>
                 </LinearGradient>
               </Pressable>

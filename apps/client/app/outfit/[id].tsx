@@ -1,13 +1,14 @@
-import { View, Text, StyleSheet, Pressable, ScrollView, ActivityIndicator, DeviceEventEmitter } from 'react-native';
+import { View, Text, StyleSheet, Pressable, ScrollView, ActivityIndicator, DeviceEventEmitter, TextInput } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useState, useEffect } from 'react';
 import { Image } from 'expo-image';
-import { ArrowLeft, MoreVertical, Edit2, Trash2, Layers, Camera, X } from 'lucide-react-native';
+import { ArrowLeft, Edit2, Trash2, Layers, Camera, X, Check, Plus } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
+import { LinearGradient } from 'expo-linear-gradient';
 
 import { FuchsiaColors, FuchsiaFonts } from '@/constants/theme';
-import { getOutfit, deleteOutfit, updateOutfit, OutfitWithWardrobesResponse } from '@/api/client';
+import { getOutfit, deleteOutfit, updateOutfit, deleteOutfitImage, removeItemFromOutfit, removeWardrobeFromOutfit, OutfitWithWardrobesResponse } from '@/api/client';
 
 export default function OutfitDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -20,6 +21,10 @@ export default function OutfitDetailScreen() {
   const [deleteAlertVisible, setDeleteAlertVisible] = useState(false);
   const [focusedPhotoId, setFocusedPhotoId] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  
+  // Edit Mode State
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editableName, setEditableName] = useState('');
 
   useEffect(() => {
     if (id) {
@@ -42,8 +47,9 @@ export default function OutfitDetailScreen() {
     try {
       const data = await getOutfit(id!);
       setOutfit(data);
+      setEditableName(data.name);
       if (data.images && data.images.length > 0 && !focusedPhotoId) {
-        setFocusedPhotoId(data.images[data.images.length - 1].id);
+        setFocusedPhotoId(data.images[0].id);
       }
     } catch (err) {
       console.error('Failed to fetch outfit:', err);
@@ -61,7 +67,7 @@ export default function OutfitDetailScreen() {
   const handleAddPhoto = async () => {
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ['images'],
         allowsEditing: true,
         quality: 0.8,
       });
@@ -74,8 +80,8 @@ export default function OutfitDetailScreen() {
         const updatedData = await getOutfit(id!);
         setOutfit(updatedData);
         if (updatedData.images && updatedData.images.length > 0) {
-          // Auto-focus the newly added image (usually the last one added, depending on backend sort, let's just focus the last one)
-          setFocusedPhotoId(updatedData.images[updatedData.images.length - 1].id);
+          // Auto-focus the newly added image (which is at index 0 because the backend sorts descending)
+          setFocusedPhotoId(updatedData.images[0].id);
         }
       }
     } catch (err) {
@@ -94,6 +100,47 @@ export default function OutfitDetailScreen() {
       console.error('Failed to delete outfit:', err);
       setIsDeleting(false);
       setDeleteAlertVisible(false);
+    }
+  };
+
+  const toggleEditMode = async () => {
+    if (!outfit) return;
+
+    if (isEditMode) {
+      // Save changes
+      if (editableName.trim() !== outfit.name && editableName.trim() !== '') {
+        try {
+          setIsLoading(true); // show loader during save
+          await updateOutfit(id!, { name: editableName.trim() });
+          await fetchOutfit();
+        } catch (err) {
+          console.error('Failed to update outfit name:', err);
+        } finally {
+          setIsLoading(false);
+        }
+      }
+    }
+    setIsEditMode(!isEditMode);
+  };
+
+  const handleDeleteImage = async (imageId: string) => {
+    try {
+      await deleteOutfitImage(imageId);
+      if (focusedPhotoId === imageId) {
+        setFocusedPhotoId(null);
+      }
+      await fetchOutfit();
+    } catch (err) {
+      console.error('Failed to delete image:', err);
+    }
+  };
+
+  const handleRemoveItem = async (itemId: string) => {
+    try {
+      await removeItemFromOutfit(id!, itemId);
+      await fetchOutfit();
+    } catch (err) {
+      console.error('Failed to remove item from outfit:', err);
     }
   };
 
@@ -117,10 +164,15 @@ export default function OutfitDetailScreen() {
         <Pressable onPress={() => router.back()} style={styles.headerButton}>
           <ArrowLeft size={18} color={FuchsiaColors.slate} />
         </Pressable>
-        <Text style={styles.headerTitle}>Outfit Detail</Text>
-        <Pressable onPress={() => setMenuVisible(!menuVisible)} style={styles.headerButton}>
+        <Text style={styles.headerTitle}>{isEditMode ? 'Edit Outfit' : 'Outfit Detail'}</Text>
+        <Pressable 
+          onPress={toggleEditMode} 
+          style={[styles.headerButton, isEditMode && styles.headerButtonActive]}
+        >
           {isDeleting ? (
             <ActivityIndicator size="small" color={FuchsiaColors.slate} />
+          ) : isEditMode ? (
+            <Check size={18} color={FuchsiaColors.vibrant} />
           ) : (
             <Edit2 size={18} color={FuchsiaColors.slate} />
           )}
@@ -198,7 +250,16 @@ export default function OutfitDetailScreen() {
       >
         {/* Outfit Name */}
         <View style={styles.nameSection}>
-          <Text style={styles.outfitName}>{outfit.name}</Text>
+          {isEditMode ? (
+            <TextInput
+              style={styles.outfitNameInput}
+              value={editableName}
+              onChangeText={setEditableName}
+              placeholder="Outfit Name"
+            />
+          ) : (
+            <Text style={styles.outfitName}>{outfit.name}</Text>
+          )}
           <View style={styles.tagsRow}>
             {outfit.is_ai_generated && (
               <View style={styles.tag}>
@@ -247,52 +308,82 @@ export default function OutfitDetailScreen() {
             </View>
           ) : null}
 
-          {/* Thumbnail Carousel */}
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.thumbnailCarousel}
-          >
-            {/* Add Photo Button */}
-            <Pressable
-              style={styles.addPhotoBtn}
-              onPress={handleAddPhoto}
-              disabled={isUploading}
+          {/* Thumbnail Carousel or Empty State */}
+          {!outfit.images || outfit.images.length === 0 ? (
+            <Pressable 
+              style={styles.emptyPhotosContainer}
+              onPress={isEditMode ? handleAddPhoto : undefined}
+              disabled={isUploading || !isEditMode}
             >
               {isUploading ? (
                 <ActivityIndicator size="small" color={FuchsiaColors.slate} />
               ) : (
-                <>
-                  <Camera size={16} color={FuchsiaColors.slate} />
-                  <Text style={styles.addPhotoBtnText}>Add</Text>
-                </>
+                <Text style={styles.emptyPhotosText}>
+                  {isEditMode 
+                    ? "No photos yet. Tap here to add a photo!" 
+                    : "No photos yet. Tap Edit to add photos of you wearing this outfit."}
+                </Text>
               )}
             </Pressable>
-
-            {/* Existing Photos */}
-            {outfit.images && outfit.images.map((img) => {
-              const isFocused = img.id === focusedPhotoId;
-              return (
+          ) : (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.thumbnailCarousel}
+            >
+              {/* Add Photo Button (Only visible in edit mode) */}
+              {isEditMode && (
                 <Pressable
-                  key={img.id}
-                  style={[styles.thumbnailBtn, isFocused && styles.thumbnailBtnFocused]}
-                  onPress={() => setFocusedPhotoId(img.id)}
+                  style={styles.addPhotoBtn}
+                  onPress={handleAddPhoto}
+                  disabled={isUploading}
                 >
-                  <Image source={{ uri: img.image_url }} style={StyleSheet.absoluteFillObject} contentFit="cover" />
-                  {isFocused && (
-                    <View style={styles.thumbnailOverlay} />
+                  {isUploading ? (
+                    <ActivityIndicator size="small" color={FuchsiaColors.slate} />
+                  ) : (
+                    <>
+                      <Camera size={16} color={FuchsiaColors.slate} />
+                      <Text style={styles.addPhotoBtnText}>Add</Text>
+                    </>
                   )}
                 </Pressable>
-              );
-            })}
-          </ScrollView>
+              )}
+
+              {/* Existing Photos */}
+              {outfit.images && outfit.images.map((img) => {
+                const isFocused = img.id === focusedPhotoId;
+                return (
+                  <Pressable
+                    key={img.id}
+                    style={[styles.thumbnailBtn, isFocused && styles.thumbnailBtnFocused]}
+                    onPress={() => setFocusedPhotoId(img.id)}
+                  >
+                    <Image source={{ uri: img.image_url }} style={StyleSheet.absoluteFillObject} contentFit="cover" />
+                    {isFocused && (
+                      <View style={styles.thumbnailOverlay} />
+                    )}
+                    {isEditMode && (
+                      <Pressable 
+                        style={styles.photoDeleteBtn}
+                        onPress={() => handleDeleteImage(img.id)}
+                      >
+                        <X size={10} color="#fff" />
+                      </Pressable>
+                    )}
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+          )}
         </View>
 
         {/* All Pieces */}
         <View style={styles.card}>
-          <Text style={styles.cardLabel}>
-            {outfit.clothing_items.length} {outfit.clothing_items.length === 1 ? 'Item' : 'Items'}
-          </Text>
+          <View style={styles.myPhotosHeader}>
+            <Text style={styles.cardLabel}>
+              {outfit.clothing_items.length} {outfit.clothing_items.length === 1 ? 'Item' : 'Items'}
+            </Text>
+          </View>
 
           {outfit.clothing_items.length === 0 ? (
             <View style={styles.emptyItems}>
@@ -331,30 +422,98 @@ export default function OutfitDetailScreen() {
                     <Text style={styles.itemName}>{item.name}</Text>
                     <Text style={styles.itemCategory}>{item.category || 'Item'}</Text>
                   </View>
-                  <View style={styles.itemBadge}>
-                    <Text style={styles.itemBadgeText}>{item.category || 'Item'}</Text>
-                  </View>
+                  {isEditMode ? (
+                    <Pressable 
+                      style={styles.itemDeleteBtn}
+                      onPress={() => handleRemoveItem(item.id)}
+                    >
+                      <Trash2 size={16} color={FuchsiaColors.vibrant} />
+                    </Pressable>
+                  ) : (
+                    <View style={styles.itemBadge}>
+                      <Text style={styles.itemBadgeText}>{item.category || 'Item'}</Text>
+                    </View>
+                  )}
                 </Pressable>
               ))}
             </ScrollView>
           )}
+          
+          {isEditMode && (
+            <Pressable 
+              style={styles.addMoreItemsBtn}
+              onPress={() => router.push(`/outfit/${outfit.id}/select-items`)}
+            >
+              <Plus size={16} color={FuchsiaColors.slate} />
+              <Text style={styles.addMoreItemsText}>Add More Items</Text>
+            </Pressable>
+          )}
         </View>
 
         {/* Wardrobes */}
-        {outfit.wardrobes && outfit.wardrobes.length > 0 && (
-          <View style={styles.card}>
-            <Text style={styles.cardLabel}>In Wardrobes</Text>
-            <View style={styles.wardrobesList}>
-              {outfit.wardrobes.map(w => (
-                <Pressable
-                  key={w.id}
-                  style={styles.wardrobeChip}
-                  onPress={() => router.push(`/wardrobe/${w.id}`)}
-                >
-                  <Text style={styles.wardrobeChipText}>{w.name}</Text>
+        {(isEditMode || (outfit.wardrobes && outfit.wardrobes.length > 0)) && (
+          <View style={[styles.card, { paddingRight: 0 }]}>
+            <View style={[styles.myPhotosHeader, { paddingRight: 20 }]}>
+              <Text style={styles.cardLabel}>In Wardrobes</Text>
+              {isEditMode && (
+                <Pressable onPress={() => router.push(`/outfit/${outfit.id}/select-wardrobes`)}>
+                  <Text style={styles.addItemText}>Add to Wardrobe</Text>
                 </Pressable>
-              ))}
+              )}
             </View>
+
+            {(!outfit.wardrobes || outfit.wardrobes.length === 0) ? (
+              <View style={[styles.emptyItems, { marginRight: 20 }]}>
+                <Layers size={24} color={FuchsiaColors.mist} />
+                <Text style={styles.emptyItemsText}>Not saved in any wardrobes yet</Text>
+              </View>
+            ) : (
+              <ScrollView 
+                horizontal 
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.wardrobesCarousel}
+              >
+                {outfit.wardrobes.map(w => (
+                  <Pressable
+                    key={w.id}
+                    style={styles.wardrobeCard}
+                    onPress={() => router.push(`/wardrobe/${w.id}`)}
+                  >
+                    {w.image_url ? (
+                      <Image source={{ uri: w.image_url }} style={StyleSheet.absoluteFillObject} contentFit="cover" />
+                    ) : (
+                      <LinearGradient
+                        colors={['#D4145A', '#86003C']}
+                        style={StyleSheet.absoluteFillObject}
+                      />
+                    )}
+                    <LinearGradient
+                      colors={['transparent', 'rgba(0,0,0,0.8)']}
+                      style={styles.wardrobeCardGradient}
+                    />
+                    <Text style={styles.wardrobeCardName} numberOfLines={2}>{w.name}</Text>
+                    {isEditMode && (
+                      <Pressable 
+                        style={styles.photoDeleteBtn}
+                        onPress={async () => {
+                          try {
+                            setIsLoading(true);
+                            await removeWardrobeFromOutfit(outfit.id, w.id);
+                            DeviceEventEmitter.emit('outfitUpdated', outfit.id);
+                            fetchOutfit();
+                          } catch (err) {
+                            console.error('Failed to remove wardrobe from outfit', err);
+                            setIsLoading(false);
+                          }
+                        }}
+                      >
+                        <X size={10} color="#fff" />
+                      </Pressable>
+                    )}
+                  </Pressable>
+                ))}
+              </ScrollView>
+            )}
           </View>
         )}
 
@@ -471,9 +630,9 @@ const styles = StyleSheet.create({
   },
   alertTitle: {
     fontFamily: FuchsiaFonts.heading,
-    fontSize: 18,
+    fontSize: 28,
     fontWeight: '700',
-    color: FuchsiaColors.ink,
+    color: FuchsiaColors.deep,
     marginBottom: 8,
     textAlign: 'center',
   },
@@ -528,6 +687,16 @@ const styles = StyleSheet.create({
     fontSize: 22,
     color: FuchsiaColors.ink,
   },
+  outfitNameInput: {
+    fontFamily: FuchsiaFonts.heading,
+    fontSize: 28,
+    fontWeight: '700',
+    color: FuchsiaColors.deep,
+    marginBottom: 8,
+    borderBottomWidth: 2,
+    borderBottomColor: FuchsiaColors.vibrant,
+    paddingVertical: 4,
+  },
   tagsRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -555,10 +724,11 @@ const styles = StyleSheet.create({
     width: '100%',
     aspectRatio: 4 / 5,
     borderRadius: 20,
-    overflow: 'hidden',
-    backgroundColor: FuchsiaColors.cloud,
+    justifyContent: 'center',
+    backgroundColor: '#fff',
     borderWidth: 1,
-    borderColor: FuchsiaColors.mist,
+    borderColor: FuchsiaColors.cloud,
+    overflow: 'hidden',
   },
   myPhotosHeader: {
     flexDirection: 'row',
@@ -635,6 +805,36 @@ const styles = StyleSheet.create({
   thumbnailOverlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0,0,0,0.1)',
+  },
+  photoDeleteBtn: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyPhotosContainer: {
+    paddingVertical: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: FuchsiaColors.cloud,
+    borderStyle: 'dashed',
+    marginBottom: 8,
+  },
+  emptyPhotosText: {
+    fontFamily: FuchsiaFonts.body,
+    fontSize: 13,
+    color: FuchsiaColors.slate,
+    textAlign: 'center',
+    paddingHorizontal: 40,
+    lineHeight: 20,
   },
   // Card sections
   card: {
@@ -716,22 +916,33 @@ const styles = StyleSheet.create({
     color: FuchsiaColors.deep,
   },
   // Wardrobes
-  wardrobesList: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
+  wardrobesCarousel: {
+    paddingRight: 20,
+    gap: 12,
   },
-  wardrobeChip: {
+  wardrobeCard: {
+    width: 140,
+    height: 180,
+    borderRadius: 16,
+    overflow: 'hidden',
     backgroundColor: FuchsiaColors.cloud,
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
   },
-  wardrobeChipText: {
-    fontFamily: FuchsiaFonts.body,
-    fontSize: 13,
-    fontWeight: '500',
-    color: FuchsiaColors.ink,
+  wardrobeCardGradient: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: '60%',
+  },
+  wardrobeCardName: {
+    position: 'absolute',
+    bottom: 12,
+    left: 12,
+    right: 12,
+    fontFamily: FuchsiaFonts.heading,
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#fff',
   },
   // Stats
   statsRow: {
@@ -756,5 +967,40 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: FuchsiaColors.slate,
     marginTop: 4,
+  },
+  headerButtonActive: {
+    backgroundColor: FuchsiaColors.blush,
+    borderColor: FuchsiaColors.mist,
+  },
+  itemDeleteBtn: {
+    width: 32,
+    height: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  addItemText: {
+    fontFamily: FuchsiaFonts.body,
+    fontSize: 12,
+    fontWeight: '600',
+    color: FuchsiaColors.vibrant,
+  },
+  addMoreItemsBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 12,
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: FuchsiaColors.mist,
+    borderStyle: 'dashed',
+    backgroundColor: 'rgba(253, 242, 248, 0.5)',
+  },
+  addMoreItemsText: {
+    fontFamily: FuchsiaFonts.body,
+    fontSize: 14,
+    fontWeight: '600',
+    color: FuchsiaColors.slate,
   },
 });
