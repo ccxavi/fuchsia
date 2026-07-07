@@ -1,4 +1,4 @@
-import { StyleSheet, View, ScrollView, Pressable } from 'react-native';
+import { StyleSheet, View, ScrollView, Pressable, Animated } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -11,6 +11,42 @@ import { getMe } from '@/api/client';
 
 import { ThemedText } from '@/components/themed-text';
 import { FuchsiaColors, FuchsiaFonts } from '@/constants/theme';
+
+const Skeleton = ({ width, height, borderRadius = 4, style }: any) => {
+  const pulseAnim = useState(new Animated.Value(0.3))[0];
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 0.7,
+          duration: 800,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 0.3,
+          duration: 800,
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+  }, [pulseAnim]);
+
+  return (
+    <Animated.View
+      style={[
+        {
+          width,
+          height,
+          borderRadius,
+          backgroundColor: FuchsiaColors.mist,
+          opacity: pulseAnim,
+        },
+        style,
+      ]}
+    />
+  );
+};
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
@@ -130,27 +166,47 @@ export default function HomeScreen() {
             colors={['#FEF3C7', '#FFEDD5']}
             style={styles.weatherIconBg}
           >
-            <ThemedText style={styles.weatherEmoji}>
-              {weatherData.loading ? '⏳' : getWeatherInfo(weatherData.conditionCode).emoji}
-            </ThemedText>
+            {weatherData.loading ? (
+              <Skeleton width={24} height={24} borderRadius={12} />
+            ) : (
+              <ThemedText style={styles.weatherEmoji}>
+                {getWeatherInfo(weatherData.conditionCode).emoji}
+              </ThemedText>
+            )}
           </LinearGradient>
           <View style={styles.weatherTextContainer}>
-            <ThemedText style={styles.weatherDate}>{currentDate}</ThemedText>
-            <ThemedText style={styles.weatherDetails}>
-              {weatherData.loading 
-                ? 'Fetching local weather...' 
-                : `${Math.round(weatherData.temperature)}°C ${getWeatherInfo(weatherData.conditionCode).text} · ${weatherData.city}`}
-            </ThemedText>
+            {weatherData.loading ? (
+              <View style={{ gap: 6 }}>
+                <Skeleton width={100} height={16} />
+                <Skeleton width={140} height={14} />
+              </View>
+            ) : (
+              <>
+                <ThemedText style={styles.weatherDate}>{currentDate}</ThemedText>
+                <ThemedText style={styles.weatherDetails}>
+                  {`${Math.round(weatherData.temperature)}°C ${getWeatherInfo(weatherData.conditionCode).text} · ${weatherData.city}`}
+                </ThemedText>
+              </>
+            )}
           </View>
           <View style={styles.weatherTags}>
-            <View style={styles.weatherTag}>
-              <ThemedText style={styles.weatherTagText}>
-                {weatherData.loading ? '...' : (weatherData.temperature > 25 ? 'Hot' : weatherData.temperature < 15 ? 'Cold' : 'Mild')}
-              </ThemedText>
-            </View>
-            <ThemedText style={styles.weatherSubTag}>
-              {weatherData.loading ? '...' : (weatherData.temperature > 25 ? 'Light fabrics' : weatherData.temperature < 15 ? 'Layers needed' : 'Perfect weather')}
-            </ThemedText>
+            {weatherData.loading ? (
+              <>
+                <Skeleton width={40} height={16} borderRadius={12} />
+                <Skeleton width={60} height={12} />
+              </>
+            ) : (
+              <>
+                <View style={styles.weatherTag}>
+                  <ThemedText style={styles.weatherTagText}>
+                    {weatherData.temperature > 25 ? 'Hot' : weatherData.temperature < 15 ? 'Cold' : 'Mild'}
+                  </ThemedText>
+                </View>
+                <ThemedText style={styles.weatherSubTag}>
+                  {weatherData.temperature > 25 ? 'Light fabrics' : weatherData.temperature < 15 ? 'Layers needed' : 'Perfect weather'}
+                </ThemedText>
+              </>
+            )}
           </View>
         </View>
 
