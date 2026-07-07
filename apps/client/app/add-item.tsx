@@ -125,6 +125,7 @@ export default function AddOrEditItemScreen() {
           imageUri: imageUri || undefined,
         });
         DeviceEventEmitter.emit('itemUpdated', updatedItem);
+        DeviceEventEmitter.emit('showGlobalToast', 'Item updated successfully');
       } else {
         await createClothingItem({
           name: name.trim(),
@@ -133,6 +134,7 @@ export default function AddOrEditItemScreen() {
           wardrobe_ids: selectedWardrobeIds.length > 0 ? selectedWardrobeIds : undefined,
           imageUri: imageUri || undefined,
         });
+        DeviceEventEmitter.emit('showGlobalToast', 'Item added successfully');
       }
       router.back();
     } catch (err: any) {

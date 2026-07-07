@@ -3,6 +3,7 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
+import { DeviceEventEmitter } from 'react-native';
 import 'react-native-reanimated';
 
 import {
@@ -28,6 +29,8 @@ import {
 } from '@expo-google-fonts/outfit';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useToast } from '@/src/hooks/useToast';
+import { Toast } from '@/src/components/ui/Toast';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -55,11 +58,20 @@ export default function RootLayout() {
 
   const fontsReady = dmMonoLoaded && playfairLoaded && interLoaded && outfitLoaded;
 
+  const { toastVisible, toastMessage, fadeAnim, showToast } = useToast();
+
   useEffect(() => {
     if (fontsReady) {
       SplashScreen.hideAsync();
     }
   }, [fontsReady]);
+
+  useEffect(() => {
+    const subscription = DeviceEventEmitter.addListener('showGlobalToast', (msg) => {
+      showToast(msg);
+    });
+    return () => subscription.remove();
+  }, [showToast]);
 
   if (!fontsReady) {
     return null;
@@ -82,6 +94,7 @@ export default function RootLayout() {
         <Stack.Screen name="outfit/[id]/select-items" options={{ headerShown: false, presentation: 'modal' }} />
         <Stack.Screen name="outfit/[id]/select-wardrobes" options={{ headerShown: false, presentation: 'modal' }} />
       </Stack>
+      <Toast visible={toastVisible} message={toastMessage} fadeAnim={fadeAnim} />
       <StatusBar style="auto" />
     </ThemeProvider>
   );
