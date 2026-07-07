@@ -179,7 +179,7 @@ export type OutfitWithWardrobesResponse = OutfitWithItemsResponse & {
 
 export type WardrobeWithDetailsResponse = WardrobeResponse & {
   clothing_items: ClothingItemResponse[];
-  outfits: OutfitResponse[];
+  outfits: OutfitWithItemsResponse[];
 };
 
 export async function getWardrobes(): Promise<WardrobeResponse[]> {

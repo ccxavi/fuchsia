@@ -3,53 +3,47 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useState, useEffect } from 'react';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Image } from 'expo-image';
-import { X, Check, Search, Settings, ChevronDown, ChevronUp, ShoppingBag, ArrowLeft } from 'lucide-react-native';
-import Animated, { FadeIn, FadeOut, Layout, FadeInDown, FadeOutDown } from 'react-native-reanimated';
+import { X, Check, Search, Plus, ShoppingBag, ArrowLeft } from 'lucide-react-native';
+import Animated, { FadeInDown, FadeOutDown, Layout } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 
 import { FuchsiaColors, FuchsiaFonts } from '@/constants/theme';
-import { CLOTHING_CATEGORIES } from '@/constants/categories';
-import { getClothingItems, getWardrobe, addItemToWardrobe, removeItemFromWardrobe, ClothingItemResponse, WardrobeWithDetailsResponse } from '@/api/client';
+import { getOutfits, getWardrobe, addWardrobeToOutfit, removeWardrobeFromOutfit, OutfitWithItemsResponse, WardrobeWithDetailsResponse } from '@/api/client';
 
-export default function SelectItemsScreen() {
+export default function SelectOutfitsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const itemWidth = (width - 48) / 2;
 
   const [wardrobe, setWardrobe] = useState<WardrobeWithDetailsResponse | null>(null);
-  const [items, setItems] = useState<ClothingItemResponse[]>([]);
+  const [outfits, setOutfits] = useState<OutfitWithItemsResponse[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [initialIds, setInitialIds] = useState<Set<string>>(new Set());
   
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
-  const [activeCategory, setActiveCategory] = useState('All');
-  const [activeSubCategory, setActiveSubCategory] = useState('All');
-  const [showFilterModal, setShowFilterModal] = useState(false);
-  const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [isSearching, setIsSearching] = useState(false);
   const [showCartModal, setShowCartModal] = useState(false);
 
   useEffect(() => {
     async function loadData() {
       if (!id) return;
       try {
-        const [wardrobeData, allItems] = await Promise.all([
+        const [wardrobeData, allOutfits] = await Promise.all([
           getWardrobe(id as string),
-          getClothingItems()
+          getOutfits()
         ]);
         
         setWardrobe(wardrobeData);
-        setItems(allItems);
+        setOutfits(allOutfits);
         
-        const existingIds = new Set(wardrobeData.clothing_items.map(i => i.id));
+        const existingIds = new Set(wardrobeData.outfits.map(o => o.id));
         setSelectedIds(existingIds);
         setInitialIds(new Set(existingIds));
       } catch (err) {
-        console.error('Failed to load items', err);
+        console.error('Failed to load outfits', err);
       } finally {
         setIsLoading(false);
       }
@@ -57,13 +51,13 @@ export default function SelectItemsScreen() {
     loadData();
   }, [id]);
 
-  const toggleSelection = (itemId: string) => {
+  const toggleSelection = (outfitId: string) => {
     setSelectedIds(prev => {
       const newSet = new Set(prev);
-      if (newSet.has(itemId)) {
-        newSet.delete(itemId);
+      if (newSet.has(outfitId)) {
+        newSet.delete(outfitId);
       } else {
-        newSet.add(itemId);
+        newSet.add(outfitId);
       }
       return newSet;
     });
@@ -74,17 +68,17 @@ export default function SelectItemsScreen() {
     setIsSaving(true);
     
     try {
-      const added = [...selectedIds].filter(itemId => !initialIds.has(itemId));
-      const removed = [...initialIds].filter(itemId => !selectedIds.has(itemId));
+      const added = [...selectedIds].filter(outfitId => !initialIds.has(outfitId));
+      const removed = [...initialIds].filter(outfitId => !selectedIds.has(outfitId));
       
       const promises: Promise<any>[] = [];
       
-      for (const itemId of added) {
-        promises.push(addItemToWardrobe(itemId, id as string));
+      for (const outfitId of added) {
+        promises.push(addWardrobeToOutfit(outfitId, id as string));
       }
       
-      for (const itemId of removed) {
-        promises.push(removeItemFromWardrobe(itemId, id as string));
+      for (const outfitId of removed) {
+        promises.push(removeWardrobeFromOutfit(outfitId, id as string));
       }
       
       await Promise.all(promises);
@@ -98,35 +92,97 @@ export default function SelectItemsScreen() {
     }
   };
 
-  const handleAdvancedFilterSelect = (main: string, sub: string = 'All') => {
-    setActiveCategory(main);
-    setActiveSubCategory(sub);
-    setShowFilterModal(false);
-  };
+  const filteredOutfits = outfits.filter(o => 
+    !searchQuery || o.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
-  const filteredItems = items.filter(i => {
-    const matchesSearch = !searchQuery || i.name.toLowerCase().includes(searchQuery.toLowerCase());
+  const renderOutfitImage = (item: OutfitWithItemsResponse) => {
+    const items = item.clothing_items || [];
     
-    const matchesCategory = activeCategory === 'All' || (() => {
-      if (!i.category) return false;
-      const targetCategory = i.category.toLowerCase();
-      
-      if (activeSubCategory !== 'All') {
-        return targetCategory === activeSubCategory.toLowerCase();
-      }
-      
-      if (targetCategory === activeCategory.toLowerCase()) return true;
-      
-      const categoryData = CLOTHING_CATEGORIES.find(c => c.main.toLowerCase() === activeCategory.toLowerCase());
-      if (categoryData) {
-        return categoryData.subs.some(sub => sub.toLowerCase() === targetCategory);
-      }
-      
-      return false;
-    })();
+    if (item.images && item.images.length > 0) {
+      const coverImage = item.images[0];
+      return <Image source={{ uri: coverImage.image_url }} style={StyleSheet.absoluteFillObject} contentFit="cover" />;
+    }
 
-    return matchesSearch && matchesCategory;
-  });
+    if (items.length === 0) {
+      return (
+        <LinearGradient
+          colors={['#D4145A', '#86003C']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={[StyleSheet.absoluteFillObject, { alignItems: 'center', justifyContent: 'center' }]}
+        >
+          <Text style={{ fontFamily: FuchsiaFonts.heading, fontSize: 14, color: '#fff', textAlign: 'center', paddingHorizontal: 8 }} numberOfLines={2}>{item.name}</Text>
+        </LinearGradient>
+      );
+    }
+
+    if (items.length === 1) {
+      return (
+        <View style={[{ flex: 1, backgroundColor: FuchsiaColors.mist }]}>
+          <Image source={{ uri: items[0].image_url || '' }} style={StyleSheet.absoluteFillObject} contentFit="cover" />
+        </View>
+      );
+    }
+
+    if (items.length === 2) {
+      return (
+        <View style={{ flex: 1, flexDirection: 'row' }}>
+          <View style={{ flex: 1, borderRightWidth: 1, borderColor: '#fff', backgroundColor: FuchsiaColors.mist }}>
+            <Image source={{ uri: items[0].image_url || '' }} style={{ flex: 1 }} contentFit="cover" />
+          </View>
+          <View style={{ flex: 1, borderLeftWidth: 1, borderColor: '#fff', backgroundColor: FuchsiaColors.mist }}>
+            <Image source={{ uri: items[1].image_url || '' }} style={{ flex: 1 }} contentFit="cover" />
+          </View>
+        </View>
+      );
+    }
+
+    if (items.length === 3) {
+      return (
+        <View style={{ flex: 1 }}>
+          <View style={{ flex: 1, borderBottomWidth: 1, borderColor: '#fff', backgroundColor: FuchsiaColors.mist }}>
+            <Image source={{ uri: items[0].image_url || '' }} style={{ flex: 1 }} contentFit="cover" />
+          </View>
+          <View style={{ flex: 1, flexDirection: 'row', borderTopWidth: 1, borderColor: '#fff' }}>
+            <View style={{ flex: 1, borderRightWidth: 1, borderColor: '#fff', backgroundColor: FuchsiaColors.mist }}>
+              <Image source={{ uri: items[1].image_url || '' }} style={{ flex: 1 }} contentFit="cover" />
+            </View>
+            <View style={{ flex: 1, borderLeftWidth: 1, borderColor: '#fff', backgroundColor: FuchsiaColors.mist }}>
+              <Image source={{ uri: items[2].image_url || '' }} style={{ flex: 1 }} contentFit="cover" />
+            </View>
+          </View>
+        </View>
+      );
+    }
+
+    const extraCount = items.length - 3;
+    return (
+      <View style={{ flex: 1 }}>
+        <View style={{ flex: 1, flexDirection: 'row', borderBottomWidth: 1, borderColor: '#fff' }}>
+          <View style={{ flex: 1, borderRightWidth: 1, borderColor: '#fff', backgroundColor: FuchsiaColors.mist }}>
+            <Image source={{ uri: items[0].image_url || '' }} style={{ flex: 1 }} contentFit="cover" />
+          </View>
+          <View style={{ flex: 1, borderLeftWidth: 1, borderColor: '#fff', backgroundColor: FuchsiaColors.mist }}>
+            <Image source={{ uri: items[1].image_url || '' }} style={{ flex: 1 }} contentFit="cover" />
+          </View>
+        </View>
+        <View style={{ flex: 1, flexDirection: 'row', borderTopWidth: 1, borderColor: '#fff' }}>
+          <View style={{ flex: 1, borderRightWidth: 1, borderColor: '#fff', backgroundColor: FuchsiaColors.mist }}>
+            <Image source={{ uri: items[2].image_url || '' }} style={{ flex: 1 }} contentFit="cover" />
+          </View>
+          <View style={{ flex: 1, borderLeftWidth: 1, borderColor: '#fff', backgroundColor: FuchsiaColors.mist }}>
+            <Image source={{ uri: items[3].image_url || '' }} style={{ flex: 1 }} contentFit="cover" />
+            {items.length > 4 && (
+              <View style={{ ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center' }}>
+                <Text style={{ fontFamily: FuchsiaFonts.heading, fontSize: 16, color: '#fff', fontWeight: 'bold' }}>+{extraCount}</Text>
+              </View>
+            )}
+          </View>
+        </View>
+      </View>
+    );
+  };
 
   if (isLoading || !wardrobe) {
     return (
@@ -137,26 +193,18 @@ export default function SelectItemsScreen() {
   }
 
   const selectedCount = selectedIds.size;
-  const selectedItemsData = items.filter(i => selectedIds.has(i.id));
+  const selectedOutfitsData = outfits.filter(o => selectedIds.has(o.id));
 
   return (
     <View style={styles.container}>
-      {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
         <View style={styles.headerTop}>
           <Pressable onPress={() => router.back()} style={styles.iconButton} disabled={isSaving}>
             <ArrowLeft size={20} color={FuchsiaColors.slate} />
           </Pressable>
           <View style={styles.headerCenter}>
-            {wardrobe?.image_url ? (
-              <Image source={{ uri: wardrobe.image_url }} style={styles.headerImage} contentFit="cover" />
-            ) : (
-              <View style={[styles.headerImage, { backgroundColor: FuchsiaColors.mist, alignItems: 'center', justifyContent: 'center' }]}>
-                <ShoppingBag size={14} color="#fff" />
-              </View>
-            )}
             <Text style={styles.headerTitleSub} numberOfLines={1}>
-              {wardrobe?.name || 'Loading...'}
+              Select Outfits
             </Text>
           </View>
           <Pressable 
@@ -178,7 +226,7 @@ export default function SelectItemsScreen() {
             <Search size={18} color={FuchsiaColors.slate} style={{ marginLeft: 12, marginRight: 8 }} />
             <TextInput
               style={styles.searchInputInner}
-              placeholder="Search clothes..."
+              placeholder="Search outfits..."
               placeholderTextColor={FuchsiaColors.mist}
               value={searchQuery}
               onChangeText={setSearchQuery}
@@ -194,45 +242,34 @@ export default function SelectItemsScreen() {
       </View>
 
       <View style={styles.filterBanner}>
-        <Text style={styles.statsLabel}>
-          {activeCategory === 'All' 
-            ? 'All categories' 
-            : activeSubCategory === 'All' 
-              ? activeCategory 
-              : activeSubCategory}
-        </Text>
-        <Text style={styles.statsCount}>{filteredItems.length} items found</Text>
+        <Text style={styles.statsLabel}>All outfits</Text>
+        <Text style={styles.statsCount}>{filteredOutfits.length} found</Text>
       </View>
 
-      {/* Grid */}
       <View style={styles.flex1}>
         <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-          {filteredItems.length === 0 ? (
+          {filteredOutfits.length === 0 ? (
             <View style={styles.emptyState}>
-              <Text style={styles.emptyTitle}>No items found</Text>
-              <Text style={styles.emptySubtitle}>Try adjusting your search or filters.</Text>
+              <Text style={styles.emptyTitle}>No outfits found</Text>
+              <Text style={styles.emptySubtitle}>Try adjusting your search or create a new outfit.</Text>
             </View>
           ) : (
             <View style={styles.gridContainer}>
-              {filteredItems.map(item => {
-                const isSelected = selectedIds.has(item.id);
+              {filteredOutfits.map(outfit => {
+                const isSelected = selectedIds.has(outfit.id);
                 
                 return (
                   <Pressable 
-                    key={item.id} 
+                    key={outfit.id} 
                     style={[styles.itemCard, { width: itemWidth }]}
-                    onPress={() => toggleSelection(item.id)}
+                    onPress={() => toggleSelection(outfit.id)}
                   >
                     <View style={[
                       styles.itemImageContainer, 
                       { height: itemWidth * 1.25 },
                       isSelected && styles.itemImageContainerSelected
                     ]}>
-                      {item.image_url ? (
-                        <Image source={{ uri: item.image_url }} style={StyleSheet.absoluteFillObject} contentFit="cover" />
-                      ) : (
-                        <View style={[StyleSheet.absoluteFillObject, { backgroundColor: FuchsiaColors.mist }]} />
-                      )}
+                      {renderOutfitImage(outfit)}
                       
                       {isSelected && (
                         <View style={styles.selectedOverlay}>
@@ -243,8 +280,8 @@ export default function SelectItemsScreen() {
                       )}
                     </View>
                     <View style={styles.itemInfo}>
-                      <Text style={styles.itemTitle} numberOfLines={1}>{item.name}</Text>
-                      {item.category && <Text style={styles.itemCategory}>{item.category}</Text>}
+                      <Text style={styles.itemTitle} numberOfLines={1}>{outfit.name}</Text>
+                      <Text style={styles.itemCategory}>{outfit.clothing_items_count} Items</Text>
                     </View>
                   </Pressable>
                 );
@@ -255,24 +292,8 @@ export default function SelectItemsScreen() {
         </ScrollView>
         
         
-        
-        <Animated.View 
-          layout={Layout.duration(250)}
-          style={[styles.filterFabWrapper, { bottom: (insets.bottom || 24) + 16 }]}
-        >
-          <Pressable 
-            style={styles.filterFab}
-            onPress={() => {
-              setExpandedCategory(activeCategory === 'All' ? null : activeCategory);
-              setShowFilterModal(true);
-            }}
-          >
-            <Settings size={20} color={FuchsiaColors.deep} />
-          </Pressable>
-        </Animated.View>
       </View>
 
-      {/* Cart Modal */}
       <Modal
         visible={showCartModal}
         animationType="slide"
@@ -282,34 +303,30 @@ export default function SelectItemsScreen() {
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { paddingBottom: (insets.bottom || 24) + 16, maxHeight: '55%' }]}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Selected Items ({selectedCount})</Text>
+              <Text style={styles.modalTitle}>Selected Outfits ({selectedCount})</Text>
               <Pressable onPress={() => setShowCartModal(false)} style={styles.modalCloseButton}>
                 <X size={20} color={FuchsiaColors.slate} />
               </Pressable>
             </View>
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.cartVerticalScrollContent}>
-              {selectedItemsData.length === 0 ? (
+              {selectedOutfitsData.length === 0 ? (
                 <View style={styles.emptyState}>
                   <Text style={styles.emptyTitle}>Empty Cart</Text>
-                  <Text style={styles.emptySubtitle}>No items selected yet.</Text>
+                  <Text style={styles.emptySubtitle}>No outfits selected yet.</Text>
                 </View>
               ) : (
-                selectedItemsData.map(item => (
-                  <View key={`vcart-${item.id}`} style={styles.cartVerticalItem}>
+                selectedOutfitsData.map(outfit => (
+                  <View key={`vcart-${outfit.id}`} style={styles.cartVerticalItem}>
                     <View style={styles.cartVerticalItemLeft}>
                       <View style={styles.cartVerticalImageContainer}>
-                        {item.image_url ? (
-                          <Image source={{ uri: item.image_url }} style={StyleSheet.absoluteFillObject} contentFit="cover" />
-                        ) : (
-                          <View style={[StyleSheet.absoluteFillObject, { backgroundColor: FuchsiaColors.mist }]} />
-                        )}
+                        {renderOutfitImage(outfit)}
                       </View>
                       <View style={styles.cartVerticalInfo}>
-                        <Text style={styles.cartVerticalTitle} numberOfLines={1}>{item.name}</Text>
-                        {item.category && <Text style={styles.cartVerticalCategory}>{item.category}</Text>}
+                        <Text style={styles.cartVerticalTitle} numberOfLines={1}>{outfit.name}</Text>
+                        <Text style={styles.cartVerticalCategory}>{outfit.clothing_items_count} Items</Text>
                       </View>
                     </View>
-                    <Pressable onPress={() => toggleSelection(item.id)} style={styles.cartVerticalRemoveButton}>
+                    <Pressable onPress={() => toggleSelection(outfit.id)} style={styles.cartVerticalRemoveButton}>
                       <Text style={styles.cartVerticalRemoveText}>Remove</Text>
                     </Pressable>
                   </View>
@@ -335,101 +352,12 @@ export default function SelectItemsScreen() {
                     <ActivityIndicator color="white" size="small" />
                   ) : (
                     <Text style={styles.cartSaveButtonText}>
-                      Pack {selectedCount} {selectedCount === 1 ? 'Item' : 'Items'}
+                      Assign {selectedCount} {selectedCount === 1 ? 'Outfit' : 'Outfits'}
                     </Text>
                   )}
                 </LinearGradient>
               </Pressable>
             </View>
-          </View>
-        </View>
-      </Modal>
-
-      {/* Filter Modal */}
-      <Modal
-        visible={showFilterModal}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setShowFilterModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { paddingBottom: (insets.bottom || 24) + 16 }]}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Filter Categories</Text>
-              <Pressable onPress={() => setShowFilterModal(false)} style={styles.modalCloseButton}>
-                <X size={20} color={FuchsiaColors.slate} />
-              </Pressable>
-            </View>
-            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.modalScrollContent}>
-              <Pressable 
-                style={styles.modalCategoryItem}
-                onPress={() => handleAdvancedFilterSelect('All')}
-              >
-                <Text style={[styles.modalCategoryMainText, activeCategory === 'All' && styles.modalCategorySelectedText]}>
-                  All Categories
-                </Text>
-                {activeCategory === 'All' && <Check size={18} color={FuchsiaColors.deep} />}
-              </Pressable>
-              
-              {CLOTHING_CATEGORIES.map((section) => {
-                const isExpanded = expandedCategory === section.main;
-                const hasSubs = section.subs.length > 0;
-                const isSectionActive = activeCategory === section.main;
-
-                return (
-                  <View key={section.main} style={styles.modalCategorySection}>
-                    <Pressable 
-                      style={styles.modalCategoryItem}
-                      onPress={() => {
-                        if (hasSubs) {
-                          setExpandedCategory(isExpanded ? null : section.main);
-                        } else {
-                          handleAdvancedFilterSelect(section.main);
-                        }
-                      }}
-                    >
-                      <Text style={[styles.modalCategoryMainText, isSectionActive && styles.modalCategorySelectedText]}>
-                        {section.main}
-                      </Text>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                        {isSectionActive && activeSubCategory === 'All' && !hasSubs && <Check size={18} color={FuchsiaColors.deep} />}
-                        {hasSubs && (isExpanded ? <ChevronUp size={20} color={FuchsiaColors.slate} /> : <ChevronDown size={20} color={FuchsiaColors.slate} />)}
-                      </View>
-                    </Pressable>
-                    
-                    {hasSubs && isExpanded && (
-                      <View style={styles.modalSubCategoryContainer}>
-                        <Pressable 
-                          style={styles.modalCategoryItem}
-                          onPress={() => handleAdvancedFilterSelect(section.main, 'All')}
-                        >
-                          <Text style={[styles.modalCategorySubText, isSectionActive && activeSubCategory === 'All' && styles.modalCategorySelectedText]}>
-                            All {section.main}
-                          </Text>
-                          {isSectionActive && activeSubCategory === 'All' && <Check size={18} color={FuchsiaColors.deep} />}
-                        </Pressable>
-
-                        {section.subs.map((sub) => {
-                          const isSubActive = isSectionActive && activeSubCategory === sub;
-                          return (
-                            <Pressable 
-                              key={sub} 
-                              style={styles.modalCategoryItem}
-                              onPress={() => handleAdvancedFilterSelect(section.main, sub)}
-                            >
-                              <Text style={[styles.modalCategorySubText, isSubActive && styles.modalCategorySelectedText]}>
-                                {sub}
-                              </Text>
-                              {isSubActive && <Check size={18} color={FuchsiaColors.deep} />}
-                            </Pressable>
-                          );
-                        })}
-                      </View>
-                    )}
-                  </View>
-                );
-              })}
-            </ScrollView>
           </View>
         </View>
       </Modal>
@@ -479,27 +407,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 16,
   },
-  headerImage: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    marginBottom: 4,
-  },
   headerTitleSub: {
     fontFamily: FuchsiaFonts.heading,
-    fontSize: 14,
+    fontSize: 18,
     fontWeight: '600',
     color: FuchsiaColors.ink,
-  },
-  saveButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-  },
-  saveButtonText: {
-    fontFamily: FuchsiaFonts.body,
-    fontSize: 16,
-    fontWeight: '600',
-    color: FuchsiaColors.vibrant,
   },
   searchRow: {
   },
@@ -618,25 +530,6 @@ const styles = StyleSheet.create({
     color: FuchsiaColors.slate,
     textAlign: 'center',
     paddingHorizontal: 40,
-  },
-  filterFabWrapper: {
-    position: 'absolute',
-    right: 24,
-  },
-  filterFab: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 8,
-    borderWidth: 1,
-    borderColor: FuchsiaColors.cloud,
   },
   cartFabWrapper: {
     position: 'absolute',
@@ -782,40 +675,5 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  modalScrollContent: {
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-  },
-  modalCategorySection: {
-    marginBottom: 8,
-  },
-  modalCategoryItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 12,
-  },
-  modalSubCategoryContainer: {
-    marginLeft: 16,
-    borderLeftWidth: 1,
-    borderLeftColor: FuchsiaColors.mist,
-    paddingLeft: 16,
-    marginTop: 4,
-  },
-  modalCategoryMainText: {
-    fontFamily: FuchsiaFonts.heading,
-    fontSize: 16,
-    fontWeight: '600',
-    color: FuchsiaColors.ink,
-  },
-  modalCategorySubText: {
-    fontFamily: FuchsiaFonts.body,
-    fontSize: 15,
-    color: FuchsiaColors.slate,
-  },
-  modalCategorySelectedText: {
-    color: FuchsiaColors.deep,
-    fontWeight: '700',
-  },
+  }
 });
