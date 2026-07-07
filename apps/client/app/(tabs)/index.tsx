@@ -76,6 +76,16 @@ export default function HomeScreen() {
     return { emoji: '🌡️', text: 'Unknown' };
   };
 
+  const getWeatherTag = (code: number, temp: number) => {
+    if ((code >= 51 && code <= 67) || (code >= 80 && code <= 82)) return { tag: 'Rainy', subTag: 'Bring an umbrella' };
+    if (code >= 71 && code <= 77) return { tag: 'Snowy', subTag: 'Bundle up' };
+    if (code >= 95) return { tag: 'Stormy', subTag: 'Stay safe indoors' };
+    
+    if (temp > 25) return { tag: 'Hot', subTag: 'Light fabrics' };
+    if (temp < 15) return { tag: 'Cold', subTag: 'Layers needed' };
+    return { tag: 'Mild', subTag: 'Perfect weather' };
+  };
+
   const currentDate = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
 
   useFocusEffect(
@@ -213,11 +223,11 @@ export default function HomeScreen() {
               <>
                 <View style={styles.weatherTag}>
                   <ThemedText style={styles.weatherTagText}>
-                    {weatherData.temperature > 25 ? 'Hot' : weatherData.temperature < 15 ? 'Cold' : 'Mild'}
+                    {getWeatherTag(weatherData.conditionCode, weatherData.temperature).tag}
                   </ThemedText>
                 </View>
                 <ThemedText style={styles.weatherSubTag}>
-                  {weatherData.temperature > 25 ? 'Light fabrics' : weatherData.temperature < 15 ? 'Layers needed' : 'Perfect weather'}
+                  {getWeatherTag(weatherData.conditionCode, weatherData.temperature).subTag}
                 </ThemedText>
               </>
             )}
