@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from app.core.auth import AuthenticatedUser, bearer_scheme, get_current_authenticated_user
 from app.db.session import get_db_session
 from app.models.wardrobe import Wardrobe
+from app.models.outfit import Outfit
 from app.services.supabase_storage import upload_file_to_supabase
 from app.v1.schemas import ClothingItemResponse, WardrobeResponse, WardrobeWithDetailsResponse, OutfitResponse
 from sqlalchemy.orm import selectinload
@@ -72,7 +73,11 @@ def get_wardrobe(
 ):
     wardrobe = db.scalar(
         select(Wardrobe)
-        .options(selectinload(Wardrobe.clothing_items), selectinload(Wardrobe.outfits))
+        .options(
+            selectinload(Wardrobe.clothing_items), 
+            selectinload(Wardrobe.outfits).selectinload(Outfit.clothing_items),
+            selectinload(Wardrobe.outfits).selectinload(Outfit.images)
+        )
         .where(
             Wardrobe.id == wardrobe_id, Wardrobe.user_id == user.user.id
         )
