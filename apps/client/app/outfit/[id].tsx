@@ -3,7 +3,7 @@ import { useLocalSearchParams, router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useState, useEffect } from 'react';
 import { Image } from 'expo-image';
-import { ArrowLeft, Edit2, Trash2, Layers, Camera, X, Check, Plus } from 'lucide-react-native';
+import { ArrowLeft, Edit2, Trash2, Layers, Camera, X, Check, Plus, MoreHorizontal } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
 
@@ -166,7 +166,13 @@ export default function OutfitDetailScreen() {
         </Pressable>
         <Text style={styles.headerTitle}>{isEditMode ? 'Edit Outfit' : 'Outfit Detail'}</Text>
         <Pressable 
-          onPress={toggleEditMode} 
+          onPress={() => {
+            if (isEditMode) {
+              toggleEditMode();
+            } else {
+              setMenuVisible(true);
+            }
+          }} 
           style={[styles.headerButton, isEditMode && styles.headerButtonActive]}
         >
           {isDeleting ? (
@@ -174,7 +180,7 @@ export default function OutfitDetailScreen() {
           ) : isEditMode ? (
             <Check size={18} color={FuchsiaColors.vibrant} />
           ) : (
-            <Edit2 size={18} color={FuchsiaColors.slate} />
+            <MoreHorizontal size={18} color={FuchsiaColors.slate} />
           )}
         </Pressable>
       </View>
@@ -194,7 +200,7 @@ export default function OutfitDetailScreen() {
             style={({ pressed }) => [styles.dropdownItem, pressed && styles.dropdownItemPressed]}
             onPress={() => {
               setMenuVisible(false);
-              router.push({ pathname: '/add-outfit', params: { id } });
+              toggleEditMode();
             }}
           >
             <Edit2 size={16} color={FuchsiaColors.slate} />
@@ -455,11 +461,6 @@ export default function OutfitDetailScreen() {
           <View style={[styles.card, { paddingRight: 0 }]}>
             <View style={[styles.myPhotosHeader, { paddingRight: 20 }]}>
               <Text style={styles.cardLabel}>In Wardrobes</Text>
-              {isEditMode && (
-                <Pressable onPress={() => router.push(`/outfit/${outfit.id}/select-wardrobes`)}>
-                  <Text style={styles.addItemText}>Add to Wardrobe</Text>
-                </Pressable>
-              )}
             </View>
 
             {(!outfit.wardrobes || outfit.wardrobes.length === 0) ? (
@@ -513,6 +514,16 @@ export default function OutfitDetailScreen() {
                   </Pressable>
                 ))}
               </ScrollView>
+            )}
+            
+            {isEditMode && (
+              <Pressable 
+                style={[styles.addMoreItemsBtn, { marginRight: 20, marginTop: 16 }]}
+                onPress={() => router.push(`/outfit/${outfit.id}/select-wardrobes`)}
+              >
+                <Plus size={16} color={FuchsiaColors.slate} />
+                <Text style={styles.addMoreItemsText}>Add to Wardrobes</Text>
+              </Pressable>
             )}
           </View>
         )}
@@ -612,36 +623,36 @@ const styles = StyleSheet.create({
   // Alert overlay
   alertOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(15, 23, 42, 0.5)',
-    zIndex: 300,
-    alignItems: 'center',
+    backgroundColor: 'rgba(15, 23, 42, 0.4)', // FuchsiaColors.deep with opacity
+    zIndex: 200,
     justifyContent: 'center',
+    paddingHorizontal: 32,
   },
   alertBox: {
-    width: '85%',
     backgroundColor: '#fff',
-    borderRadius: 20,
+    borderRadius: 16,
     padding: 24,
-    shadowColor: '#000',
+    width: '100%',
+    shadowColor: FuchsiaColors.deep,
+    shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.15,
-    shadowRadius: 20,
-    shadowOffset: { width: 0, height: 10 },
-    elevation: 15,
+    shadowRadius: 16,
+    elevation: 10,
+    borderWidth: 1,
+    borderColor: FuchsiaColors.mist,
   },
   alertTitle: {
     fontFamily: FuchsiaFonts.heading,
-    fontSize: 28,
-    fontWeight: '700',
-    color: FuchsiaColors.deep,
+    fontSize: 22,
+    fontWeight: '600',
+    color: FuchsiaColors.ink,
     marginBottom: 8,
-    textAlign: 'center',
   },
   alertMessage: {
     fontFamily: FuchsiaFonts.body,
-    fontSize: 14,
+    fontSize: 15,
     color: FuchsiaColors.slate,
-    lineHeight: 20,
-    textAlign: 'center',
+    lineHeight: 22,
     marginBottom: 24,
   },
   alertButtonsRow: {
@@ -650,30 +661,31 @@ const styles = StyleSheet.create({
   },
   alertCancelButton: {
     flex: 1,
-    minHeight: 44,
+    height: 48,
     borderRadius: 12,
+    backgroundColor: '#fff',
     borderWidth: 1,
     borderColor: FuchsiaColors.mist,
-    alignItems: 'center',
     justifyContent: 'center',
+    alignItems: 'center',
   },
   alertCancelText: {
     fontFamily: FuchsiaFonts.body,
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '600',
     color: FuchsiaColors.ink,
   },
   alertDeleteButton: {
     flex: 1,
-    minHeight: 44,
+    height: 48,
     borderRadius: 12,
     backgroundColor: '#E11D48',
-    alignItems: 'center',
     justifyContent: 'center',
+    alignItems: 'center',
   },
   alertDeleteText: {
     fontFamily: FuchsiaFonts.body,
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '600',
     color: '#fff',
   },
