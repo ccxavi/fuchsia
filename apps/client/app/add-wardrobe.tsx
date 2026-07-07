@@ -94,12 +94,14 @@ export default function AddWardrobeScreen() {
           imageUri: isNewImage ? imageUri : undefined,
         });
         DeviceEventEmitter.emit('wardrobeUpdated', id);
+        DeviceEventEmitter.emit('showGlobalToast', 'Wardrobe updated successfully');
       } else {
         await createWardrobe({
           name: name.trim(),
           quantity: 0,
           imageUri: imageUri || undefined,
         });
+        DeviceEventEmitter.emit('showGlobalToast', 'Wardrobe created successfully');
       }
       router.back();
     } catch (err: any) {

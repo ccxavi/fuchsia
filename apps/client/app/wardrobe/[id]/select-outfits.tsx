@@ -84,6 +84,7 @@ export default function SelectOutfitsScreen() {
       await Promise.all(promises);
       
       DeviceEventEmitter.emit('wardrobeUpdated', id);
+      DeviceEventEmitter.emit('showGlobalToast', 'Outfits updated successfully');
       router.back();
     } catch (err) {
       console.error('Failed to save selections', err);

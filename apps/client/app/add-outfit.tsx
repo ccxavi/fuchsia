@@ -100,12 +100,14 @@ export default function AddOrEditOutfitScreen() {
         // The backend updateOutfit doesn't take clothing_item_ids right now.
         // But we are focusing on the UI here.
         DeviceEventEmitter.emit('outfitUpdated', updatedOutfit);
+        DeviceEventEmitter.emit('showGlobalToast', 'Outfit updated successfully');
       } else {
         await createOutfit({
           name: name.trim(),
           clothing_item_ids: selectedItems.map(i => i.id),
           wardrobe_ids: selectedWardrobeIds.length > 0 ? selectedWardrobeIds : undefined,
         });
+        DeviceEventEmitter.emit('showGlobalToast', 'Outfit created successfully');
       }
       router.back();
     } catch (err: any) {

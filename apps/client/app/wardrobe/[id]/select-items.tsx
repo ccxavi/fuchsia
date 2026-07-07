@@ -90,6 +90,7 @@ export default function SelectItemsScreen() {
       await Promise.all(promises);
       
       DeviceEventEmitter.emit('wardrobeUpdated', id);
+      DeviceEventEmitter.emit('showGlobalToast', 'Items updated successfully');
       router.back();
     } catch (err) {
       console.error('Failed to save selections', err);

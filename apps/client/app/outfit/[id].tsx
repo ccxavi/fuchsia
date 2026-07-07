@@ -113,11 +113,14 @@ export default function OutfitDetailScreen() {
           setIsLoading(true); // show loader during save
           await updateOutfit(id!, { name: editableName.trim() });
           await fetchOutfit();
+          DeviceEventEmitter.emit('showGlobalToast', 'Changes saved successfully');
         } catch (err) {
           console.error('Failed to update outfit name:', err);
         } finally {
           setIsLoading(false);
         }
+      } else {
+        DeviceEventEmitter.emit('showGlobalToast', 'Changes saved successfully');
       }
     }
     setIsEditMode(!isEditMode);
