@@ -3,7 +3,7 @@ import { useLocalSearchParams, router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useState, useEffect } from 'react';
 import { Image } from 'expo-image';
-import { ArrowLeft, Trash2, Palette, Sun, RefreshCcw, Upload, Plus, MoreVertical, Edit2 } from 'lucide-react-native';
+import { ArrowLeft, Trash2, Palette, Sun, RefreshCcw, Upload, Plus, MoreHorizontal, Edit2 } from 'lucide-react-native';
 
 import { FuchsiaColors, FuchsiaFonts } from '@/constants/theme';
 import { getClothingItem, deleteClothingItem, ClothingItemResponse } from '@/api/client';
@@ -91,7 +91,7 @@ export default function ItemDetailScreen() {
           <ArrowLeft color={FuchsiaColors.slate} size={20} />
         </Pressable>
         <Pressable onPress={() => setMenuVisible(!menuVisible)} style={styles.backButton}>
-          {isDeleting ? <ActivityIndicator size="small" color={FuchsiaColors.slate} /> : <MoreVertical color={FuchsiaColors.slate} size={20} />}
+          {isDeleting ? <ActivityIndicator size="small" color={FuchsiaColors.slate} /> : <MoreHorizontal color={FuchsiaColors.slate} size={20} />}
         </Pressable>
       </View>
 
