@@ -127,7 +127,18 @@ export default function SelectWardrobesScreen() {
               {outfit?.name || 'Loading...'}
             </Text>
           </View>
-          <View style={{ width: 40 }} />
+          <Pressable 
+            style={styles.iconButton}
+            onPress={() => setShowCartModal(true)}
+            disabled={selectedCount === 0 || isSaving}
+          >
+            <ShoppingBag size={20} color={selectedCount > 0 ? FuchsiaColors.ink : FuchsiaColors.slate} />
+            {selectedCount > 0 && (
+              <View style={[styles.cartBadge, { top: -8, right: -8, backgroundColor: FuchsiaColors.vibrant }]}>
+                <Text style={styles.cartBadgeText}>{selectedCount}</Text>
+              </View>
+            )}
+          </Pressable>
         </View>
 
         <View style={styles.searchRow}>
@@ -209,20 +220,7 @@ export default function SelectWardrobesScreen() {
           <View style={{ height: (insets.bottom || 24) + 40 }} />
         </ScrollView>
         
-        {selectedCount > 0 && (
-          <Animated.View 
-            entering={FadeInDown.duration(250)} 
-            exiting={FadeOutDown.duration(250)}
-            style={[styles.cartFabWrapper, { bottom: (insets.bottom || 24) + 16 }]}
-          >
-            <Pressable style={styles.cartFab} onPress={() => setShowCartModal(true)}>
-              <ShoppingBag size={20} color="white" />
-              <View style={styles.cartBadge}>
-                <Text style={styles.cartBadgeText}>{selectedCount}</Text>
-              </View>
-            </Pressable>
-          </Animated.View>
-        )}
+        
       </View>
 
       {/* Cart Modal */}
