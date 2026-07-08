@@ -106,6 +106,20 @@ class RecallTestCase(unittest.TestCase):
 
         self.assertEqual([memory.content for memory in memories], ["Never wears heels"])
 
+    def test_default_cutoff_excludes_loosely_related_memories(self) -> None:
+        # A close match (nearly parallel to the query) is kept; a loosely-related
+        # one at ~0.44 cosine distance — the level a bare greeting scores against
+        # unrelated facts with gemini-embedding-001 — is dropped by the default.
+        self._seed("clearly relevant", [1.0, 0.02], category="preference")
+        self._seed("loosely related", [0.56, 0.8285], category="preference")  # dist ~0.44
+
+        with self.session_factory() as session, patch(
+            "app.services.agent.recall.embed_query", return_value=[1.0, 0.0]
+        ):
+            memories = retrieve_relevant_memories(session, _USER_ID, "a real query")
+
+        self.assertEqual([m.content for m in memories], ["clearly relevant"])
+
     def test_retrieve_returns_empty_when_query_blank(self) -> None:
         with self.session_factory() as session, patch(
             "app.services.agent.recall.embed_query"

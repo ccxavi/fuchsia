@@ -19,6 +19,12 @@ class Settings(BaseSettings):
     gemini_base_url: str = "https://generativelanguage.googleapis.com/v1beta/openai"
     gemini_model: str = "gemini-2.5-flash"
     gemini_embedding_model: str = "gemini-embedding-001"
+    # Memory recall (RAG) tuning. gemini-embedding-001 has a high similarity
+    # floor for short text, so the max cosine distance is kept tight to avoid
+    # injecting loosely-related memories (e.g. on a bare greeting). Calibrated:
+    # real matches land ~0.23-0.30, unrelated/greeting noise ~0.42+.
+    memory_recall_top_k: int = 6
+    memory_recall_max_distance: float = 0.38
     openweathermap_api_key: str | None = None
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")

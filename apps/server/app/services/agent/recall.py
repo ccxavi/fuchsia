@@ -6,13 +6,16 @@ from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.models.memory import Memory
 from app.services.embeddings import embed_query
 
-RECALL_TOP_K = 6
-# Cosine distance cutoff (0 = identical, 2 = opposite). ~0.5 keeps reasonably
-# related memories while dropping unrelated ones.
-RECALL_MAX_DISTANCE = 0.5
+# Cosine distance cutoff (0 = identical, 2 = opposite) and result cap. Kept
+# tight because gemini-embedding-001 has a high similarity floor for short text
+# — a bare greeting scores ~0.44 against unrelated facts, while genuine matches
+# land ~0.23-0.30. Tunable via settings without a code change.
+RECALL_TOP_K = settings.memory_recall_top_k
+RECALL_MAX_DISTANCE = settings.memory_recall_max_distance
 
 
 def retrieve_relevant_memories(
