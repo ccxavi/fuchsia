@@ -2,8 +2,9 @@ import { View, StyleSheet, TextInput, Pressable, ScrollView, ActivityIndicator, 
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useState, useEffect } from 'react';
 import { router, useLocalSearchParams } from 'expo-router';
-import { ArrowLeft, Plus, X, Check, Search, Settings, ChevronDown, ChevronUp, ShoppingBag } from 'lucide-react-native';
+import { ArrowLeft, Plus, X, Check, Search, Settings, ChevronDown, ChevronUp, ShoppingBag, Calendar } from 'lucide-react-native';
 import { Image } from 'expo-image';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { FadeInDown, FadeOutDown, Layout } from 'react-native-reanimated';
 
@@ -19,6 +20,7 @@ import {
   getWardrobeClothingItems,
   addItemToOutfit,
   removeItemFromOutfit,
+  createCalendarOutfit,
   ClothingItemResponse,
   WardrobeResponse,
 } from '@/api/client';
@@ -40,6 +42,8 @@ export default function AddOrEditOutfitScreen() {
   const [showItemPicker, setShowItemPicker] = useState(false);
   const [showCartModal, setShowCartModal] = useState(false);
   const [pickerSelectedIds, setPickerSelectedIds] = useState<Set<string>>(new Set());
+  const [scheduledDate, setScheduledDate] = useState<Date | null>(null);
+  const [showDatePicker, setShowDatePicker] = useState(false);
 
   // Item Picker state
   const [activeCategory, setActiveCategory] = useState('All');
@@ -95,6 +99,8 @@ export default function AddOrEditOutfitScreen() {
     setError('');
 
     try {
+      let finalOutfitId = id;
+
       if (id) {
         const updatedOutfit = await updateOutfit(id, {
           name: name.trim(),
@@ -117,13 +123,24 @@ export default function AddOrEditOutfitScreen() {
         DeviceEventEmitter.emit('outfitUpdated', id);
         DeviceEventEmitter.emit('showGlobalToast', 'Outfit updated successfully');
       } else {
-        await createOutfit({
+        const newOutfit = await createOutfit({
           name: name.trim(),
           clothing_item_ids: selectedItems.map(i => i.id),
           wardrobe_ids: selectedWardrobeIds.length > 0 ? selectedWardrobeIds : undefined,
         });
+        finalOutfitId = newOutfit.id;
         DeviceEventEmitter.emit('showGlobalToast', 'Outfit created successfully');
       }
+
+      if (scheduledDate && finalOutfitId) {
+        // Schedule the outfit
+        await createCalendarOutfit({
+          outfit_id: finalOutfitId,
+          date: scheduledDate.toISOString().split('T')[0],
+        });
+        DeviceEventEmitter.emit('showGlobalToast', 'Outfit scheduled successfully');
+      }
+
       router.back();
     } catch (err: any) {
       setError(err.message || `Failed to ${id ? 'update' : 'create'} outfit`);
@@ -282,6 +299,34 @@ export default function AddOrEditOutfitScreen() {
               onChangeText={setName}
             />
           </View>
+          <View style={styles.formGroup}>
+            <ThemedText style={styles.label}>Schedule Outfit (Optional)</ThemedText>
+            <Pressable 
+              style={styles.scheduleButton}
+              onPress={() => setShowDatePicker(true)}
+            >
+              <Calendar size={18} color={FuchsiaColors.slate} />
+              <ThemedText style={scheduledDate ? styles.scheduledDateText : styles.schedulePlaceholderText}>
+                {scheduledDate ? scheduledDate.toLocaleDateString() : 'Select a date...'}
+              </ThemedText>
+              {scheduledDate && (
+                <Pressable onPress={() => setScheduledDate(null)} style={{ marginLeft: 'auto' }}>
+                  <X size={16} color={FuchsiaColors.slate} />
+                </Pressable>
+              )}
+            </Pressable>
+            {showDatePicker && (
+              <DateTimePicker
+                value={scheduledDate || new Date()}
+                mode="date"
+                display="default"
+                onChange={(event, date) => {
+                  setShowDatePicker(false);
+                  if (date) setScheduledDate(date);
+                }}
+              />
+            )}
+          </View>
         </View>
 
         {/* Wardrobe Selector */}
@@ -343,18 +388,25 @@ export default function AddOrEditOutfitScreen() {
           onPress={handleSave}
           disabled={!name.trim() || isLoading}
           style={({ pressed }) => [
-            styles.saveButton,
+            { borderRadius: 14, overflow: 'hidden', elevation: 8, shadowColor: FuchsiaColors.vibrant, shadowOpacity: 0.25, shadowRadius: 12, shadowOffset: { width: 0, height: 6 } },
             { transform: [{ scale: pressed ? 0.98 : 1 }] },
             (!name.trim() || isLoading) && styles.saveButtonDisabled,
           ]}
         >
-          {isLoading ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <ThemedText style={styles.saveButtonText}>
-              {id ? 'Save Changes' : 'Save Outfit'}
-            </ThemedText>
-          )}
+          <LinearGradient
+            colors={['#D4145A', '#86003C']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.saveButton}
+          >
+            {isLoading ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <ThemedText style={styles.saveButtonText}>
+                {id ? 'Save Changes' : 'Save Outfit'}
+              </ThemedText>
+            )}
+          </LinearGradient>
         </Pressable>
       </View>
 
@@ -783,14 +835,35 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   input: {
-    minHeight: 44,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: FuchsiaColors.mist,
     backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
     paddingHorizontal: 16,
+    paddingVertical: 14,
+    fontSize: 16,
     fontFamily: FuchsiaFonts.body,
-    fontSize: 14,
+    color: FuchsiaColors.ink,
+  },
+  scheduleButton: {
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  schedulePlaceholderText: {
+    fontSize: 16,
+    fontFamily: FuchsiaFonts.body,
+    color: FuchsiaColors.mist,
+  },
+  scheduledDateText: {
+    fontSize: 16,
+    fontFamily: FuchsiaFonts.body,
     color: FuchsiaColors.ink,
   },
   wardrobeRow: {
@@ -848,15 +921,8 @@ const styles = StyleSheet.create({
   },
   saveButton: {
     minHeight: 52,
-    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: FuchsiaColors.deep,
-    shadowColor: FuchsiaColors.deep,
-    shadowOpacity: 0.25,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 8,
   },
   saveButtonDisabled: {
     opacity: 0.5,

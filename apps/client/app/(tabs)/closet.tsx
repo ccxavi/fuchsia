@@ -555,7 +555,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
-    paddingVertical: 12,
+    paddingTop: 16,
+    paddingBottom: 12,
   },
   headerTitle: {
     fontFamily: FuchsiaFonts.heading,

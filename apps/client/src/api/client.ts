@@ -515,3 +515,68 @@ export async function deleteOutfitImage(imageId: string): Promise<void> {
     method: 'DELETE',
   });
 }
+
+// ==========================================
+// CALENDAR OUTFITS
+// ==========================================
+
+export type CalendarOutfitResponse = {
+  id: string;
+  user_id: string;
+  outfit_id: string;
+  date: string;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type CalendarOutfitWithOutfitResponse = CalendarOutfitResponse & {
+  outfit: OutfitWithItemsResponse;
+  // Day images can be ignored for now unless needed
+};
+
+export type CalendarOutfitCreateRequest = {
+  outfit_id: string;
+  date: string; // YYYY-MM-DD
+  notes?: string;
+};
+
+export type CalendarOutfitUpdateRequest = {
+  date?: string; // YYYY-MM-DD
+  notes?: string;
+};
+
+export async function createCalendarOutfit(data: CalendarOutfitCreateRequest): Promise<CalendarOutfitResponse> {
+  return apiFetch<CalendarOutfitResponse>('/calendar/', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(data),
+  });
+}
+
+export async function getCalendarOutfits(year?: number, month?: number): Promise<CalendarOutfitWithOutfitResponse[]> {
+  const queryParams = new URLSearchParams();
+  if (year !== undefined) queryParams.append('year', year.toString());
+  if (month !== undefined) queryParams.append('month', month.toString());
+  
+  const queryString = queryParams.toString() ? `?${queryParams.toString()}` : '';
+  return apiFetch<CalendarOutfitWithOutfitResponse[]>(`/calendar/${queryString}`);
+}
+
+export async function updateCalendarOutfit(id: string, data: CalendarOutfitUpdateRequest): Promise<CalendarOutfitResponse> {
+  return apiFetch<CalendarOutfitResponse>(`/calendar/${id}`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(data),
+  });
+}
+
+export async function deleteCalendarOutfit(id: string): Promise<void> {
+  return apiFetch<void>(`/calendar/${id}`, {
+    method: 'DELETE',
+  });
+}
