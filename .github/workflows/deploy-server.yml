@@ -6,6 +6,10 @@ on:
     paths:
       - "apps/server/**"
       - ".github/workflows/deploy-server.yml"
+  pull_request:
+    paths:
+      - "apps/server/**"
+      - ".github/workflows/deploy-server.yml"
 
 concurrency:
   group: deploy-server-${{ github.ref }}
@@ -32,6 +36,7 @@ jobs:
 
   deploy:
     needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
       - name: Trigger Render deploy hook
