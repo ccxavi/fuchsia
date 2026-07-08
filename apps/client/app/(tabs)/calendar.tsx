@@ -51,8 +51,21 @@ export default function CalendarScreen() {
     setShowReschedulePicker(false);
     if (event.type === 'set' && date && rescheduleOutfitId) {
       try {
-        setIsLoading(true);
         const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+        
+        const calendarOutfitToMove = outfits.find(o => o.id === rescheduleOutfitId);
+        if (calendarOutfitToMove) {
+          const existingOutfitsForDate = outfitsByDate[dateStr] || [];
+          const isDuplicate = existingOutfitsForDate.some(co => co.outfit.id === calendarOutfitToMove.outfit.id);
+          
+          if (isDuplicate) {
+            Alert.alert('Duplicate Outfit', 'This outfit is already scheduled on that day!');
+            setRescheduleOutfitId(null);
+            return;
+          }
+        }
+
+        setIsLoading(true);
         await updateCalendarOutfit(rescheduleOutfitId, { date: dateStr });
         
         if (date.getFullYear() !== currentMonth.getFullYear() || date.getMonth() !== currentMonth.getMonth()) {
