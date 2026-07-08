@@ -200,12 +200,35 @@ class MemoryResponse(BaseModel):
     updated_at: datetime.datetime
 
 
+class OutfitSuggestion(BaseModel):
+    name: str = Field(..., min_length=1, max_length=255)
+    clothing_item_ids: list[str] = Field(..., min_length=1)
+    rationale: str | None = Field(default=None, max_length=500)
+
+    @field_validator("name")
+    @classmethod
+    def validate_name(cls, value: str) -> str:
+        cleaned = value.strip()
+        if not cleaned:
+            raise ValueError("name must not be empty")
+        return cleaned
+
+    @field_validator("rationale")
+    @classmethod
+    def validate_rationale(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        cleaned = value.strip()
+        return cleaned or None
+
+
 class ChatResponse(BaseModel):
     message: ChatMessage
     model: str
     usage: dict[str, Any] | None = None
     memory_suggestions: list[MemorySuggestion] = []
     memories_used: list[MemoryResponse] = []
+    outfit_suggestions: list[OutfitSuggestion] = []
 
 class ClothingItemResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)

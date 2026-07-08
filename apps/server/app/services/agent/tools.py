@@ -95,7 +95,66 @@ SUGGEST_MEMORIES_TOOL: dict[str, Any] = {
     },
 }
 
-STYLIST_TOOLS: list[dict[str, Any]] = [CLOTHING_ITEMS_TOOL, SUGGEST_MEMORIES_TOOL]
+SUGGEST_OUTFITS_TOOL: dict[str, Any] = {
+    "type": "function",
+    "function": {
+        "name": "suggest_outfits",
+        "description": (
+            "Propose one or more complete outfits assembled from pieces the user "
+            "actually owns. Only use clothing items returned by get_clothing_items, "
+            "referencing each by its exact 'id'. Never invent pieces the user does "
+            "not own. Reflect the user's remembered style preferences when choosing. "
+            "Call this in the same turn you answer once you have decided on an outfit; "
+            "if you cannot build one from their wardrobe, do not call it."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "outfits": {
+                    "type": "array",
+                    "description": "The outfits you are proposing.",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "name": {
+                                "type": "string",
+                                "description": (
+                                    "A short descriptive name, e.g. 'Casual Friday' "
+                                    "or 'Wedding Guest Look'."
+                                ),
+                            },
+                            "clothing_item_ids": {
+                                "type": "array",
+                                "description": (
+                                    "The exact 'id' values of the chosen clothing "
+                                    "items, taken from get_clothing_items results."
+                                ),
+                                "items": {"type": "string"},
+                            },
+                            "rationale": {
+                                "type": "string",
+                                "description": (
+                                    "One short sentence on why these pieces work "
+                                    "together for the request."
+                                ),
+                            },
+                        },
+                        "required": ["name", "clothing_item_ids"],
+                        "additionalProperties": False,
+                    },
+                },
+            },
+            "required": ["outfits"],
+            "additionalProperties": False,
+        },
+    },
+}
+
+STYLIST_TOOLS: list[dict[str, Any]] = [
+    CLOTHING_ITEMS_TOOL,
+    SUGGEST_MEMORIES_TOOL,
+    SUGGEST_OUTFITS_TOOL,
+]
 
 
 def get_clothing_items(
@@ -120,6 +179,7 @@ def get_clothing_items(
 
     return [
         {
+            "id": item.id,
             "name": item.name,
             "category": item.category,
             "color": item.color,

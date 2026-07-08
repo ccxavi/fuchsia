@@ -9,6 +9,10 @@ from app.services.agent.memory import (
     _parse_suggestions,
     drop_stored_suggestions,
 )
+from app.services.agent.outfits import (
+    _parse_outfit_suggestions,
+    filter_valid_outfit_suggestions,
+)
 from app.services.agent.openai_compat import (
     Provider,
     build_body,
@@ -24,7 +28,13 @@ from app.services.agent.recall import (
 )
 from app.services.agent.tools import STYLIST_TOOLS, execute_tool
 from app.models.memory import Memory
-from app.v1.schemas import ChatMessage, ChatResponse, MemoryResponse, MemorySuggestion
+from app.v1.schemas import (
+    ChatMessage,
+    ChatResponse,
+    MemoryResponse,
+    MemorySuggestion,
+    OutfitSuggestion,
+)
 
 MAX_TOOL_ROUNDS = 4
 
@@ -95,6 +105,7 @@ def _run_tool_call(
     db: Session,
     user_id: str,
     suggestions: list[MemorySuggestion],
+    outfit_suggestions: list[OutfitSuggestion],
 ) -> dict[str, Any]:
     function = tool_call.get("function") or {}
     name = function.get("name") or ""
@@ -106,6 +117,13 @@ def _run_tool_call(
         parsed = _parse_suggestions(raw if isinstance(raw, str) else "")
         suggestions.extend(parsed)
         content = json.dumps({"status": "noted", "count": len(parsed)})
+    elif name == "suggest_outfits":
+        # Output-only tool: record the proposed outfits and acknowledge. Item ids
+        # are validated against the user's wardrobe after the loop finishes.
+        raw = function.get("arguments")
+        parsed_outfits = _parse_outfit_suggestions(raw if isinstance(raw, str) else "")
+        outfit_suggestions.extend(parsed_outfits)
+        content = json.dumps({"status": "noted", "count": len(parsed_outfits)})
     else:
         arguments = _parse_arguments(function.get("arguments"))
         content = execute_tool(name, arguments, db=db, user_id=user_id)
@@ -126,6 +144,7 @@ def _generate_answer(
     temperature: float | None,
     max_tokens: int | None,
     suggestions: list[MemorySuggestion],
+    outfit_suggestions: list[OutfitSuggestion],
 ) -> ChatResponse:
     """Run the tool loop and return the model's final text answer.
 
@@ -158,7 +177,11 @@ def _generate_answer(
         for tool_call in tool_calls:
             serialized.append(
                 _run_tool_call(
-                    tool_call, db=db, user_id=user_id, suggestions=suggestions
+                    tool_call,
+                    db=db,
+                    user_id=user_id,
+                    suggestions=suggestions,
+                    outfit_suggestions=outfit_suggestions,
                 )
             )
 
@@ -196,6 +219,7 @@ def run_stylist_chat(
         serialized, messages, db=db, user_id=user_id
     )
     suggestions: list[MemorySuggestion] = []
+    outfit_suggestions: list[OutfitSuggestion] = []
     response = _generate_answer(
         serialized,
         provider=provider,
@@ -204,9 +228,13 @@ def run_stylist_chat(
         temperature=temperature,
         max_tokens=max_tokens,
         suggestions=suggestions,
+        outfit_suggestions=outfit_suggestions,
     )
     suggestions = drop_stored_suggestions(
         db, user_id, _dedupe_suggestions(suggestions)
+    )
+    outfit_suggestions = filter_valid_outfit_suggestions(
+        db, user_id, outfit_suggestions
     )
     return response.model_copy(
         update={
@@ -214,5 +242,6 @@ def run_stylist_chat(
             "memories_used": [
                 MemoryResponse.model_validate(memory) for memory in used_memories
             ],
+            "outfit_suggestions": outfit_suggestions,
         }
     )

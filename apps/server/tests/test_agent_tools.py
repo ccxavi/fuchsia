@@ -105,10 +105,17 @@ class StylistToolsTestCase(unittest.TestCase):
         self.assertEqual(parsed["count"], 1)
         self.assertEqual(parsed["items"][0]["name"], "Blue jeans")
 
-    def test_advertised_tools_include_wardrobe_and_memory(self) -> None:
+    def test_advertised_tools_include_wardrobe_memory_and_outfits(self) -> None:
         names = {tool["function"]["name"] for tool in STYLIST_TOOLS}
 
-        self.assertEqual(names, {"get_clothing_items", "suggest_memories"})
+        self.assertEqual(
+            names, {"get_clothing_items", "suggest_memories", "suggest_outfits"}
+        )
+
+    def test_items_include_id_so_outfits_can_reference_them(self) -> None:
+        items = get_clothing_items(self.session, "user-1")
+
+        self.assertTrue(all(isinstance(item["id"], str) and item["id"] for item in items))
 
     def test_empty_wardrobe_returns_empty(self) -> None:
         result = execute_tool(

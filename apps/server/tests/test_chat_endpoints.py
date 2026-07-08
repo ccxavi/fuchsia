@@ -16,7 +16,12 @@ from app.db.session import get_db_session
 from app.main import app
 from app.models.user import User
 from app.services.agent.openai_compat import Provider
-from app.v1.schemas import ChatMessage, ChatResponse, MemorySuggestion
+from app.v1.schemas import (
+    ChatMessage,
+    ChatResponse,
+    MemorySuggestion,
+    OutfitSuggestion,
+)
 
 _TEXT_PROVIDER = Provider(
     name="DeepSeek",
@@ -152,6 +157,38 @@ class ChatEndpointTestCase(unittest.TestCase):
         suggestions = response.json()["memory_suggestions"]
         self.assertEqual(len(suggestions), 1)
         self.assertEqual(suggestions[0], {"content": "Never wears heels", "category": "preference"})
+
+    def test_chat_returns_outfit_suggestions(self) -> None:
+        self._override_auth()
+        completion = ChatResponse(
+            message=ChatMessage(role="assistant", content="Try this look."),
+            model="deepseek-chat",
+            outfit_suggestions=[
+                OutfitSuggestion(
+                    name="Casual Friday",
+                    clothing_item_ids=["item-1", "item-2"],
+                    rationale="Relaxed but put-together.",
+                )
+            ],
+        )
+
+        with self._patch_chat(return_value=completion):
+            response = self.client.post(
+                "/api/v1/chat",
+                json={"messages": [{"role": "user", "content": "build me an outfit"}]},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        outfits = response.json()["outfit_suggestions"]
+        self.assertEqual(len(outfits), 1)
+        self.assertEqual(
+            outfits[0],
+            {
+                "name": "Casual Friday",
+                "clothing_item_ids": ["item-1", "item-2"],
+                "rationale": "Relaxed but put-together.",
+            },
+        )
 
     def test_chat_propagates_upstream_error(self) -> None:
         self._override_auth()
