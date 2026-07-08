@@ -136,6 +136,9 @@ class ChatEndpointTestCase(unittest.TestCase):
         self.assertEqual(kwargs["temperature"], 0.5)
         self.assertEqual(kwargs["max_tokens"], 1024)
         self.assertEqual(kwargs["user_id"], _authenticated_user().user.id)
+        # No coordinates supplied -> weather is unavailable to the agent.
+        self.assertIsNone(kwargs["latitude"])
+        self.assertIsNone(kwargs["longitude"])
 
     def test_chat_returns_memory_suggestions(self) -> None:
         self._override_auth()
@@ -157,6 +160,51 @@ class ChatEndpointTestCase(unittest.TestCase):
         suggestions = response.json()["memory_suggestions"]
         self.assertEqual(len(suggestions), 1)
         self.assertEqual(suggestions[0], {"content": "Never wears heels", "category": "preference"})
+
+    def test_chat_forwards_coordinates(self) -> None:
+        self._override_auth()
+
+        with self._patch_chat(return_value=_completion()) as run_mock:
+            response = self.client.post(
+                "/api/v1/chat",
+                json={
+                    "messages": [{"role": "user", "content": "what should I wear?"}],
+                    "latitude": 14.6,
+                    "longitude": 121.0,
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        _, kwargs = run_mock.call_args
+        self.assertEqual(kwargs["latitude"], 14.6)
+        self.assertEqual(kwargs["longitude"], 121.0)
+
+    def test_chat_rejects_out_of_range_coordinates(self) -> None:
+        self._override_auth()
+
+        response = self.client.post(
+            "/api/v1/chat",
+            json={
+                "messages": [{"role": "user", "content": "hi"}],
+                "latitude": 200.0,
+                "longitude": 0.0,
+            },
+        )
+
+        self.assertEqual(response.status_code, 422)
+
+    def test_chat_rejects_partial_coordinates(self) -> None:
+        self._override_auth()
+
+        response = self.client.post(
+            "/api/v1/chat",
+            json={
+                "messages": [{"role": "user", "content": "hi"}],
+                "latitude": 14.6,
+            },
+        )
+
+        self.assertEqual(response.status_code, 422)
 
     def test_chat_returns_outfit_suggestions(self) -> None:
         self._override_auth()

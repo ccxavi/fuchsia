@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 from typing import Any
 
@@ -7,6 +8,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.models.clothing_item import ClothingItem
+from app.services.weather import get_current_weather
 
 MAX_ITEMS = 100
 
@@ -150,10 +152,31 @@ SUGGEST_OUTFITS_TOOL: dict[str, Any] = {
     },
 }
 
+GET_WEATHER_TOOL: dict[str, Any] = {
+    "type": "function",
+    "function": {
+        "name": "get_weather",
+        "description": (
+            "Get the current weather at the user's location. Call this whenever "
+            "weather-appropriate dressing advice would help — for example when the "
+            "user asks what to wear today or for an outing. Takes no arguments; the "
+            "location comes from the user's device. Returns current conditions only, "
+            "not a multi-day forecast. If the location is unavailable, ask the user "
+            "to describe the weather instead."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": False,
+        },
+    },
+}
+
 STYLIST_TOOLS: list[dict[str, Any]] = [
     CLOTHING_ITEMS_TOOL,
     SUGGEST_MEMORIES_TOOL,
     SUGGEST_OUTFITS_TOOL,
+    GET_WEATHER_TOOL,
 ]
 
 
@@ -190,18 +213,45 @@ def get_clothing_items(
     ]
 
 
+def _weather_payload(latitude: float | None, longitude: float | None) -> dict[str, Any]:
+    """Fetch current weather for the injected coordinates as a model-friendly dict.
+
+    Bridges the async weather service into the synchronous tool loop. Never
+    raises: a missing location or upstream failure becomes an ``{"error": ...}``
+    payload the model can read and recover from.
+    """
+    if latitude is None or longitude is None:
+        return {"error": "Location not available; ask the user about current conditions."}
+
+    try:
+        weather = asyncio.run(get_current_weather(latitude, longitude))
+    except Exception:  # noqa: BLE001 - any failure degrades to a readable error
+        return {"error": "Could not fetch the weather right now."}
+
+    return {
+        "temperature_c": weather.get("temperature"),
+        "description": weather.get("description"),
+        "city": weather.get("city"),
+    }
+
+
 def execute_tool(
     name: str,
     arguments: dict[str, Any],
     *,
     db: Session,
     user_id: str,
+    latitude: float | None = None,
+    longitude: float | None = None,
 ) -> str:
     """Execute a stylist tool by name and return a JSON string for the model.
 
     Never raises for a caller-recoverable problem (unknown tool, bad args); it
     returns a JSON error payload the model can read and recover from.
     """
+    if name == "get_weather":
+        return json.dumps(_weather_payload(latitude, longitude))
+
     if name != "get_clothing_items":
         return json.dumps({"error": f"Unknown tool: {name}"})
 

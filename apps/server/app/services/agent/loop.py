@@ -106,6 +106,8 @@ def _run_tool_call(
     user_id: str,
     suggestions: list[MemorySuggestion],
     outfit_suggestions: list[OutfitSuggestion],
+    latitude: float | None,
+    longitude: float | None,
 ) -> dict[str, Any]:
     function = tool_call.get("function") or {}
     name = function.get("name") or ""
@@ -126,7 +128,14 @@ def _run_tool_call(
         content = json.dumps({"status": "noted", "count": len(parsed_outfits)})
     else:
         arguments = _parse_arguments(function.get("arguments"))
-        content = execute_tool(name, arguments, db=db, user_id=user_id)
+        content = execute_tool(
+            name,
+            arguments,
+            db=db,
+            user_id=user_id,
+            latitude=latitude,
+            longitude=longitude,
+        )
 
     return {
         "role": "tool",
@@ -145,6 +154,8 @@ def _generate_answer(
     max_tokens: int | None,
     suggestions: list[MemorySuggestion],
     outfit_suggestions: list[OutfitSuggestion],
+    latitude: float | None,
+    longitude: float | None,
 ) -> ChatResponse:
     """Run the tool loop and return the model's final text answer.
 
@@ -182,6 +193,8 @@ def _generate_answer(
                     user_id=user_id,
                     suggestions=suggestions,
                     outfit_suggestions=outfit_suggestions,
+                    latitude=latitude,
+                    longitude=longitude,
                 )
             )
 
@@ -205,6 +218,8 @@ def run_stylist_chat(
     user_id: str,
     temperature: float | None = None,
     max_tokens: int | None = None,
+    latitude: float | None = None,
+    longitude: float | None = None,
 ) -> ChatResponse:
     """Generate the stylist's answer, collecting any memory suggestions it makes.
 
@@ -229,6 +244,8 @@ def run_stylist_chat(
         max_tokens=max_tokens,
         suggestions=suggestions,
         outfit_suggestions=outfit_suggestions,
+        latitude=latitude,
+        longitude=longitude,
     )
     suggestions = drop_stored_suggestions(
         db, user_id, _dedupe_suggestions(suggestions)

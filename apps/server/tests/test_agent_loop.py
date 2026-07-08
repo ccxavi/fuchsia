@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import unittest
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
@@ -93,6 +93,29 @@ def _suggest_outfits_payload(outfits: list[dict]) -> dict:
                             "function": {
                                 "name": "suggest_outfits",
                                 "arguments": json.dumps({"outfits": outfits}),
+                            },
+                        }
+                    ],
+                }
+            }
+        ]
+    }
+
+
+def _weather_tool_call_payload() -> dict:
+    return {
+        "choices": [
+            {
+                "message": {
+                    "role": "assistant",
+                    "content": None,
+                    "tool_calls": [
+                        {
+                            "id": "call_weather",
+                            "type": "function",
+                            "function": {
+                                "name": "get_weather",
+                                "arguments": "{}",
                             },
                         }
                     ],
@@ -226,6 +249,62 @@ class RunStylistChatTestCase(unittest.TestCase):
             result = self._run()
 
         self.assertEqual(result.outfit_suggestions, [])
+
+    def test_weather_tool_uses_request_coordinates(self) -> None:
+        fake_weather = AsyncMock(
+            return_value={
+                "temperature": 12.0,
+                "description": "Cloudy",
+                "icon_url": "https://example.test/i.png",
+                "city": "Baguio",
+            }
+        )
+        with patch(
+            "app.services.agent.tools.get_current_weather", new=fake_weather
+        ), patch(
+            "app.services.agent.loop.post_chat",
+            side_effect=[
+                _weather_tool_call_payload(),
+                _content_payload("Bring a light jacket."),
+            ],
+        ) as post_mock:
+            result = run_stylist_chat(
+                [ChatMessage(role="user", content="what should I wear today?")],
+                provider=_provider(),
+                db=self.session,
+                user_id="user-1",
+                latitude=16.4,
+                longitude=120.6,
+            )
+
+        self.assertEqual(result.message.content, "Bring a light jacket.")
+        # Coordinates from the request reach the weather service.
+        fake_weather.assert_awaited_once_with(16.4, 120.6)
+
+        # The weather result is fed back to the model in the next round.
+        _, second_body = post_mock.call_args_list[1].args
+        tool_message = next(m for m in second_body["messages"] if m["role"] == "tool")
+        self.assertEqual(tool_message["tool_call_id"], "call_weather")
+        self.assertIn("Cloudy", tool_message["content"])
+
+    def test_weather_tool_without_coordinates_returns_error_to_model(self) -> None:
+        with patch(
+            "app.services.agent.tools.get_current_weather"
+        ) as fake_weather, patch(
+            "app.services.agent.loop.post_chat",
+            side_effect=[
+                _weather_tool_call_payload(),
+                _content_payload("Where are you based?"),
+            ],
+        ) as post_mock:
+            # No latitude/longitude passed -> default None.
+            result = self._run()
+
+        self.assertEqual(result.message.content, "Where are you based?")
+        fake_weather.assert_not_called()
+        _, second_body = post_mock.call_args_list[1].args
+        tool_message = next(m for m in second_body["messages"] if m["role"] == "tool")
+        self.assertIn("error", tool_message["content"])
 
     def test_executes_tool_then_returns_final_answer(self) -> None:
         with patch(

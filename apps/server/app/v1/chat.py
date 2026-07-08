@@ -51,4 +51,6 @@ def chat(
         user_id=authenticated_user.user.id,
         temperature=payload.temperature,
         max_tokens=payload.max_tokens,
+        latitude=payload.latitude,
+        longitude=payload.longitude,
     )

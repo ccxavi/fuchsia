@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import json
 import unittest
+from unittest.mock import AsyncMock, patch
 
+from fastapi import HTTPException
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
@@ -105,11 +107,17 @@ class StylistToolsTestCase(unittest.TestCase):
         self.assertEqual(parsed["count"], 1)
         self.assertEqual(parsed["items"][0]["name"], "Blue jeans")
 
-    def test_advertised_tools_include_wardrobe_memory_and_outfits(self) -> None:
+    def test_advertised_tools_include_wardrobe_memory_outfits_and_weather(self) -> None:
         names = {tool["function"]["name"] for tool in STYLIST_TOOLS}
 
         self.assertEqual(
-            names, {"get_clothing_items", "suggest_memories", "suggest_outfits"}
+            names,
+            {
+                "get_clothing_items",
+                "suggest_memories",
+                "suggest_outfits",
+                "get_weather",
+            },
         )
 
     def test_items_include_id_so_outfits_can_reference_them(self) -> None:
@@ -125,6 +133,57 @@ class StylistToolsTestCase(unittest.TestCase):
         parsed = json.loads(result)
         self.assertEqual(parsed["count"], 0)
         self.assertEqual(parsed["items"], [])
+
+    def test_get_weather_returns_conditions_for_coords(self) -> None:
+        fake = AsyncMock(
+            return_value={
+                "temperature": 21.5,
+                "description": "Light Rain",
+                "icon_url": "https://example.test/icon.png",
+                "city": "Manila",
+            }
+        )
+        with patch("app.services.agent.tools.get_current_weather", new=fake):
+            result = execute_tool(
+                "get_weather",
+                {},
+                db=self.session,
+                user_id="user-1",
+                latitude=14.6,
+                longitude=121.0,
+            )
+
+        fake.assert_awaited_once_with(14.6, 121.0)
+        parsed = json.loads(result)
+        self.assertEqual(parsed["temperature_c"], 21.5)
+        self.assertEqual(parsed["description"], "Light Rain")
+        self.assertEqual(parsed["city"], "Manila")
+
+    def test_get_weather_without_coords_returns_error(self) -> None:
+        result = execute_tool(
+            "get_weather", {}, db=self.session, user_id="user-1"
+        )
+
+        parsed = json.loads(result)
+        self.assertIn("error", parsed)
+
+    def test_get_weather_swallows_service_errors(self) -> None:
+        fake = AsyncMock(
+            side_effect=HTTPException(status_code=503, detail="down")
+        )
+        with patch("app.services.agent.tools.get_current_weather", new=fake):
+            result = execute_tool(
+                "get_weather",
+                {},
+                db=self.session,
+                user_id="user-1",
+                latitude=14.6,
+                longitude=121.0,
+            )
+
+        # Never raises; the failure is a readable error payload for the model.
+        parsed = json.loads(result)
+        self.assertIn("error", parsed)
 
 
 if __name__ == "__main__":
