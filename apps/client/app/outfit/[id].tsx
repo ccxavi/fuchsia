@@ -3,12 +3,13 @@ import { useLocalSearchParams, router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useState, useEffect } from 'react';
 import { Image } from 'expo-image';
-import { ArrowLeft, Edit2, Trash2, Layers, Camera, X, Check, Plus, MoreHorizontal, Info } from 'lucide-react-native';
+import { ArrowLeft, Edit2, Trash2, Layers, Camera, X, Check, Plus, MoreHorizontal, Info, Calendar } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
+import DateTimePicker from '@react-native-community/datetimepicker';
 
 import { FuchsiaColors, FuchsiaFonts } from '@/constants/theme';
-import { getOutfit, deleteOutfit, updateOutfit, deleteOutfitImage, addItemToOutfit, removeItemFromOutfit, addWardrobeToOutfit, removeWardrobeFromOutfit, OutfitWithWardrobesResponse } from '@/api/client';
+import { getOutfit, deleteOutfit, updateOutfit, deleteOutfitImage, addItemToOutfit, removeItemFromOutfit, addWardrobeToOutfit, removeWardrobeFromOutfit, createCalendarOutfit, OutfitWithWardrobesResponse } from '@/api/client';
 
 export default function OutfitDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -23,6 +24,7 @@ export default function OutfitDetailScreen() {
   const [infoAlertVisible, setInfoAlertVisible] = useState(false);
   const [photoToDelete, setPhotoToDelete] = useState<string | null>(null);
   const [isDeletingPhoto, setIsDeletingPhoto] = useState(false);
+  const [showDatePicker, setShowDatePicker] = useState(false);
   const [focusedPhotoId, setFocusedPhotoId] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
 
@@ -167,6 +169,7 @@ export default function OutfitDetailScreen() {
       {/* Dropdown Menu */}
       {menuVisible && (
         <View style={[styles.dropdownMenu, { top: insets.top + 56 }]}>
+
           <Pressable
             style={({ pressed }) => [styles.dropdownItem, pressed && styles.dropdownItemPressed]}
             onPress={() => {
@@ -197,6 +200,29 @@ export default function OutfitDetailScreen() {
             <Text style={[styles.dropdownItemText, { color: '#E11D48' }]}>Delete Outfit</Text>
           </Pressable>
         </View>
+      )}
+
+      {/* Date Picker */}
+      {showDatePicker && (
+        <DateTimePicker
+          value={new Date()}
+          mode="date"
+          display="default"
+          onChange={async (event, date) => {
+            setShowDatePicker(false);
+            if (date && outfit) {
+              try {
+                await createCalendarOutfit({
+                  outfit_id: outfit.id,
+                  date: date.toISOString().split('T')[0],
+                });
+                DeviceEventEmitter.emit('showGlobalToast', 'Outfit scheduled successfully!');
+              } catch (err) {
+                Alert.alert('Error', 'Failed to schedule outfit');
+              }
+            }
+          }}
+        />
       )}
 
       {/* Photo Delete Confirmation */}
@@ -495,6 +521,24 @@ export default function OutfitDetailScreen() {
             </View>
           </View>
         </View>
+
+        {/* Schedule Button */}
+        <View style={{ paddingHorizontal: 20, marginTop: 16 }}>
+          <Pressable 
+            style={{ borderRadius: 16, overflow: 'hidden', elevation: 4, shadowColor: FuchsiaColors.vibrant, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.25, shadowRadius: 12 }}
+            onPress={() => setShowDatePicker(true)}
+          >
+            <LinearGradient
+              colors={['#D4145A', '#86003C']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.primaryScheduleButton}
+            >
+              <Calendar size={20} color="#fff" />
+              <Text style={styles.primaryScheduleButtonText}>Schedule Outfit</Text>
+            </LinearGradient>
+          </Pressable>
+        </View>
       </ScrollView>
     </View>
   );
@@ -564,6 +608,20 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
     color: FuchsiaColors.ink,
+  },
+  primaryScheduleButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+    paddingVertical: 16,
+    borderRadius: 16,
+  },
+  primaryScheduleButtonText: {
+    fontFamily: FuchsiaFonts.heading,
+    fontSize: 16,
+    color: '#fff',
+    fontWeight: '600',
   },
   dropdownDivider: {
     height: 1,

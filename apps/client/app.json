@@ -46,7 +46,8 @@
         {
           "locationAlwaysAndWhenInUsePermission": "Allow Fuchsia to use your location to provide accurate weather-based outfit recommendations."
         }
-      ]
+      ],
+      "@react-native-community/datetimepicker"
     ],
     "experiments": {
       "typedRoutes": true,
