@@ -1,15 +1,53 @@
-import { StyleSheet, View, ScrollView, Pressable } from 'react-native';
+import { StyleSheet, View, ScrollView, Pressable, Animated } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Sparkles, Lightbulb, Palette, LogOut } from 'lucide-react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import * as Location from 'expo-location';
+import { jwtDecode } from 'jwt-decode';
 import { getMe } from '@/api/client';
 
 import { ThemedText } from '@/components/themed-text';
 import { FuchsiaColors, FuchsiaFonts } from '@/constants/theme';
+
+const Skeleton = ({ width, height, borderRadius = 4, style }: any) => {
+  const pulseAnim = useState(new Animated.Value(0.3))[0];
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 0.7,
+          duration: 800,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 0.3,
+          duration: 800,
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+  }, [pulseAnim]);
+
+  return (
+    <Animated.View
+      style={[
+        {
+          width,
+          height,
+          borderRadius,
+          backgroundColor: FuchsiaColors.mist,
+          opacity: pulseAnim,
+        },
+        style,
+      ]}
+    />
+  );
+};
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
@@ -18,9 +56,48 @@ export default function HomeScreen() {
   const [userName, setUserName] = useState<string>('there');
   const [greetingTime, setGreetingTime] = useState<string>('Good morning');
 
-  useEffect(() => {
+  const [weatherData, setWeatherData] = useState<{
+    temperature: number;
+    conditionCode: number;
+    city: string;
+    loading: boolean;
+  }>({ temperature: 0, conditionCode: 0, city: 'Loading...', loading: true });
+
+  const getWeatherInfo = (code: number) => {
     const hour = new Date().getHours();
-    if (hour < 12) setGreetingTime('Good morning');
+    const isNight = hour < 6 || hour >= 18;
+
+    if (code === 0) return { emoji: isNight ? '🌙' : '☀️', text: 'Clear' };
+    if (code === 1) return { emoji: isNight ? '🌙' : '🌤️', text: 'Mostly clear' };
+    if (code === 2) return { emoji: '⛅', text: 'Partly cloudy' };
+    if (code === 3) return { emoji: '☁️', text: 'Overcast' };
+    if (code === 45 || code === 48) return { emoji: '🌫️', text: 'Fog' };
+    if (code >= 51 && code <= 67) return { emoji: '🌧️', text: 'Rain' };
+    if (code >= 71 && code <= 77) return { emoji: '❄️', text: 'Snow' };
+    if (code >= 80 && code <= 82) return { emoji: '🌦️', text: 'Rain showers' };
+    if (code >= 95) return { emoji: '⛈️', text: 'Thunderstorms' };
+    return { emoji: '🌡️', text: 'Unknown' };
+  };
+
+  const getWeatherTag = (code: number, temp: number) => {
+    const hour = new Date().getHours();
+    const isNight = hour < 6 || hour >= 18;
+
+    if ((code >= 51 && code <= 67) || (code >= 80 && code <= 82)) return { tag: 'Rainy', subTag: 'Bring an umbrella' };
+    if (code >= 71 && code <= 77) return { tag: 'Snowy', subTag: 'Bundle up' };
+    if (code >= 95) return { tag: 'Stormy', subTag: 'Stay safe indoors' };
+    
+    if (temp > 25) return { tag: isNight ? 'Warm night' : 'Hot', subTag: 'Light fabrics' };
+    if (temp < 15) return { tag: isNight ? 'Cold night' : 'Cold', subTag: 'Layers needed' };
+    return { tag: isNight ? 'Clear night' : 'Mild', subTag: 'Perfect weather' };
+  };
+
+  const currentDate = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+
+  useFocusEffect(
+    useCallback(() => {
+      const hour = new Date().getHours();
+      if (hour < 12) setGreetingTime('Good morning');
     else if (hour < 18) setGreetingTime('Good afternoon');
     else setGreetingTime('Good evening');
 
@@ -29,14 +106,68 @@ export default function HomeScreen() {
         const data = await getMe();
         if (data?.user?.display_name) {
           setUserName(data.user.display_name.split(' ')[0]);
+        } else {
+          const token = await SecureStore.getItemAsync('access_token');
+          if (token) {
+            try {
+              const decoded: any = jwtDecode(token);
+              const fallbackName = decoded?.user_metadata?.full_name || decoded?.user_metadata?.name || decoded?.email?.split('@')[0] || 'there';
+              setUserName(fallbackName.split(' ')[0]);
+            } catch (e) {
+              console.error('Failed to decode token:', e);
+            }
+          }
         }
       } catch (error) {
         console.error('Error fetching user name from API:', error);
       }
     };
     
+    const fetchWeather = async () => {
+      try {
+        let { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== 'granted') {
+          setWeatherData(prev => ({ ...prev, loading: false, city: 'Location Denied' }));
+          return;
+        }
+
+        let location = await Location.getCurrentPositionAsync({});
+        const lat = location.coords.latitude;
+        const lon = location.coords.longitude;
+
+        let city = 'Unknown City';
+        try {
+          let geocode = await Location.reverseGeocodeAsync({ latitude: lat, longitude: lon });
+          if (geocode && geocode.length > 0) {
+            city = geocode[0].city || geocode[0].region || 'Unknown City';
+          }
+        } catch (e) {
+          // ignore reverse geocode errors
+        }
+
+        const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true`);
+        const json = await res.json();
+        
+        if (json.current_weather) {
+          setWeatherData({
+            temperature: json.current_weather.temperature,
+            conditionCode: json.current_weather.weathercode,
+            city,
+            loading: false,
+          });
+        } else {
+          setWeatherData(prev => ({ ...prev, loading: false, city: 'Weather Error' }));
+        }
+      } catch (error) {
+        console.error('Error fetching weather:', error);
+        setWeatherData(prev => ({ ...prev, loading: false, city: 'Weather Error' }));
+      }
+    };
+
     fetchUser();
-  }, []);
+    fetchWeather();
+  }, [])
+  );
 
   const handleLogout = async () => {
     await SecureStore.deleteItemAsync('access_token');
@@ -65,17 +196,47 @@ export default function HomeScreen() {
             colors={['#FEF3C7', '#FFEDD5']}
             style={styles.weatherIconBg}
           >
-            <ThemedText style={styles.weatherEmoji}>⛅</ThemedText>
+            {weatherData.loading ? (
+              <Skeleton width={24} height={24} borderRadius={12} />
+            ) : (
+              <ThemedText style={styles.weatherEmoji}>
+                {getWeatherInfo(weatherData.conditionCode).emoji}
+              </ThemedText>
+            )}
           </LinearGradient>
           <View style={styles.weatherTextContainer}>
-            <ThemedText style={styles.weatherDate}>Saturday, June 28</ThemedText>
-            <ThemedText style={styles.weatherDetails}>32°C Partly cloudy · Cebu City</ThemedText>
+            {weatherData.loading ? (
+              <View style={{ gap: 6 }}>
+                <Skeleton width={100} height={16} />
+                <Skeleton width={140} height={14} />
+              </View>
+            ) : (
+              <>
+                <ThemedText style={styles.weatherDate}>{currentDate}</ThemedText>
+                <ThemedText style={styles.weatherDetails}>
+                  {`${Math.round(weatherData.temperature)}°C ${getWeatherInfo(weatherData.conditionCode).text} · ${weatherData.city}`}
+                </ThemedText>
+              </>
+            )}
           </View>
           <View style={styles.weatherTags}>
-            <View style={styles.weatherTag}>
-              <ThemedText style={styles.weatherTagText}>Hot</ThemedText>
-            </View>
-            <ThemedText style={styles.weatherSubTag}>Light fabrics</ThemedText>
+            {weatherData.loading ? (
+              <>
+                <Skeleton width={40} height={16} borderRadius={12} />
+                <Skeleton width={60} height={12} />
+              </>
+            ) : (
+              <>
+                <View style={styles.weatherTag}>
+                  <ThemedText style={styles.weatherTagText}>
+                    {getWeatherTag(weatherData.conditionCode, weatherData.temperature).tag}
+                  </ThemedText>
+                </View>
+                <ThemedText style={styles.weatherSubTag}>
+                  {getWeatherTag(weatherData.conditionCode, weatherData.temperature).subTag}
+                </ThemedText>
+              </>
+            )}
           </View>
         </View>
 

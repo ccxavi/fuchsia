@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, Pressable, ScrollView, FlatList, ImageBackground, ActivityIndicator, TextInput, RefreshControl, useWindowDimensions, Modal } from 'react-native';
+import { View, Text, StyleSheet, Pressable, ScrollView, FlatList, ActivityIndicator, TextInput, RefreshControl, useWindowDimensions, Modal } from 'react-native';
 import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useState, useCallback } from 'react';
@@ -9,20 +9,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 
 import { FuchsiaColors, FuchsiaFonts } from '@/constants/theme';
 import { CLOTHING_CATEGORIES } from '@/constants/categories';
-import { getClothingItems, getWardrobes, ClothingItemResponse, WardrobeResponse } from '@/api/client';
+import { getClothingItems, getWardrobes, getOutfits, ClothingItemResponse, WardrobeResponse, OutfitWithItemsResponse } from '@/api/client';
 
-// Dummy Data mapped to prototype assets
-const OUTFITS = [
-  { id: '1', title: 'Office Ready', items: '3 Items', image: require('@/assets/images/prototype/fit_mirror_selfie_1782795284202.png') },
-  { id: '2', title: 'Sunday Brunch', items: '1 Item', image: require('@/assets/images/prototype/fit_floral_dress_1782795310776.png') },
-  { id: '3', title: 'City Casual', items: '2 Items', image: require('@/assets/images/prototype/fit_street_style_1782795298638.png') },
-  { id: '4', title: 'Lazy Sunday', items: '2 Items', image: require('@/assets/images/prototype/fit_casual_hoodie_1782802276628.png') },
-];
-
-const WARDROBES = [
-  { id: '1', title: 'Trip to Japan', subtitle: '14 Outfits · 22 Items', image: require('@/assets/images/prototype/fit_white_shirt_1782802240221.png') },
-  { id: '2', title: 'Spring Classics', subtitle: '8 Outfits · 12 Items', image: require('@/assets/images/prototype/fit_trench_coat_1782802251066.png') },
-];
 
 export default function ClosetScreen() {
   const insets = useSafeAreaInsets();
@@ -36,6 +24,7 @@ export default function ClosetScreen() {
   const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
   const [clothingItems, setClothingItems] = useState<ClothingItemResponse[]>([]);
   const [wardrobes, setWardrobes] = useState<WardrobeResponse[]>([]);
+  const [outfits, setOutfits] = useState<OutfitWithItemsResponse[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
@@ -54,6 +43,12 @@ export default function ClosetScreen() {
         return [];
       });
       setClothingItems(fetchedItems);
+
+      const fetchedOutfits = await getOutfits().catch(err => {
+        console.error('Failed to fetch outfits:', err);
+        return [];
+      });
+      setOutfits(fetchedOutfits);
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
@@ -71,7 +66,7 @@ export default function ClosetScreen() {
     fetchData();
   };
 
-  const filteredOutfits = OUTFITS.filter(o => o.title.toLowerCase().includes(searchQuery.toLowerCase()));
+  const filteredOutfits = outfits.filter(o => o.name.toLowerCase().includes(searchQuery.toLowerCase()));
   const filteredWardrobes = wardrobes.filter(w => w.name.toLowerCase().includes(searchQuery.toLowerCase()));
   const filteredItems = clothingItems.filter(i => {
     const matchesSearch = i.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
@@ -181,28 +176,129 @@ export default function ClosetScreen() {
     </View>
   );
 
+  const renderOutfitImage = (item: OutfitWithItemsResponse) => {
+    const items = item.clothing_items || [];
+    
+    // If user uploaded a custom image, prioritize it over the 2x2 grid collage
+    if (item.images && item.images.length > 0) {
+      const coverImage = item.images[0];
+      return <Image source={{ uri: coverImage.image_url }} style={styles.image} contentFit="cover" />;
+    }
+
+    if (items.length === 0) {
+      return (
+        <LinearGradient
+          colors={['#D4145A', '#86003C']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={[styles.image, { alignItems: 'center', justifyContent: 'center' }]}
+        >
+          <Text style={{ fontFamily: FuchsiaFonts.heading, fontSize: 14, color: '#fff', textAlign: 'center', paddingHorizontal: 8 }} numberOfLines={2}>{item.name}</Text>
+        </LinearGradient>
+      );
+    }
+
+    if (items.length === 1) {
+      return (
+        <View style={[{ flex: 1, backgroundColor: FuchsiaColors.mist }]}>
+          <Image source={{ uri: items[0].image_url || '' }} style={styles.image} contentFit="cover" />
+        </View>
+      );
+    }
+
+    if (items.length === 2) {
+      return (
+        <View style={{ flex: 1, flexDirection: 'row' }}>
+          <View style={{ flex: 1, borderRightWidth: 1, borderColor: '#fff', backgroundColor: FuchsiaColors.mist }}>
+            <Image source={{ uri: items[0].image_url || '' }} style={{ flex: 1 }} contentFit="cover" />
+          </View>
+          <View style={{ flex: 1, borderLeftWidth: 1, borderColor: '#fff', backgroundColor: FuchsiaColors.mist }}>
+            <Image source={{ uri: items[1].image_url || '' }} style={{ flex: 1 }} contentFit="cover" />
+          </View>
+        </View>
+      );
+    }
+
+    if (items.length === 3) {
+      return (
+        <View style={{ flex: 1 }}>
+          <View style={{ flex: 1, borderBottomWidth: 1, borderColor: '#fff', backgroundColor: FuchsiaColors.mist }}>
+            <Image source={{ uri: items[0].image_url || '' }} style={{ flex: 1 }} contentFit="cover" />
+          </View>
+          <View style={{ flex: 1, flexDirection: 'row', borderTopWidth: 1, borderColor: '#fff' }}>
+            <View style={{ flex: 1, borderRightWidth: 1, borderColor: '#fff', backgroundColor: FuchsiaColors.mist }}>
+              <Image source={{ uri: items[1].image_url || '' }} style={{ flex: 1 }} contentFit="cover" />
+            </View>
+            <View style={{ flex: 1, borderLeftWidth: 1, borderColor: '#fff', backgroundColor: FuchsiaColors.mist }}>
+              <Image source={{ uri: items[2].image_url || '' }} style={{ flex: 1 }} contentFit="cover" />
+            </View>
+          </View>
+        </View>
+      );
+    }
+
+    // 4 or more items
+    const extraCount = items.length - 3;
+    return (
+      <View style={{ flex: 1 }}>
+        <View style={{ flex: 1, flexDirection: 'row', borderBottomWidth: 1, borderColor: '#fff' }}>
+          <View style={{ flex: 1, borderRightWidth: 1, borderColor: '#fff', backgroundColor: FuchsiaColors.mist }}>
+            <Image source={{ uri: items[0].image_url || '' }} style={{ flex: 1 }} contentFit="cover" />
+          </View>
+          <View style={{ flex: 1, borderLeftWidth: 1, borderColor: '#fff', backgroundColor: FuchsiaColors.mist }}>
+            <Image source={{ uri: items[1].image_url || '' }} style={{ flex: 1 }} contentFit="cover" />
+          </View>
+        </View>
+        <View style={{ flex: 1, flexDirection: 'row', borderTopWidth: 1, borderColor: '#fff' }}>
+          <View style={{ flex: 1, borderRightWidth: 1, borderColor: '#fff', backgroundColor: FuchsiaColors.mist }}>
+            <Image source={{ uri: items[2].image_url || '' }} style={{ flex: 1 }} contentFit="cover" />
+          </View>
+          <View style={{ flex: 1, borderLeftWidth: 1, borderColor: '#fff', backgroundColor: FuchsiaColors.mist }}>
+            <Image source={{ uri: items[3].image_url || '' }} style={{ flex: 1 }} contentFit="cover" />
+            {items.length > 4 && (
+              <View style={{ ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center' }}>
+                <Text style={{ fontFamily: FuchsiaFonts.heading, fontSize: 16, color: '#fff', fontWeight: 'bold' }}>+{extraCount}</Text>
+              </View>
+            )}
+          </View>
+        </View>
+      </View>
+    );
+  };
+
   const renderOutfits = () => (
-    <FlatList
-      data={filteredOutfits}
-      keyExtractor={(item) => item.id}
-      numColumns={2}
-      columnWrapperStyle={styles.gridRow}
-      contentContainerStyle={[styles.listContent, filteredOutfits.length === 0 && { flex: 1 }]}
-      showsVerticalScrollIndicator={false}
-      refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor={FuchsiaColors.vibrant} />}
-      ListEmptyComponent={() => renderEmptyState("Your stylish outfits will appear here!\nTap the + below to create one.")}
-      renderItem={({ item }) => (
-        <Pressable style={[styles.gridItem, { width: itemWidth, flex: 0 }]}>
-          <View style={styles.imageContainer}>
-            <Image source={item.image} style={styles.image} contentFit="cover" />
-          </View>
-          <View style={styles.itemInfo}>
-            <Text style={styles.itemTitle} numberOfLines={1}>{item.title}</Text>
-            <Text style={styles.itemSubtitle}>{item.items}</Text>
-          </View>
-        </Pressable>
-      )}
-    />
+    <View style={styles.flex1}>
+      <View style={styles.statsBanner}>
+        <Text style={styles.statsCount}>{filteredOutfits.length} outfits</Text>
+        <Text style={styles.statsLabel}>All outfits</Text>
+      </View>
+      <FlatList
+        data={filteredOutfits}
+        keyExtractor={(item) => item.id}
+        numColumns={2}
+        columnWrapperStyle={styles.gridRow}
+        contentContainerStyle={[styles.listContent, filteredOutfits.length === 0 && { flex: 1 }]}
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor={FuchsiaColors.vibrant} />}
+        ListEmptyComponent={() => renderEmptyState("Your stylish outfits will appear here!\nTap the + below to create one.")}
+        renderItem={({ item }) => {
+          return (
+            <Pressable
+              style={[styles.gridItem, { width: itemWidth, flex: 0 }]}
+              onPress={() => router.push(`/outfit/${item.id}`)}
+            >
+              <View style={styles.imageContainer}>
+                {renderOutfitImage(item)}
+              </View>
+              <View style={styles.itemInfo}>
+                <Text style={styles.itemTitle} numberOfLines={1}>{item.name}</Text>
+                <Text style={styles.itemSubtitle}>{item.clothing_items_count} {item.clothing_items_count === 1 ? 'Item' : 'Items'}</Text>
+              </View>
+            </Pressable>
+          );
+        }}
+      />
+    </View>
   );
 
   const renderWardrobe = () => (
@@ -216,21 +312,25 @@ export default function ClosetScreen() {
       renderItem={({ item }) => {
         const imageUrl = (item as any).image_url;
         return (
-          <Pressable style={styles.wardrobeCard}>
+          <Pressable 
+            style={styles.wardrobeCard}
+            onPress={() => router.push(`/wardrobe/${item.id}`)}
+          >
             {imageUrl ? (
-              <ImageBackground 
-                source={{ uri: imageUrl }} 
-                style={styles.wardrobeImage} 
-                imageStyle={styles.wardrobeImageStyle}
-              >
+              <View style={styles.wardrobeImage}>
+                <Image 
+                  source={{ uri: imageUrl }} 
+                  style={[StyleSheet.absoluteFillObject, styles.wardrobeImageStyle]} 
+                  contentFit="cover" 
+                />
                 <LinearGradient
                   colors={['transparent', 'rgba(0,0,0,0.8)']}
-                  style={styles.wardrobeGradient}
+                  style={[StyleSheet.absoluteFillObject, styles.wardrobeGradient]}
                 >
                   <Text style={styles.wardrobeTitle}>{item.name}</Text>
-                  <Text style={styles.wardrobeSubtitle}>{item.quantity} Items</Text>
+                  <Text style={styles.wardrobeSubtitle}>{item.outfits_count} Outfits · {item.clothing_items_count} Items</Text>
                 </LinearGradient>
-              </ImageBackground>
+              </View>
             ) : (
               <LinearGradient
                 colors={['#D4145A', '#86003C']}
@@ -243,7 +343,7 @@ export default function ClosetScreen() {
                   style={styles.wardrobeGradient}
                 >
                   <Text style={styles.wardrobeTitle}>{item.name}</Text>
-                  <Text style={styles.wardrobeSubtitle}>{item.quantity} Items</Text>
+                  <Text style={styles.wardrobeSubtitle}>{item.outfits_count} Outfits · {item.clothing_items_count} Items</Text>
                 </LinearGradient>
               </LinearGradient>
             )}
@@ -455,7 +555,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
-    paddingVertical: 12,
+    paddingTop: 16,
+    paddingBottom: 12,
   },
   headerTitle: {
     fontFamily: FuchsiaFonts.heading,
@@ -627,6 +728,7 @@ const styles = StyleSheet.create({
   wardrobeGradient: {
     padding: 20,
     paddingTop: 40,
+    justifyContent: 'flex-end',
   },
   wardrobeTitle: {
     fontFamily: FuchsiaFonts.heading,
@@ -699,7 +801,14 @@ const styles = StyleSheet.create({
     color: FuchsiaColors.ink,
   },
   modalCloseButton: {
-    padding: 4,
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: FuchsiaColors.mist,
+    backgroundColor: '#fff',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   modalScrollContent: {
     paddingHorizontal: 24,
