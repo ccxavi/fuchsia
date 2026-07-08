@@ -2,7 +2,7 @@ from typing import Annotated
 import datetime
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status, Query
 from fastapi.security import HTTPAuthorizationCredentials
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
@@ -14,7 +14,7 @@ from app.models.clothing_item import ClothingItem
 from app.models.wardrobe import Wardrobe
 from app.models.outfit_image import OutfitImage
 from app.services.supabase_storage import upload_file_to_supabase
-from app.v1.schemas import OutfitResponse, OutfitWithItemsResponse, OutfitWithWardrobesResponse, OutfitImageResponse
+from app.v1.schemas import OutfitResponse, OutfitWithItemsResponse, OutfitWithWardrobesResponse, OutfitImageResponse, RecentLookResponse
 
 router = APIRouter()
 
@@ -94,6 +94,26 @@ async def create_outfit(
         
     db.refresh(db_outfit)
     return db_outfit
+
+
+@router.get("/recent-looks", response_model=list[RecentLookResponse])
+def get_recent_looks(
+    user: Annotated[AuthenticatedUser, Depends(get_current_authenticated_user)],
+    db: Annotated[Session, Depends(get_db_session)],
+    limit: int = Query(3, ge=1, le=50),
+    offset: int = Query(0, ge=0)
+):
+    recent_images = db.scalars(
+        select(OutfitImage)
+        .join(OutfitImage.outfit)
+        .options(selectinload(OutfitImage.outfit))
+        .where(Outfit.user_id == user.user.id)
+        .order_by(OutfitImage.created_at.desc())
+        .limit(limit)
+        .offset(offset)
+    ).all()
+    
+    return recent_images
 
 
 @router.get("/", response_model=list[OutfitWithItemsResponse])

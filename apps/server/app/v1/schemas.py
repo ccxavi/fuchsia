@@ -147,6 +147,10 @@ class OutfitWithItemsResponse(OutfitResponse):
     images: list[OutfitImageResponse] = []
 
 
+class RecentLookResponse(OutfitImageResponse):
+    outfit: OutfitResponse
+
+
 class OutfitWithWardrobesResponse(OutfitWithItemsResponse):
     wardrobes: list[WardrobeResponse] = []
 
@@ -184,7 +188,7 @@ class CalendarOutfitResponse(BaseModel):
 
 
 class CalendarOutfitWithOutfitResponse(CalendarOutfitResponse):
-    outfit: OutfitResponse
+    outfit: OutfitWithItemsResponse
     day_images: list[OutfitImageResponse] = []
 
 
