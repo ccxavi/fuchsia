@@ -217,8 +217,13 @@ export default function OutfitDetailScreen() {
                   date: date.toISOString().split('T')[0],
                 });
                 DeviceEventEmitter.emit('showGlobalToast', 'Outfit scheduled successfully!');
-              } catch (err) {
-                Alert.alert('Error', 'Failed to schedule outfit');
+              } catch (err: any) {
+                console.error('Failed to schedule outfit:', err);
+                if (err.message && err.message.includes('400')) {
+                  Alert.alert('Duplicate', 'This outfit is already scheduled on that day!');
+                } else {
+                  Alert.alert('Error', 'Failed to schedule outfit');
+                }
               }
             }
           }}
