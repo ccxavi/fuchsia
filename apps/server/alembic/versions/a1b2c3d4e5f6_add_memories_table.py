@@ -1,7 +1,7 @@
 """add memories table
 
 Revision ID: a1b2c3d4e5f6
-Revises: 6885634e8098
+Revises: 46139ad10209
 Create Date: 2026-07-08 09:30:00.000000
 """
 
@@ -13,7 +13,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision = 'a1b2c3d4e5f6'
-down_revision = '6885634e8098'
+down_revision = '46139ad10209'
 branch_labels = None
 depends_on = None
 
