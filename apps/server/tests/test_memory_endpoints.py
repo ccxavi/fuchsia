@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import unittest
+from datetime import datetime, timezone
 from unittest.mock import patch
 
 from fastapi.testclient import TestClient
@@ -81,6 +82,29 @@ class MemoryEndpointTestCase(unittest.TestCase):
                 Memory(user_id=_USER_ID, content=content, category=category)
             )
             session.commit()
+
+    def _seed_returning_id(
+        self,
+        content: str,
+        category: str | None,
+        *,
+        user_id: str = _USER_ID,
+        embedding: list[float] | None = None,
+        created_at: datetime | None = None,
+    ) -> str:
+        with self.session_factory() as session:
+            memory = Memory(
+                user_id=user_id,
+                content=content,
+                category=category,
+                embedding=embedding,
+            )
+            if created_at is not None:
+                memory.created_at = created_at
+            session.add(memory)
+            session.commit()
+            session.refresh(memory)
+            return memory.id
 
     def test_ingest_persists_and_returns_created(self) -> None:
         response = self.client.post(
@@ -186,6 +210,125 @@ class MemoryEndpointTestCase(unittest.TestCase):
         stored = self._stored_memories()
         self.assertEqual(len(stored), 1)
         self.assertIsNone(stored[0].embedding)
+
+    def test_list_returns_memories_newest_first(self) -> None:
+        self._seed_returning_id(
+            "older", "fact", created_at=datetime(2026, 1, 1, tzinfo=timezone.utc)
+        )
+        self._seed_returning_id(
+            "newer", "fact", created_at=datetime(2026, 6, 1, tzinfo=timezone.utc)
+        )
+
+        response = self.client.get("/api/v1/memories")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual([m["content"] for m in response.json()], ["newer", "older"])
+
+    def test_list_filters_by_category(self) -> None:
+        self._seed("Never wears heels", "preference")
+        self._seed("Wears size M tops", "measurement")
+
+        response = self.client.get(
+            "/api/v1/memories", params={"category": "measurement"}
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            [m["content"] for m in response.json()], ["Wears size M tops"]
+        )
+
+    def test_list_is_scoped_to_user(self) -> None:
+        self._seed("mine", "fact")
+        self._seed_returning_id("theirs", "fact", user_id="other-user")
+
+        response = self.client.get("/api/v1/memories")
+
+        self.assertEqual([m["content"] for m in response.json()], ["mine"])
+
+    def test_get_one_returns_memory(self) -> None:
+        memory_id = self._seed_returning_id("Never wears heels", "preference")
+
+        response = self.client.get(f"/api/v1/memories/{memory_id}")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["content"], "Never wears heels")
+
+    def test_get_one_unknown_returns_404(self) -> None:
+        response = self.client.get("/api/v1/memories/does-not-exist")
+
+        self.assertEqual(response.status_code, 404)
+
+    def test_update_content_reembeds(self) -> None:
+        memory_id = self._seed_returning_id("old text", "preference")
+        self.mock_embed.return_value = [[0.5] * 768]
+
+        response = self.client.patch(
+            f"/api/v1/memories/{memory_id}", json={"content": "new text"}
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["content"], "new text")
+        (contents,), _ = self.mock_embed.call_args
+        self.assertEqual(contents, ["new text"])
+        stored = {memory.content: memory for memory in self._stored_memories()}
+        self.assertIsNotNone(stored["new text"].embedding)
+
+    def test_update_nulls_stale_embedding_when_reembed_fails(self) -> None:
+        memory_id = self._seed_returning_id(
+            "old text", "preference", embedding=[0.1] * 768
+        )
+        self.mock_embed.return_value = None
+
+        response = self.client.patch(
+            f"/api/v1/memories/{memory_id}", json={"content": "new text"}
+        )
+
+        self.assertEqual(response.status_code, 200)
+        stored = {memory.content: memory for memory in self._stored_memories()}
+        self.assertIsNone(stored["new text"].embedding)
+
+    def test_update_category_only_coerces_unknown_and_skips_reembed(self) -> None:
+        memory_id = self._seed_returning_id(
+            "Attends galas", "event", embedding=[0.1] * 768
+        )
+
+        response = self.client.patch(
+            f"/api/v1/memories/{memory_id}", json={"category": "random"}
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIsNone(response.json()["category"])
+        # Content untouched -> no re-embedding, existing vector preserved.
+        self.mock_embed.assert_not_called()
+        stored = {memory.content: memory for memory in self._stored_memories()}
+        self.assertIsNotNone(stored["Attends galas"].embedding)
+
+    def test_update_unknown_returns_404(self) -> None:
+        response = self.client.patch(
+            "/api/v1/memories/does-not-exist", json={"content": "x"}
+        )
+
+        self.assertEqual(response.status_code, 404)
+
+    def test_delete_removes_memory(self) -> None:
+        memory_id = self._seed_returning_id("Never wears heels", "preference")
+
+        response = self.client.delete(f"/api/v1/memories/{memory_id}")
+
+        self.assertEqual(response.status_code, 204)
+        self.assertEqual(self._stored_memories(), [])
+
+    def test_delete_unknown_returns_404(self) -> None:
+        response = self.client.delete("/api/v1/memories/does-not-exist")
+
+        self.assertEqual(response.status_code, 404)
+
+    def test_list_requires_auth(self) -> None:
+        app.dependency_overrides.pop(get_current_authenticated_user, None)
+
+        response = self.client.get("/api/v1/memories")
+
+        self.assertEqual(response.status_code, 401)
 
     def test_requires_auth(self) -> None:
         app.dependency_overrides.pop(get_current_authenticated_user, None)
