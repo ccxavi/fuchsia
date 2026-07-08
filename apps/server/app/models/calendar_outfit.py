@@ -3,7 +3,7 @@ from __future__ import annotations
 import datetime
 from uuid import uuid4
 
-from sqlalchemy import Date, ForeignKey, String, Text
+from sqlalchemy import Date, ForeignKey, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from typing import TYPE_CHECKING
@@ -16,6 +16,9 @@ from app.db.base import Base, TimestampMixin
 
 class CalendarOutfit(TimestampMixin, Base):
     __tablename__ = "calendar_outfits"
+    __table_args__ = (
+        UniqueConstraint("outfit_id", "date", name="uq_calendar_outfit_date"),
+    )
 
     id: Mapped[str] = mapped_column(
         String(36),
