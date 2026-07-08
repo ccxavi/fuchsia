@@ -3,11 +3,16 @@ from __future__ import annotations
 from typing import Annotated
 
 from fastapi import APIRouter, Depends
+from sqlalchemy.orm import Session
 
 from app.core.auth import AuthenticatedUser, get_current_authenticated_user
-from app.services.deepseek import create_chat_completion
-from app.services.gemini import create_gemini_completion
-from app.services.stylist import build_stylist_messages
+from app.db.session import get_db_session
+from app.services.agent import (
+    build_stylist_messages,
+    deepseek_provider,
+    gemini_provider,
+    run_stylist_chat,
+)
 from app.v1.schemas import ChatMessage, ChatRequest, ChatResponse, ImagePart
 
 router = APIRouter(prefix="/chat")
@@ -24,22 +29,26 @@ def _has_image(messages: list[ChatMessage]) -> bool:
 @router.post(
     "",
     response_model=ChatResponse,
-    summary="Generate a chat completion (DeepSeek text / Gemini vision)",
+    summary="Generate a stylist chat completion (DeepSeek text / Gemini vision)",
 )
 def chat(
     payload: ChatRequest,
     authenticated_user: Annotated[
         AuthenticatedUser, Depends(get_current_authenticated_user)
     ],
+    db: Annotated[Session, Depends(get_db_session)],
 ) -> ChatResponse:
-    complete = (
-        create_gemini_completion
+    provider = (
+        gemini_provider()
         if _has_image(payload.messages)
-        else create_chat_completion
+        else deepseek_provider()
     )
     messages = build_stylist_messages(payload.messages)
-    return complete(
+    return run_stylist_chat(
         messages,
+        provider=provider,
+        db=db,
+        user_id=authenticated_user.user.id,
         temperature=payload.temperature,
         max_tokens=payload.max_tokens,
     )
