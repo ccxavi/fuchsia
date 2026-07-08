@@ -385,6 +385,8 @@ export default function CalendarScreen() {
               {(selectedDayStr ? outfitsByDate[selectedDayStr] || [] : []).map(calendarOutfit => {
                 const outfit = calendarOutfit.outfit;
                 const items = (outfit.clothing_items || []).filter(item => item.image_url);
+                const isPast = selectedDayStr ? selectedDayStr < todayStr : false;
+                
                 return (
                   <View key={calendarOutfit.id} style={styles.dayModalOutfitRow}>
                     <Pressable 
@@ -430,15 +432,17 @@ export default function CalendarScreen() {
                       </Text>
                     </View>
                     <View style={styles.dayModalOutfitActions}>
-                      <Pressable 
-                        style={styles.dayModalIconButton}
-                        onPress={() => {
-                          setRescheduleOutfitId(calendarOutfit.id);
-                          setShowReschedulePicker(true);
-                        }}
-                      >
-                        <Calendar size={18} color={FuchsiaColors.deep} />
-                      </Pressable>
+                      {!isPast && (
+                        <Pressable 
+                          style={styles.dayModalIconButton}
+                          onPress={() => {
+                            setRescheduleOutfitId(calendarOutfit.id);
+                            setShowReschedulePicker(true);
+                          }}
+                        >
+                          <Calendar size={18} color={FuchsiaColors.deep} />
+                        </Pressable>
+                      )}
                       <Pressable 
                         style={[styles.dayModalIconButton, { backgroundColor: '#FEE2E2' }]}
                         onPress={() => handleRemove(calendarOutfit.id)}
