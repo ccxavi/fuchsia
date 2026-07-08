@@ -54,7 +54,8 @@ def get_calendar_outfits(
     month: Annotated[int | None, Query(description="Filter by month (1-12)")] = None,
 ):
     stmt = select(CalendarOutfit).options(
-        selectinload(CalendarOutfit.outfit),
+        selectinload(CalendarOutfit.outfit).selectinload(Outfit.clothing_items),
+        selectinload(CalendarOutfit.outfit).selectinload(Outfit.images),
         selectinload(CalendarOutfit.day_images)
     ).where(
         CalendarOutfit.user_id == user.user.id
