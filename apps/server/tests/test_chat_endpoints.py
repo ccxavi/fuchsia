@@ -16,7 +16,7 @@ from app.db.session import get_db_session
 from app.main import app
 from app.models.user import User
 from app.services.agent.openai_compat import Provider
-from app.v1.schemas import ChatMessage, ChatResponse
+from app.v1.schemas import ChatMessage, ChatResponse, MemorySuggestion
 
 _TEXT_PROVIDER = Provider(
     name="DeepSeek",
@@ -125,11 +125,33 @@ class ChatEndpointTestCase(unittest.TestCase):
         body = response.json()
         self.assertEqual(body["message"], {"role": "assistant", "content": "Hello there!"})
         self.assertEqual(body["usage"]["total_tokens"], 5)
+        self.assertEqual(body["memory_suggestions"], [])
         run_mock.assert_called_once()
         _, kwargs = run_mock.call_args
         self.assertEqual(kwargs["temperature"], 0.5)
         self.assertEqual(kwargs["max_tokens"], 1024)
         self.assertEqual(kwargs["user_id"], _authenticated_user().user.id)
+
+    def test_chat_returns_memory_suggestions(self) -> None:
+        self._override_auth()
+        completion = ChatResponse(
+            message=ChatMessage(role="assistant", content="Let's find you flats."),
+            model="deepseek-chat",
+            memory_suggestions=[
+                MemorySuggestion(content="Never wears heels", category="preference")
+            ],
+        )
+
+        with self._patch_chat(return_value=completion):
+            response = self.client.post(
+                "/api/v1/chat",
+                json={"messages": [{"role": "user", "content": "I never wear heels"}]},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        suggestions = response.json()["memory_suggestions"]
+        self.assertEqual(len(suggestions), 1)
+        self.assertEqual(suggestions[0], {"content": "Never wears heels", "category": "preference"})
 
     def test_chat_propagates_upstream_error(self) -> None:
         self._override_auth()

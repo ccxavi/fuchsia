@@ -63,6 +63,13 @@ class RunStylistChatTestCase(unittest.TestCase):
             ClothingItem(user_id="user-1", name="Blue jeans", category="Bottoms")
         )
         self.session.commit()
+        # The memory-extraction pass is exercised in test_agent_memory.py; here we
+        # isolate the answer-generation loop so post_chat call counts are exact.
+        extract_patcher = patch(
+            "app.services.agent.loop.extract_memory_suggestions", return_value=[]
+        )
+        self.mock_extract = extract_patcher.start()
+        self.addCleanup(extract_patcher.stop)
 
     def tearDown(self) -> None:
         self.session.close()
@@ -84,7 +91,28 @@ class RunStylistChatTestCase(unittest.TestCase):
             result = self._run()
 
         self.assertEqual(result.message.content, "You have great style.")
+        self.assertEqual(result.memory_suggestions, [])
         post_mock.assert_called_once()
+
+    def test_attaches_extracted_memory_suggestions(self) -> None:
+        from app.v1.schemas import MemorySuggestion
+
+        self.mock_extract.return_value = [
+            MemorySuggestion(content="Never wears heels", category="preference")
+        ]
+
+        with patch(
+            "app.services.agent.loop.post_chat",
+            return_value=_content_payload("Let's find you flats."),
+        ):
+            result = self._run()
+
+        self.assertEqual(len(result.memory_suggestions), 1)
+        self.assertEqual(result.memory_suggestions[0].content, "Never wears heels")
+        # Extraction is fed the original conversation, not tool-loop scaffolding.
+        (extract_messages,), extract_kwargs = self.mock_extract.call_args
+        self.assertEqual(extract_messages[0].content, "what do I own?")
+        self.assertIn("provider", extract_kwargs)
 
     def test_executes_tool_then_returns_final_answer(self) -> None:
         with patch(

@@ -5,6 +5,7 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
+from app.services.agent.memory import extract_memory_suggestions
 from app.services.agent.openai_compat import (
     Provider,
     build_body,
@@ -43,25 +44,21 @@ def _run_tool_call(
     }
 
 
-def run_stylist_chat(
-    messages: list[ChatMessage],
+def _generate_answer(
+    serialized: list[dict[str, Any]],
     *,
     provider: Provider,
     db: Session,
     user_id: str,
-    temperature: float | None = None,
-    max_tokens: int | None = None,
+    temperature: float | None,
+    max_tokens: int | None,
 ) -> ChatResponse:
-    """Drive a chat completion, resolving any tool calls the model makes.
+    """Run the tool loop and return the model's final text answer.
 
     Loops up to ``MAX_TOOL_ROUNDS`` while the model requests tools; once it
     returns a plain answer that answer is returned. If the model never stops
     requesting tools, a final request without tools forces a text answer.
     """
-    serialized = serialize_messages(
-        messages, flatten=provider.flatten_content
-    )
-
     for _ in range(MAX_TOOL_ROUNDS):
         body = build_body(
             provider.model,
@@ -97,3 +94,31 @@ def run_stylist_chat(
     )
     payload = post_chat(provider, body)
     return parse_chat_response(payload, fallback_model=provider.model)
+
+
+def run_stylist_chat(
+    messages: list[ChatMessage],
+    *,
+    provider: Provider,
+    db: Session,
+    user_id: str,
+    temperature: float | None = None,
+    max_tokens: int | None = None,
+) -> ChatResponse:
+    """Generate the stylist's answer, then extract memory suggestions.
+
+    The answer is produced by the tool loop; a separate best-effort extraction
+    pass then proposes durable facts worth remembering. Extraction never fails
+    the reply — see :func:`extract_memory_suggestions`.
+    """
+    serialized = serialize_messages(messages, flatten=provider.flatten_content)
+    response = _generate_answer(
+        serialized,
+        provider=provider,
+        db=db,
+        user_id=user_id,
+        temperature=temperature,
+        max_tokens=max_tokens,
+    )
+    suggestions = extract_memory_suggestions(messages, provider=provider)
+    return response.model_copy(update={"memory_suggestions": suggestions})
