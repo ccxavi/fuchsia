@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends
 from app.core.auth import AuthenticatedUser, get_current_authenticated_user
 from app.services.deepseek import create_chat_completion
 from app.services.gemini import create_gemini_completion
+from app.services.stylist import build_stylist_messages
 from app.v1.schemas import ChatMessage, ChatRequest, ChatResponse, ImagePart
 
 router = APIRouter(prefix="/chat")
@@ -36,8 +37,9 @@ def chat(
         if _has_image(payload.messages)
         else create_chat_completion
     )
+    messages = build_stylist_messages(payload.messages)
     return complete(
-        payload.messages,
+        messages,
         temperature=payload.temperature,
         max_tokens=payload.max_tokens,
     )
