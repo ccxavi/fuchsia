@@ -3,75 +3,42 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from fastapi import HTTPException
 from pydantic import ValidationError
+from sqlalchemy import select
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.orm import Session
 
-from app.services.agent.openai_compat import (
-    Provider,
-    build_body,
-    first_choice_message,
-    post_chat,
-    serialize_messages,
-)
-from app.v1.schemas import ChatMessage, MemorySuggestion
+from app.models.memory import Memory
+from app.v1.schemas import MemorySuggestion
 
 MEMORY_CATEGORIES = {"preference", "fact", "event", "measurement"}
-MAX_MEMORY_TOKENS = 512
-
-MEMORY_EXTRACTION_PROMPT = (
-    "You extract durable facts worth remembering about the user from a styling "
-    "conversation in a fashion wardrobe app.\n"
-    "\n"
-    "Return ONLY a JSON array (no prose, no code fences). Each element is an object "
-    '{"content": string, "category": one of "preference", "fact", "event", '
-    '"measurement"}.\n'
-    "\n"
-    "Include only lasting, styling-relevant facts that the USER stated about "
-    "themselves: style preferences and dislikes, body measurements or sizes, "
-    "lifestyle facts, or upcoming events they will dress for. Exclude one-off "
-    "requests, anything the assistant merely suggested, greetings, small talk, and "
-    "anything sensitive that is not needed for styling.\n"
-    "\n"
-    "Write each content as a short neutral statement, e.g. \"Never wears heels\" or "
-    '"Wears size M tops". If there is nothing worth remembering, return [].'
-)
 
 
-def extract_memory_suggestions(
-    messages: list[ChatMessage], *, provider: Provider
+def drop_stored_suggestions(
+    db: Session, user_id: str, suggestions: list[MemorySuggestion]
 ) -> list[MemorySuggestion]:
-    """Extract durable memory suggestions from a conversation.
+    """Drop suggestions whose content the user already has stored.
 
-    Best-effort and secondary to the chat answer: any upstream or parsing failure
-    yields an empty list rather than raising, so a memory hiccup never fails the
-    user's reply.
+    Matches on content case-insensitively so a fact the user already saved is not
+    re-suggested. Best-effort: on any DB error the suggestions pass through
+    unfiltered rather than failing the reply, consistent with the extraction pass.
     """
-    conversation = [message for message in messages if message.role != "system"]
-    if not conversation:
-        return []
-
-    request_messages: list[dict[str, Any]] = [
-        {"role": "system", "content": MEMORY_EXTRACTION_PROMPT},
-        *serialize_messages(conversation, flatten=True),
-    ]
-    body = build_body(
-        provider.model,
-        request_messages,
-        temperature=0,
-        max_tokens=MAX_MEMORY_TOKENS,
-        tools=None,
-    )
+    if not suggestions:
+        return suggestions
 
     try:
-        payload = post_chat(provider, body)
-        content = first_choice_message(payload).get("content")
-    except HTTPException:
-        return []
+        stored = db.scalars(
+            select(Memory.content).where(Memory.user_id == user_id)
+        ).all()
+    except SQLAlchemyError:
+        return suggestions
 
-    if not isinstance(content, str):
-        return []
-
-    return _parse_suggestions(content)
+    seen = {content.lower() for content in stored}
+    return [
+        suggestion
+        for suggestion in suggestions
+        if suggestion.content.lower() not in seen
+    ]
 
 
 def _load_json(text: str) -> Any:

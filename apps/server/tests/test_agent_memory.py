@@ -1,30 +1,18 @@
 from __future__ import annotations
 
 import unittest
-from unittest.mock import patch
 
-from fastapi import HTTPException
+from sqlalchemy import create_engine
+from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.pool import StaticPool
 
+from app.db.base import Base
+from app.models.memory import Memory
 from app.services.agent.memory import (
     _parse_suggestions,
-    extract_memory_suggestions,
+    drop_stored_suggestions,
 )
-from app.services.agent.openai_compat import Provider
-from app.v1.schemas import ChatMessage
-
-
-def _provider() -> Provider:
-    return Provider(
-        name="Test",
-        base_url="https://example.test",
-        api_key="key",
-        model="test-model",
-        flatten_content=True,
-    )
-
-
-def _payload(content: str) -> dict:
-    return {"choices": [{"message": {"role": "assistant", "content": content}}]}
+from app.v1.schemas import MemorySuggestion
 
 
 class ParseSuggestionsTestCase(unittest.TestCase):
@@ -71,58 +59,67 @@ class ParseSuggestionsTestCase(unittest.TestCase):
         self.assertEqual(_parse_suggestions('[{"category": "fact"}]'), [])
 
 
-class ExtractMemorySuggestionsTestCase(unittest.TestCase):
-    def _messages(self) -> list[ChatMessage]:
-        return [
-            ChatMessage(role="system", content="stylist system prompt"),
-            ChatMessage(role="user", content="I never wear heels"),
-        ]
+_USER_ID = "user-123"
 
-    def test_returns_suggestions_from_model(self) -> None:
-        with patch(
-            "app.services.agent.memory.post_chat",
-            return_value=_payload(
-                '[{"content": "Never wears heels", "category": "preference"}]'
-            ),
-        ) as post_mock:
-            result = extract_memory_suggestions(self._messages(), provider=_provider())
 
-        self.assertEqual(len(result), 1)
-        self.assertEqual(result[0].content, "Never wears heels")
+class DropStoredSuggestionsTestCase(unittest.TestCase):
+    def setUp(self) -> None:
+        self.engine = create_engine(
+            "sqlite://",
+            connect_args={"check_same_thread": False},
+            poolclass=StaticPool,
+        )
+        Base.metadata.create_all(self.engine)
+        self.session_factory = sessionmaker(bind=self.engine, expire_on_commit=False)
 
-        # System prompt is replaced with the extraction prompt; text is flattened.
-        _, body = post_mock.call_args.args
-        self.assertEqual(body["messages"][0]["role"], "system")
-        self.assertIn("JSON", body["messages"][0]["content"])
-        self.assertNotIn("tools", body)
+    def tearDown(self) -> None:
+        Base.metadata.drop_all(self.engine)
+        self.engine.dispose()
 
-    def test_no_conversation_skips_call(self) -> None:
-        with patch("app.services.agent.memory.post_chat") as post_mock:
-            result = extract_memory_suggestions(
-                [ChatMessage(role="system", content="only system")],
-                provider=_provider(),
+    def _store(self, content: str, *, user_id: str = _USER_ID) -> None:
+        with self.session_factory() as session:
+            session.add(Memory(user_id=user_id, content=content, category=None))
+            session.commit()
+
+    @staticmethod
+    def _suggestions(*contents: str) -> list[MemorySuggestion]:
+        return [MemorySuggestion(content=content) for content in contents]
+
+    def test_drops_already_stored_content(self) -> None:
+        self._store("Never wears heels")
+
+        with self.session_factory() as session:
+            result = drop_stored_suggestions(
+                session,
+                _USER_ID,
+                self._suggestions("Never wears heels", "Loves linen"),
+            )
+
+        self.assertEqual([s.content for s in result], ["Loves linen"])
+
+    def test_match_is_case_insensitive(self) -> None:
+        self._store("Never Wears Heels")
+
+        with self.session_factory() as session:
+            result = drop_stored_suggestions(
+                session, _USER_ID, self._suggestions("never wears heels")
             )
 
         self.assertEqual(result, [])
-        post_mock.assert_not_called()
 
-    def test_upstream_error_is_swallowed(self) -> None:
-        with patch(
-            "app.services.agent.memory.post_chat",
-            side_effect=HTTPException(status_code=502, detail="boom"),
-        ):
-            result = extract_memory_suggestions(self._messages(), provider=_provider())
+    def test_is_scoped_to_user(self) -> None:
+        self._store("Never wears heels", user_id="other-user")
 
-        self.assertEqual(result, [])
+        with self.session_factory() as session:
+            result = drop_stored_suggestions(
+                session, _USER_ID, self._suggestions("Never wears heels")
+            )
 
-    def test_non_string_content_returns_empty(self) -> None:
-        with patch(
-            "app.services.agent.memory.post_chat",
-            return_value={"choices": [{"message": {"role": "assistant", "content": None}}]},
-        ):
-            result = extract_memory_suggestions(self._messages(), provider=_provider())
+        self.assertEqual([s.content for s in result], ["Never wears heels"])
 
-        self.assertEqual(result, [])
+    def test_empty_input_returns_empty(self) -> None:
+        with self.session_factory() as session:
+            self.assertEqual(drop_stored_suggestions(session, _USER_ID, []), [])
 
 
 if __name__ == "__main__":

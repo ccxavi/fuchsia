@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import unittest
 from unittest.mock import patch
 
@@ -55,6 +56,29 @@ def _content_payload(content: str = "Here are some ideas.") -> dict:
     }
 
 
+def _suggest_memories_payload(memories: list[dict]) -> dict:
+    return {
+        "choices": [
+            {
+                "message": {
+                    "role": "assistant",
+                    "content": None,
+                    "tool_calls": [
+                        {
+                            "id": "call_mem",
+                            "type": "function",
+                            "function": {
+                                "name": "suggest_memories",
+                                "arguments": json.dumps({"memories": memories}),
+                            },
+                        }
+                    ],
+                }
+            }
+        ]
+    }
+
+
 class RunStylistChatTestCase(unittest.TestCase):
     def setUp(self) -> None:
         self.engine = create_engine("sqlite:///:memory:")
@@ -64,13 +88,6 @@ class RunStylistChatTestCase(unittest.TestCase):
             ClothingItem(user_id="user-1", name="Blue jeans", category="Bottoms")
         )
         self.session.commit()
-        # The memory-extraction pass is exercised in test_agent_memory.py; here we
-        # isolate the answer-generation loop so post_chat call counts are exact.
-        extract_patcher = patch(
-            "app.services.agent.loop.extract_memory_suggestions", return_value=[]
-        )
-        self.mock_extract = extract_patcher.start()
-        self.addCleanup(extract_patcher.stop)
         # RAG retrieval is exercised in test_agent_recall.py; default it to a miss
         # so the answer-generation loop stays isolated and post_chat counts exact.
         recall_patcher = patch(
@@ -102,25 +119,48 @@ class RunStylistChatTestCase(unittest.TestCase):
         self.assertEqual(result.memory_suggestions, [])
         post_mock.assert_called_once()
 
-    def test_attaches_extracted_memory_suggestions(self) -> None:
-        from app.v1.schemas import MemorySuggestion
-
-        self.mock_extract.return_value = [
-            MemorySuggestion(content="Never wears heels", category="preference")
-        ]
-
+    def test_collects_memory_suggestions_from_tool_call(self) -> None:
+        # The model calls suggest_memories, then returns its answer next round.
         with patch(
             "app.services.agent.loop.post_chat",
-            return_value=_content_payload("Let's find you flats."),
+            side_effect=[
+                _suggest_memories_payload(
+                    [{"content": "Never wears heels", "category": "preference"}]
+                ),
+                _content_payload("Let's find you flats."),
+            ],
         ):
             result = self._run()
 
+        self.assertEqual(result.message.content, "Let's find you flats.")
         self.assertEqual(len(result.memory_suggestions), 1)
         self.assertEqual(result.memory_suggestions[0].content, "Never wears heels")
-        # Extraction is fed the original conversation, not tool-loop scaffolding.
-        (extract_messages,), extract_kwargs = self.mock_extract.call_args
-        self.assertEqual(extract_messages[0].content, "what do I own?")
-        self.assertIn("provider", extract_kwargs)
+        self.assertEqual(result.memory_suggestions[0].category, "preference")
+
+    def test_filters_already_stored_memory_suggestions(self) -> None:
+        self.session.add(
+            Memory(user_id="user-1", content="Never wears heels", category="preference")
+        )
+        self.session.commit()
+
+        with patch(
+            "app.services.agent.loop.post_chat",
+            side_effect=[
+                _suggest_memories_payload(
+                    [
+                        {"content": "Never wears heels", "category": "preference"},
+                        {"content": "Loves linen", "category": "preference"},
+                    ]
+                ),
+                _content_payload("Noted."),
+            ],
+        ):
+            result = self._run()
+
+        # The already-stored fact is dropped by the backstop; only the new one remains.
+        self.assertEqual(
+            [s.content for s in result.memory_suggestions], ["Loves linen"]
+        )
 
     def test_executes_tool_then_returns_final_answer(self) -> None:
         with patch(

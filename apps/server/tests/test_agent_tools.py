@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.db.base import Base
 from app.models.clothing_item import ClothingItem
-from app.services.agent.tools import execute_tool, get_clothing_items
+from app.services.agent.tools import STYLIST_TOOLS, execute_tool, get_clothing_items
 
 
 class StylistToolsTestCase(unittest.TestCase):
@@ -104,6 +104,11 @@ class StylistToolsTestCase(unittest.TestCase):
         # Non-string category is ignored; truthy favorites_only keeps only favorites.
         self.assertEqual(parsed["count"], 1)
         self.assertEqual(parsed["items"][0]["name"], "Blue jeans")
+
+    def test_advertised_tools_include_wardrobe_and_memory(self) -> None:
+        names = {tool["function"]["name"] for tool in STYLIST_TOOLS}
+
+        self.assertEqual(names, {"get_clothing_items", "suggest_memories"})
 
     def test_empty_wardrobe_returns_empty(self) -> None:
         result = execute_tool(

@@ -5,7 +5,10 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
-from app.services.agent.memory import extract_memory_suggestions
+from app.services.agent.memory import (
+    _parse_suggestions,
+    drop_stored_suggestions,
+)
 from app.services.agent.openai_compat import (
     Provider,
     build_body,
@@ -21,7 +24,7 @@ from app.services.agent.recall import (
 )
 from app.services.agent.tools import STYLIST_TOOLS, execute_tool
 from app.models.memory import Memory
-from app.v1.schemas import ChatMessage, ChatResponse, MemoryResponse
+from app.v1.schemas import ChatMessage, ChatResponse, MemoryResponse, MemorySuggestion
 
 MAX_TOOL_ROUNDS = 4
 
@@ -61,6 +64,21 @@ def _inject_memory_context(
     return memories
 
 
+def _dedupe_suggestions(
+    suggestions: list[MemorySuggestion],
+) -> list[MemorySuggestion]:
+    """Drop duplicate suggestions (by content + category) across tool calls."""
+    seen: set[tuple[str, str | None]] = set()
+    unique: list[MemorySuggestion] = []
+    for suggestion in suggestions:
+        key = (suggestion.content.lower(), suggestion.category)
+        if key in seen:
+            continue
+        seen.add(key)
+        unique.append(suggestion)
+    return unique
+
+
 def _parse_arguments(raw_arguments: Any) -> dict[str, Any]:
     if not isinstance(raw_arguments, str) or not raw_arguments.strip():
         return {}
@@ -72,12 +90,26 @@ def _parse_arguments(raw_arguments: Any) -> dict[str, Any]:
 
 
 def _run_tool_call(
-    tool_call: dict[str, Any], *, db: Session, user_id: str
+    tool_call: dict[str, Any],
+    *,
+    db: Session,
+    user_id: str,
+    suggestions: list[MemorySuggestion],
 ) -> dict[str, Any]:
     function = tool_call.get("function") or {}
     name = function.get("name") or ""
-    arguments = _parse_arguments(function.get("arguments"))
-    content = execute_tool(name, arguments, db=db, user_id=user_id)
+
+    if name == "suggest_memories":
+        # Output-only tool: record the proposed memories and acknowledge. Reuses
+        # the shared parser for JSON tolerance, category coercion, and dedup.
+        raw = function.get("arguments")
+        parsed = _parse_suggestions(raw if isinstance(raw, str) else "")
+        suggestions.extend(parsed)
+        content = json.dumps({"status": "noted", "count": len(parsed)})
+    else:
+        arguments = _parse_arguments(function.get("arguments"))
+        content = execute_tool(name, arguments, db=db, user_id=user_id)
+
     return {
         "role": "tool",
         "tool_call_id": tool_call.get("id"),
@@ -93,6 +125,7 @@ def _generate_answer(
     user_id: str,
     temperature: float | None,
     max_tokens: int | None,
+    suggestions: list[MemorySuggestion],
 ) -> ChatResponse:
     """Run the tool loop and return the model's final text answer.
 
@@ -123,7 +156,11 @@ def _generate_answer(
             }
         )
         for tool_call in tool_calls:
-            serialized.append(_run_tool_call(tool_call, db=db, user_id=user_id))
+            serialized.append(
+                _run_tool_call(
+                    tool_call, db=db, user_id=user_id, suggestions=suggestions
+                )
+            )
 
     # Tools were requested every round; force a final text answer without tools.
     body = build_body(
@@ -146,16 +183,19 @@ def run_stylist_chat(
     temperature: float | None = None,
     max_tokens: int | None = None,
 ) -> ChatResponse:
-    """Generate the stylist's answer, then extract memory suggestions.
+    """Generate the stylist's answer, collecting any memory suggestions it makes.
 
-    The answer is produced by the tool loop; a separate best-effort extraction
-    pass then proposes durable facts worth remembering. Extraction never fails
-    the reply — see :func:`extract_memory_suggestions`.
+    The answer is produced by the tool loop; within that same loop the model may
+    call the ``suggest_memories`` tool to propose durable facts worth remembering.
+    Because the loop's context already includes the user's relevant remembered
+    facts (see :func:`_inject_memory_context`), the model avoids re-proposing what
+    it already knows; ``drop_stored_suggestions`` is a final exact-match backstop.
     """
     serialized = serialize_messages(messages, flatten=provider.flatten_content)
     used_memories = _inject_memory_context(
         serialized, messages, db=db, user_id=user_id
     )
+    suggestions: list[MemorySuggestion] = []
     response = _generate_answer(
         serialized,
         provider=provider,
@@ -163,8 +203,11 @@ def run_stylist_chat(
         user_id=user_id,
         temperature=temperature,
         max_tokens=max_tokens,
+        suggestions=suggestions,
     )
-    suggestions = extract_memory_suggestions(messages, provider=provider)
+    suggestions = drop_stored_suggestions(
+        db, user_id, _dedupe_suggestions(suggestions)
+    )
     return response.model_copy(
         update={
             "memory_suggestions": suggestions,

@@ -44,7 +44,58 @@ CLOTHING_ITEMS_TOOL: dict[str, Any] = {
     },
 }
 
-STYLIST_TOOLS: list[dict[str, Any]] = [CLOTHING_ITEMS_TOOL]
+SUGGEST_MEMORIES_TOOL: dict[str, Any] = {
+    "type": "function",
+    "function": {
+        "name": "suggest_memories",
+        "description": (
+            "Propose durable, styling-relevant facts about the user that are worth "
+            "remembering for future conversations — style preferences and dislikes, "
+            "body measurements or sizes, lifestyle facts, or upcoming events they "
+            "will dress for. Only propose facts the USER stated about themselves. "
+            "Do NOT propose anything already listed in the 'Relevant things you "
+            "remember about this user' block, one-off requests, small talk, or "
+            "details you merely inferred. Call this in the same turn you answer; if "
+            "there is nothing new worth remembering, do not call it."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "memories": {
+                    "type": "array",
+                    "description": "The new facts worth remembering.",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "content": {
+                                "type": "string",
+                                "description": (
+                                    "A short neutral statement, e.g. 'Never wears "
+                                    "heels' or 'Wears size M tops'."
+                                ),
+                            },
+                            "category": {
+                                "type": "string",
+                                "enum": [
+                                    "preference",
+                                    "fact",
+                                    "event",
+                                    "measurement",
+                                ],
+                            },
+                        },
+                        "required": ["content"],
+                        "additionalProperties": False,
+                    },
+                },
+            },
+            "required": ["memories"],
+            "additionalProperties": False,
+        },
+    },
+}
+
+STYLIST_TOOLS: list[dict[str, Any]] = [CLOTHING_ITEMS_TOOL, SUGGEST_MEMORIES_TOOL]
 
 
 def get_clothing_items(
