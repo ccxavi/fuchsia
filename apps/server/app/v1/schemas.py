@@ -142,10 +142,70 @@ class ChatRequest(BaseModel):
     max_tokens: int = Field(default=1024, ge=16, le=8192)
 
 
+class MemorySuggestion(BaseModel):
+    content: str = Field(..., min_length=1, max_length=500)
+    category: str | None = Field(default=None, max_length=50)
+
+    @field_validator("content")
+    @classmethod
+    def validate_content(cls, value: str) -> str:
+        cleaned = value.strip()
+        if not cleaned:
+            raise ValueError("content must not be empty")
+        return cleaned
+
+    @field_validator("category")
+    @classmethod
+    def validate_category(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        cleaned = value.strip()
+        return cleaned or None
+
+
+class MemoryIngestRequest(BaseModel):
+    memories: list[MemorySuggestion] = Field(..., min_length=1, max_length=50)
+
+
+class MemoryUpdateRequest(BaseModel):
+    content: str | None = Field(default=None, min_length=1, max_length=500)
+    category: str | None = Field(default=None, max_length=50)
+
+    @field_validator("content")
+    @classmethod
+    def validate_content(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        cleaned = value.strip()
+        if not cleaned:
+            raise ValueError("content must not be empty")
+        return cleaned
+
+    @field_validator("category")
+    @classmethod
+    def validate_category(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        cleaned = value.strip()
+        return cleaned or None
+
+
+class MemoryResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    content: str
+    category: str | None = None
+    created_at: datetime.datetime
+    updated_at: datetime.datetime
+
+
 class ChatResponse(BaseModel):
     message: ChatMessage
     model: str
     usage: dict[str, Any] | None = None
+    memory_suggestions: list[MemorySuggestion] = []
+    memories_used: list[MemoryResponse] = []
 
 class ClothingItemResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)

@@ -1,11 +1,25 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Any
 
 import httpx
 from fastapi import HTTPException, status
 
 from app.v1.schemas import ChatMessage, ChatResponse, ImagePart, TextPart
+
+_HTTP_TIMEOUT = 60
+
+
+@dataclass(frozen=True, slots=True)
+class Provider:
+    """Configuration for an OpenAI-compatible chat completions provider."""
+
+    name: str
+    base_url: str
+    api_key: str
+    model: str
+    flatten_content: bool
 
 
 def flatten_text_content(content: str | list[Any]) -> str:
@@ -40,32 +54,83 @@ def _serialize_content(content: str | list[Any]) -> Any:
     return serialized
 
 
-def build_payload(
+def serialize_messages(
+    messages: list[ChatMessage], *, flatten: bool = False
+) -> list[dict[str, Any]]:
+    """Serialize public ``ChatMessage`` objects into OpenAI message dicts.
+
+    When ``flatten`` is set, multimodal parts are collapsed to a plain string
+    (for text-only providers).
+    """
+    serialize = flatten_text_content if flatten else _serialize_content
+    return [
+        {"role": message.role, "content": serialize(message.content)}
+        for message in messages
+    ]
+
+
+def build_body(
     model: str,
-    messages: list[ChatMessage],
+    message_dicts: list[dict[str, Any]],
     *,
     temperature: float | None,
     max_tokens: int | None,
-    flatten_content: bool = False,
+    tools: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Build an OpenAI-compatible chat completion request body.
 
-    When ``flatten_content`` is set, multimodal parts are collapsed to a plain
-    string (for text-only providers).
+    ``message_dicts`` must already be serialized (see :func:`serialize_messages`),
+    which lets the agentic loop append raw ``assistant``/``tool`` messages between
+    rounds.
     """
-    serialize = flatten_text_content if flatten_content else _serialize_content
     payload: dict[str, Any] = {
         "model": model,
-        "messages": [
-            {"role": message.role, "content": serialize(message.content)}
-            for message in messages
-        ],
+        "messages": message_dicts,
         "stream": False,
     }
     if temperature is not None:
         payload["temperature"] = temperature
     if max_tokens is not None:
         payload["max_tokens"] = max_tokens
+    if tools:
+        payload["tools"] = tools
+
+    return payload
+
+
+def post_chat(provider: Provider, body: dict[str, Any]) -> dict[str, Any]:
+    """POST a chat completion request and return the raw response payload."""
+    url = f"{provider.base_url.rstrip('/')}/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {provider.api_key}",
+        "Content-Type": "application/json",
+    }
+
+    try:
+        with httpx.Client(timeout=_HTTP_TIMEOUT) as client:
+            response = client.post(url, headers=headers, json=body)
+    except httpx.HTTPError as error:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Failed to reach {provider.name}.",
+        ) from error
+
+    if response.is_error:
+        raise_from_response(response, provider=provider.name)
+
+    try:
+        payload = response.json()
+    except ValueError as error:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"{provider.name} returned an invalid response.",
+        ) from error
+
+    if not isinstance(payload, dict):
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"{provider.name} returned an invalid response.",
+        )
 
     return payload
 
@@ -89,7 +154,8 @@ def raise_from_response(response: httpx.Response, *, provider: str) -> None:
     raise HTTPException(status_code=response.status_code, detail=detail)
 
 
-def parse_chat_response(payload: dict[str, Any], *, fallback_model: str) -> ChatResponse:
+def first_choice_message(payload: dict[str, Any]) -> dict[str, Any]:
+    """Return ``choices[0].message`` (may contain ``tool_calls``)."""
     choices = payload.get("choices")
     if not isinstance(choices, list) or not choices:
         raise HTTPException(
@@ -99,7 +165,18 @@ def parse_chat_response(payload: dict[str, Any], *, fallback_model: str) -> Chat
 
     first_choice = choices[0]
     message = first_choice.get("message") if isinstance(first_choice, dict) else None
-    content = message.get("content") if isinstance(message, dict) else None
+    if not isinstance(message, dict):
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Upstream returned an invalid response.",
+        )
+
+    return message
+
+
+def parse_chat_response(payload: dict[str, Any], *, fallback_model: str) -> ChatResponse:
+    message = first_choice_message(payload)
+    content = message.get("content")
     if not isinstance(content, str) or not content:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
