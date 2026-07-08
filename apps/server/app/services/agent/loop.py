@@ -10,14 +10,55 @@ from app.services.agent.openai_compat import (
     Provider,
     build_body,
     first_choice_message,
+    flatten_text_content,
     parse_chat_response,
     post_chat,
     serialize_messages,
 )
+from app.services.agent.recall import (
+    build_memory_context_block,
+    retrieve_relevant_memories,
+)
 from app.services.agent.tools import STYLIST_TOOLS, execute_tool
-from app.v1.schemas import ChatMessage, ChatResponse
+from app.models.memory import Memory
+from app.v1.schemas import ChatMessage, ChatResponse, MemoryResponse
 
 MAX_TOOL_ROUNDS = 4
+
+
+def _latest_user_text(messages: list[ChatMessage]) -> str:
+    """Return the flattened text of the most recent user message ("" if none)."""
+    for message in reversed(messages):
+        if message.role == "user":
+            return flatten_text_content(message.content)
+    return ""
+
+
+def _inject_memory_context(
+    serialized: list[dict[str, Any]],
+    messages: list[ChatMessage],
+    *,
+    db: Session,
+    user_id: str,
+) -> list[Memory]:
+    """Fold relevant remembered facts into the system prompt, in place.
+
+    Best-effort RAG step: retrieves memories similar to the user's latest
+    message and appends them to the leading system message so the model treats
+    them as background. Returns exactly the memories that were injected (so the
+    caller can surface them on the response); a miss, failure, or missing system
+    message leaves ``serialized`` unchanged and returns an empty list.
+    """
+    if not serialized or serialized[0].get("role") != "system":
+        return []
+
+    memories = retrieve_relevant_memories(db, user_id, _latest_user_text(messages))
+    if not memories:
+        return []
+
+    block = build_memory_context_block(memories)
+    serialized[0]["content"] = f"{serialized[0]['content']}\n\n{block}"
+    return memories
 
 
 def _parse_arguments(raw_arguments: Any) -> dict[str, Any]:
@@ -112,6 +153,9 @@ def run_stylist_chat(
     the reply — see :func:`extract_memory_suggestions`.
     """
     serialized = serialize_messages(messages, flatten=provider.flatten_content)
+    used_memories = _inject_memory_context(
+        serialized, messages, db=db, user_id=user_id
+    )
     response = _generate_answer(
         serialized,
         provider=provider,
@@ -121,4 +165,11 @@ def run_stylist_chat(
         max_tokens=max_tokens,
     )
     suggestions = extract_memory_suggestions(messages, provider=provider)
-    return response.model_copy(update={"memory_suggestions": suggestions})
+    return response.model_copy(
+        update={
+            "memory_suggestions": suggestions,
+            "memories_used": [
+                MemoryResponse.model_validate(memory) for memory in used_memories
+            ],
+        }
+    )

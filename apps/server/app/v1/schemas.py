@@ -163,11 +163,26 @@ class MemorySuggestion(BaseModel):
         return cleaned or None
 
 
+class MemoryIngestRequest(BaseModel):
+    memories: list[MemorySuggestion] = Field(..., min_length=1, max_length=50)
+
+
+class MemoryResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    content: str
+    category: str | None = None
+    created_at: datetime.datetime
+    updated_at: datetime.datetime
+
+
 class ChatResponse(BaseModel):
     message: ChatMessage
     model: str
     usage: dict[str, Any] | None = None
     memory_suggestions: list[MemorySuggestion] = []
+    memories_used: list[MemoryResponse] = []
 
 class ClothingItemResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)

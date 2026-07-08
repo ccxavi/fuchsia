@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.db.base import Base
 from app.models.clothing_item import ClothingItem
+from app.models.memory import Memory
 from app.services.agent.loop import MAX_TOOL_ROUNDS, run_stylist_chat
 from app.services.agent.openai_compat import Provider
 from app.v1.schemas import ChatMessage
@@ -70,6 +71,13 @@ class RunStylistChatTestCase(unittest.TestCase):
         )
         self.mock_extract = extract_patcher.start()
         self.addCleanup(extract_patcher.stop)
+        # RAG retrieval is exercised in test_agent_recall.py; default it to a miss
+        # so the answer-generation loop stays isolated and post_chat counts exact.
+        recall_patcher = patch(
+            "app.services.agent.loop.retrieve_relevant_memories", return_value=[]
+        )
+        self.mock_recall = recall_patcher.start()
+        self.addCleanup(recall_patcher.stop)
 
     def tearDown(self) -> None:
         self.session.close()
@@ -131,6 +139,62 @@ class RunStylistChatTestCase(unittest.TestCase):
         tool_message = next(m for m in second_body["messages"] if m["role"] == "tool")
         self.assertEqual(tool_message["tool_call_id"], "call_1")
         self.assertIn("Blue jeans", tool_message["content"])
+
+    def _seed_memory(self, content: str, category: str | None) -> Memory:
+        memory = Memory(user_id="user-1", content=content, category=category)
+        self.session.add(memory)
+        self.session.commit()
+        self.session.refresh(memory)
+        return memory
+
+    def test_injects_retrieved_memories_into_system_prompt(self) -> None:
+        memory = self._seed_memory("Never wears heels", "preference")
+        self.mock_recall.return_value = [memory]
+        messages = [
+            ChatMessage(role="system", content="PERSONA"),
+            ChatMessage(role="user", content="what should I wear tonight?"),
+        ]
+
+        with patch(
+            "app.services.agent.loop.post_chat",
+            return_value=_content_payload("Try flats."),
+        ) as post_mock:
+            result = run_stylist_chat(
+                messages, provider=_provider(), db=self.session, user_id="user-1"
+            )
+
+        # Retrieval is keyed off the latest user message.
+        recall_args, _ = self.mock_recall.call_args
+        self.assertEqual(recall_args[2], "what should I wear tonight?")
+
+        # The block is folded into the leading system message.
+        _, first_body = post_mock.call_args_list[0].args
+        system_message = first_body["messages"][0]
+        self.assertEqual(system_message["role"], "system")
+        self.assertIn("PERSONA", system_message["content"])
+        self.assertIn("Never wears heels", system_message["content"])
+
+        # The used memories are surfaced on the response.
+        self.assertEqual([m.content for m in result.memories_used], ["Never wears heels"])
+        self.assertEqual(result.memories_used[0].category, "preference")
+
+    def test_leaves_system_prompt_unchanged_when_no_memories(self) -> None:
+        messages = [
+            ChatMessage(role="system", content="PERSONA"),
+            ChatMessage(role="user", content="hi"),
+        ]
+
+        with patch(
+            "app.services.agent.loop.post_chat",
+            return_value=_content_payload("Hello!"),
+        ) as post_mock:
+            result = run_stylist_chat(
+                messages, provider=_provider(), db=self.session, user_id="user-1"
+            )
+
+        _, first_body = post_mock.call_args_list[0].args
+        self.assertEqual(first_body["messages"][0]["content"], "PERSONA")
+        self.assertEqual(result.memories_used, [])
 
     def test_falls_back_to_no_tools_after_max_rounds(self) -> None:
         payloads = [_tool_call_payload()] * MAX_TOOL_ROUNDS + [
