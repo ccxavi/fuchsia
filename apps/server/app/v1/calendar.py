@@ -1,6 +1,7 @@
 from typing import Annotated
 from sqlalchemy import select, extract
 from sqlalchemy.orm import Session, selectinload
+from sqlalchemy.exc import IntegrityError
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from pydantic import BaseModel
 
@@ -41,7 +42,14 @@ def create_calendar_outfit(
         notes=data.notes,
     )
     db.add(db_calendar_outfit)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=400, 
+            detail="This outfit is already scheduled for this date."
+        )
     db.refresh(db_calendar_outfit)
     return db_calendar_outfit
 
@@ -91,7 +99,14 @@ def update_calendar_outfit(
     if data.notes is not None:
         calendar_outfit.notes = data.notes
 
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=400, 
+            detail="This outfit is already scheduled for this date."
+        )
     db.refresh(calendar_outfit)
     return calendar_outfit
 
