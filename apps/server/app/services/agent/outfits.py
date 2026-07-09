@@ -6,6 +6,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.models.clothing_item import ClothingItem
+from app.models.wardrobe import Wardrobe
 from app.services.agent.memory import _load_json
 from app.v1.schemas import OutfitSuggestion
 
@@ -13,20 +14,27 @@ from app.v1.schemas import OutfitSuggestion
 def filter_valid_outfit_suggestions(
     db: Session, user_id: str, suggestions: list[OutfitSuggestion]
 ) -> list[OutfitSuggestion]:
-    """Drop item ids the user does not own; drop outfits left with no items.
+    """Drop ids the user does not own; drop outfits left with no items.
 
-    Best-effort backstop against the model citing pieces that do not exist or
-    belong to someone else. On any DB error the suggestions pass through
-    unfiltered rather than failing the reply, consistent with
+    Best-effort backstop against the model citing pieces or wardrobes that do
+    not exist or belong to someone else. Item ids are required (an outfit with
+    none left is dropped); wardrobe ids are optional (an emptied set just means
+    the outfit is not filed under a wardrobe). On any DB error the suggestions
+    pass through unfiltered rather than failing the reply, consistent with
     :func:`app.services.agent.memory.drop_stored_suggestions`.
     """
     if not suggestions:
         return suggestions
 
     try:
-        owned = set(
+        owned_items = set(
             db.scalars(
                 select(ClothingItem.id).where(ClothingItem.user_id == user_id)
+            ).all()
+        )
+        owned_wardrobes = set(
+            db.scalars(
+                select(Wardrobe.id).where(Wardrobe.user_id == user_id)
             ).all()
         )
     except SQLAlchemyError:
@@ -34,14 +42,26 @@ def filter_valid_outfit_suggestions(
 
     valid: list[OutfitSuggestion] = []
     for suggestion in suggestions:
-        kept_ids = [
+        kept_items = [
             item_id
             for item_id in suggestion.clothing_item_ids
-            if item_id in owned
+            if item_id in owned_items
         ]
-        if not kept_ids:
+        if not kept_items:
             continue
-        valid.append(suggestion.model_copy(update={"clothing_item_ids": kept_ids}))
+        kept_wardrobes = [
+            wardrobe_id
+            for wardrobe_id in suggestion.wardrobe_ids
+            if wardrobe_id in owned_wardrobes
+        ]
+        valid.append(
+            suggestion.model_copy(
+                update={
+                    "clothing_item_ids": kept_items,
+                    "wardrobe_ids": kept_wardrobes,
+                }
+            )
+        )
 
     return valid
 
@@ -78,11 +98,23 @@ def _parse_outfit_suggestions(text: str) -> list[OutfitSuggestion]:
         if not clothing_item_ids:
             continue
 
+        raw_wardrobe_ids = item.get("wardrobe_ids")
+        wardrobe_ids = (
+            [
+                value.strip()
+                for value in raw_wardrobe_ids
+                if isinstance(value, str) and value.strip()
+            ]
+            if isinstance(raw_wardrobe_ids, list)
+            else []
+        )
+
         rationale = item.get("rationale")
         try:
             suggestion = OutfitSuggestion(
                 name=name if isinstance(name, str) else "",
                 clothing_item_ids=clothing_item_ids,
+                wardrobe_ids=wardrobe_ids,
                 rationale=rationale if isinstance(rationale, str) else None,
             )
         except ValidationError:

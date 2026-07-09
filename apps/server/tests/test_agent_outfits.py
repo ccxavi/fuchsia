@@ -10,6 +10,7 @@ from sqlalchemy.pool import StaticPool
 
 from app.db.base import Base
 from app.models.clothing_item import ClothingItem
+from app.models.wardrobe import Wardrobe
 from app.services.agent.outfits import (
     _parse_outfit_suggestions,
     filter_valid_outfit_suggestions,
@@ -36,6 +37,16 @@ class ParseOutfitSuggestionsTestCase(unittest.TestCase):
 
         self.assertEqual(len(result), 1)
         self.assertIsNone(result[0].rationale)
+        self.assertEqual(result[0].wardrobe_ids, [])
+
+    def test_parses_wardrobe_ids_when_present(self) -> None:
+        result = _parse_outfit_suggestions(
+            '[{"name": "Summer Brunch", "clothing_item_ids": ["a"],'
+            ' "wardrobe_ids": ["w1", "w2"]}]'
+        )
+
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0].wardrobe_ids, ["w1", "w2"])
 
     def test_parses_code_fenced_array(self) -> None:
         text = (
@@ -79,20 +90,24 @@ class FilterValidOutfitSuggestionsTestCase(unittest.TestCase):
         )
         Base.metadata.create_all(self.engine)
         self.session_factory = sessionmaker(bind=self.engine, expire_on_commit=False)
-        self.owned_ids = self._seed()
+        self._seed()
 
     def tearDown(self) -> None:
         Base.metadata.drop_all(self.engine)
         self.engine.dispose()
 
-    def _seed(self) -> list[str]:
+    def _seed(self) -> None:
         with self.session_factory() as session:
             jeans = ClothingItem(user_id=_USER_ID, name="Blue jeans")
             tee = ClothingItem(user_id=_USER_ID, name="White tee")
             other = ClothingItem(user_id="other-user", name="Not yours")
-            session.add_all([jeans, tee, other])
+            wardrobe = Wardrobe(user_id=_USER_ID, name="Summer")
+            other_wardrobe = Wardrobe(user_id="other-user", name="Theirs")
+            session.add_all([jeans, tee, other, wardrobe, other_wardrobe])
             session.commit()
-            return [jeans.id, tee.id]
+            self.owned_ids = [jeans.id, tee.id]
+            self.wardrobe_id = wardrobe.id
+            self.other_wardrobe_id = other_wardrobe.id
 
     def test_drops_unknown_and_foreign_ids(self) -> None:
         suggestion = OutfitSuggestion(
@@ -115,6 +130,32 @@ class FilterValidOutfitSuggestionsTestCase(unittest.TestCase):
             result = filter_valid_outfit_suggestions(session, _USER_ID, [suggestion])
 
         self.assertEqual(result, [])
+
+    def test_keeps_owned_wardrobe_ids(self) -> None:
+        suggestion = OutfitSuggestion(
+            name="Summer Brunch",
+            clothing_item_ids=[self.owned_ids[0]],
+            wardrobe_ids=[self.wardrobe_id],
+        )
+
+        with self.session_factory() as session:
+            result = filter_valid_outfit_suggestions(session, _USER_ID, [suggestion])
+
+        self.assertEqual(result[0].wardrobe_ids, [self.wardrobe_id])
+
+    def test_drops_unknown_or_foreign_wardrobe_ids_but_keeps_outfit(self) -> None:
+        suggestion = OutfitSuggestion(
+            name="Weekend",
+            clothing_item_ids=[self.owned_ids[0]],
+            wardrobe_ids=[self.other_wardrobe_id, "made-up-wardrobe"],
+        )
+
+        with self.session_factory() as session:
+            result = filter_valid_outfit_suggestions(session, _USER_ID, [suggestion])
+
+        # The outfit survives (items are valid); only the bad wardrobe ids drop.
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0].wardrobe_ids, [])
 
     def test_empty_input_returns_empty(self) -> None:
         with self.session_factory() as session:

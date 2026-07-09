@@ -16,6 +16,9 @@ class StylistSystemPromptTestCase(unittest.TestCase):
     def test_mentions_weather_tool(self) -> None:
         self.assertIn("get_weather", STYLIST_SYSTEM_PROMPT)
 
+    def test_mentions_wardrobes_tool(self) -> None:
+        self.assertIn("get_wardrobes", STYLIST_SYSTEM_PROMPT)
+
 
 class BuildStylistMessagesTestCase(unittest.TestCase):
     def test_prepends_system_prompt_and_preserves_order(self) -> None:

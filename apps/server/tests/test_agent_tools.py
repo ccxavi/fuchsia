@@ -5,12 +5,18 @@ import unittest
 from unittest.mock import AsyncMock, patch
 
 from fastapi import HTTPException
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
 
 from app.db.base import Base
 from app.models.clothing_item import ClothingItem
-from app.services.agent.tools import STYLIST_TOOLS, execute_tool, get_clothing_items
+from app.models.wardrobe import Wardrobe
+from app.services.agent.tools import (
+    STYLIST_TOOLS,
+    execute_tool,
+    get_clothing_items,
+    get_wardrobes,
+)
 
 
 class StylistToolsTestCase(unittest.TestCase):
@@ -107,13 +113,14 @@ class StylistToolsTestCase(unittest.TestCase):
         self.assertEqual(parsed["count"], 1)
         self.assertEqual(parsed["items"][0]["name"], "Blue jeans")
 
-    def test_advertised_tools_include_wardrobe_memory_outfits_and_weather(self) -> None:
+    def test_advertised_tools_cover_the_stylist_capabilities(self) -> None:
         names = {tool["function"]["name"] for tool in STYLIST_TOOLS}
 
         self.assertEqual(
             names,
             {
                 "get_clothing_items",
+                "get_wardrobes",
                 "suggest_memories",
                 "suggest_outfits",
                 "get_weather",
@@ -133,6 +140,68 @@ class StylistToolsTestCase(unittest.TestCase):
         parsed = json.loads(result)
         self.assertEqual(parsed["count"], 0)
         self.assertEqual(parsed["items"], [])
+
+    def _seed_wardrobe(self) -> Wardrobe:
+        """Create a 'Summer' wardrobe for user-1 holding only the white tee."""
+        tee = self.session.scalar(
+            select(ClothingItem).where(ClothingItem.name == "White tee")
+        )
+        wardrobe = Wardrobe(user_id="user-1", name="Summer")
+        wardrobe.clothing_items.append(tee)
+        self.session.add(wardrobe)
+        self.session.commit()
+        self.session.refresh(wardrobe)
+        return wardrobe
+
+    def test_wardrobe_filter_returns_only_that_wardrobes_items(self) -> None:
+        wardrobe = self._seed_wardrobe()
+
+        items = get_clothing_items(self.session, "user-1", wardrobe_id=wardrobe.id)
+
+        self.assertEqual([item["name"] for item in items], ["White tee"])
+
+    def test_wardrobe_filter_is_scoped_to_the_user(self) -> None:
+        wardrobe = self._seed_wardrobe()
+
+        # Another user cannot read items via someone else's wardrobe id.
+        items = get_clothing_items(self.session, "user-2", wardrobe_id=wardrobe.id)
+
+        self.assertEqual(items, [])
+
+    def test_get_wardrobes_lists_users_wardrobes_with_counts(self) -> None:
+        self._seed_wardrobe()
+
+        wardrobes = get_wardrobes(self.session, "user-1")
+
+        self.assertEqual(len(wardrobes), 1)
+        self.assertEqual(wardrobes[0]["name"], "Summer")
+        self.assertEqual(wardrobes[0]["item_count"], 1)
+        self.assertIsInstance(wardrobes[0]["id"], str)
+
+    def test_execute_tool_get_wardrobes_returns_json_payload(self) -> None:
+        self._seed_wardrobe()
+
+        result = execute_tool(
+            "get_wardrobes", {}, db=self.session, user_id="user-1"
+        )
+
+        parsed = json.loads(result)
+        self.assertEqual(parsed["count"], 1)
+        self.assertEqual(parsed["wardrobes"][0]["name"], "Summer")
+
+    def test_execute_tool_clothing_items_forwards_wardrobe_id(self) -> None:
+        wardrobe = self._seed_wardrobe()
+
+        result = execute_tool(
+            "get_clothing_items",
+            {"wardrobe_id": wardrobe.id},
+            db=self.session,
+            user_id="user-1",
+        )
+
+        parsed = json.loads(result)
+        self.assertEqual(parsed["count"], 1)
+        self.assertEqual(parsed["items"][0]["name"], "White tee")
 
     def test_get_weather_returns_conditions_for_coords(self) -> None:
         fake = AsyncMock(

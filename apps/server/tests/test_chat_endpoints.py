@@ -215,6 +215,7 @@ class ChatEndpointTestCase(unittest.TestCase):
                 OutfitSuggestion(
                     name="Casual Friday",
                     clothing_item_ids=["item-1", "item-2"],
+                    wardrobe_ids=["wardrobe-1"],
                     rationale="Relaxed but put-together.",
                 )
             ],
@@ -234,6 +235,7 @@ class ChatEndpointTestCase(unittest.TestCase):
             {
                 "name": "Casual Friday",
                 "clothing_item_ids": ["item-1", "item-2"],
+                "wardrobe_ids": ["wardrobe-1"],
                 "rationale": "Relaxed but put-together.",
             },
         )

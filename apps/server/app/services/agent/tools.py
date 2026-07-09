@@ -8,6 +8,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.models.clothing_item import ClothingItem
+from app.models.wardrobe import Wardrobe
 from app.services.weather import get_current_weather
 
 MAX_ITEMS = 100
@@ -40,7 +41,32 @@ CLOTHING_ITEMS_TOOL: dict[str, Any] = {
                     "type": "boolean",
                     "description": "When true, only return items marked as favorite.",
                 },
+                "wardrobe_id": {
+                    "type": "string",
+                    "description": (
+                        "Restrict to items in this wardrobe (a named collection). "
+                        "Get the id from get_wardrobes."
+                    ),
+                },
             },
+            "additionalProperties": False,
+        },
+    },
+}
+
+GET_WARDROBES_TOOL: dict[str, Any] = {
+    "type": "function",
+    "function": {
+        "name": "get_wardrobes",
+        "description": (
+            "List the user's wardrobes — their named collections of clothing items, "
+            "such as 'Summer' or 'Work'. Use this to resolve a wardrobe the user "
+            "names into its id, for example before building an outfit from a specific "
+            "wardrobe. Takes no arguments."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {},
             "additionalProperties": False,
         },
     },
@@ -133,6 +159,16 @@ SUGGEST_OUTFITS_TOOL: dict[str, Any] = {
                                 ),
                                 "items": {"type": "string"},
                             },
+                            "wardrobe_ids": {
+                                "type": "array",
+                                "description": (
+                                    "Optional. If the user asked for an outfit from a "
+                                    "specific wardrobe, include that wardrobe's id here "
+                                    "(from get_wardrobes) so the outfit is saved into "
+                                    "it."
+                                ),
+                                "items": {"type": "string"},
+                            },
                             "rationale": {
                                 "type": "string",
                                 "description": (
@@ -174,6 +210,7 @@ GET_WEATHER_TOOL: dict[str, Any] = {
 
 STYLIST_TOOLS: list[dict[str, Any]] = [
     CLOTHING_ITEMS_TOOL,
+    GET_WARDROBES_TOOL,
     SUGGEST_MEMORIES_TOOL,
     SUGGEST_OUTFITS_TOOL,
     GET_WEATHER_TOOL,
@@ -187,6 +224,7 @@ def get_clothing_items(
     category: str | None = None,
     color: str | None = None,
     favorites_only: bool = False,
+    wardrobe_id: str | None = None,
 ) -> list[dict[str, Any]]:
     """Return the user's clothing items, optionally filtered, capped at MAX_ITEMS."""
     query = select(ClothingItem).where(ClothingItem.user_id == user_id)
@@ -197,6 +235,12 @@ def get_clothing_items(
         query = query.where(func.lower(ClothingItem.color) == color.strip().lower())
     if favorites_only:
         query = query.where(ClothingItem.is_favorite.is_(True))
+    if wardrobe_id:
+        query = (
+            query.join(ClothingItem.wardrobes)
+            .where(Wardrobe.id == wardrobe_id, Wardrobe.user_id == user_id)
+            .distinct()
+        )
 
     items = db.scalars(query.limit(MAX_ITEMS)).all()
 
@@ -210,6 +254,22 @@ def get_clothing_items(
             "is_favorite": item.is_favorite,
         }
         for item in items
+    ]
+
+
+def get_wardrobes(db: Session, user_id: str) -> list[dict[str, Any]]:
+    """Return the user's wardrobes as {id, name, item_count} dicts."""
+    wardrobes = db.scalars(
+        select(Wardrobe).where(Wardrobe.user_id == user_id).limit(MAX_ITEMS)
+    ).all()
+
+    return [
+        {
+            "id": wardrobe.id,
+            "name": wardrobe.name,
+            "item_count": wardrobe.clothing_items_count,
+        }
+        for wardrobe in wardrobes
     ]
 
 
@@ -252,12 +312,17 @@ def execute_tool(
     if name == "get_weather":
         return json.dumps(_weather_payload(latitude, longitude))
 
+    if name == "get_wardrobes":
+        wardrobes = get_wardrobes(db, user_id)
+        return json.dumps({"count": len(wardrobes), "wardrobes": wardrobes})
+
     if name != "get_clothing_items":
         return json.dumps({"error": f"Unknown tool: {name}"})
 
     category = arguments.get("category")
     color = arguments.get("color")
     favorites_only = bool(arguments.get("favorites_only", False))
+    wardrobe_id = arguments.get("wardrobe_id")
 
     items = get_clothing_items(
         db,
@@ -265,6 +330,7 @@ def execute_tool(
         category=category if isinstance(category, str) else None,
         color=color if isinstance(color, str) else None,
         favorites_only=favorites_only,
+        wardrobe_id=wardrobe_id if isinstance(wardrobe_id, str) else None,
     )
 
     return json.dumps({"count": len(items), "items": items})

@@ -213,6 +213,7 @@ class MemoryResponse(BaseModel):
 class OutfitSuggestion(BaseModel):
     name: str = Field(..., min_length=1, max_length=255)
     clothing_item_ids: list[str] = Field(..., min_length=1)
+    wardrobe_ids: list[str] = []
     rationale: str | None = Field(default=None, max_length=500)
 
     @field_validator("name")
