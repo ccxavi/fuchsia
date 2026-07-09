@@ -10,7 +10,7 @@ import React from 'react';
 import { ThemedText } from '@/components/themed-text';
 import { FuchsiaColors, FuchsiaFonts } from '@/constants/theme';
 import { getCalendarOutfits, CalendarOutfitWithOutfitResponse, updateCalendarOutfit, deleteCalendarOutfit } from '@/api/client';
-import DateTimePicker from '@react-native-community/datetimepicker';
+import { CustomDatePicker } from '@/components/ui/CustomDatePicker';
 
 export default function CalendarScreen() {
   const insets = useSafeAreaInsets();
@@ -471,14 +471,13 @@ export default function CalendarScreen() {
         </View>
       </Modal>
 
-      {showReschedulePicker && (
-        <DateTimePicker
-          value={selectedDayStr ? new Date(selectedDayStr + 'T12:00:00Z') : new Date()}
-          mode="date"
-          display="default"
-          onChange={handleRescheduleDateChange}
-        />
-      )}
+      {/* Reschedule Date Picker */}
+      <CustomDatePicker
+        visible={showReschedulePicker}
+        value={selectedDayStr ? new Date(selectedDayStr + 'T12:00:00Z') : new Date()}
+        onClose={() => setShowReschedulePicker(false)}
+        onChange={handleRescheduleDateChange}
+      />
     </View>
   );
 }

@@ -6,7 +6,7 @@ import { Image } from 'expo-image';
 import { ArrowLeft, Edit2, Trash2, Layers, Camera, X, Check, Plus, MoreHorizontal, Info, Calendar } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
-import DateTimePicker from '@react-native-community/datetimepicker';
+import { CustomDatePicker } from '@/components/ui/CustomDatePicker';
 
 import { FuchsiaColors, FuchsiaFonts } from '@/constants/theme';
 import { getOutfit, deleteOutfit, updateOutfit, deleteOutfitImage, addItemToOutfit, removeItemFromOutfit, addWardrobeToOutfit, removeWardrobeFromOutfit, createCalendarOutfit, OutfitWithWardrobesResponse } from '@/api/client';
@@ -202,33 +202,31 @@ export default function OutfitDetailScreen() {
         </View>
       )}
 
-      {/* Date Picker */}
-      {showDatePicker && (
-        <DateTimePicker
-          value={new Date()}
-          mode="date"
-          display="default"
-          onChange={async (event, date) => {
-            setShowDatePicker(false);
-            if (date && outfit) {
-              try {
-                await createCalendarOutfit({
-                  outfit_id: outfit.id,
-                  date: date.toISOString().split('T')[0],
-                });
-                DeviceEventEmitter.emit('showGlobalToast', 'Outfit scheduled successfully!');
-              } catch (err: any) {
-                console.error('Failed to schedule outfit:', err);
-                if (err.message && err.message.includes('400')) {
-                  Alert.alert('Duplicate', 'This outfit is already scheduled on that day!');
-                } else {
-                  Alert.alert('Error', 'Failed to schedule outfit');
-                }
+      {/* Custom Date Picker */}
+      <CustomDatePicker
+        visible={showDatePicker}
+        value={new Date()}
+        onClose={() => setShowDatePicker(false)}
+        onChange={async (event, date) => {
+          setShowDatePicker(false);
+          if (date && outfit) {
+            try {
+              await createCalendarOutfit({
+                outfit_id: outfit.id,
+                date: date.toISOString().split('T')[0],
+              });
+              DeviceEventEmitter.emit('showGlobalToast', 'Outfit scheduled successfully!');
+            } catch (err: any) {
+              console.error('Failed to schedule outfit:', err);
+              if (err.message && err.message.includes('400')) {
+                Alert.alert('Duplicate', 'This outfit is already scheduled on that day!');
+              } else {
+                Alert.alert('Error', 'Failed to schedule outfit');
               }
             }
-          }}
-        />
-      )}
+          }
+        }}
+      />
 
       {/* Photo Delete Confirmation */}
       {photoToDelete && (
