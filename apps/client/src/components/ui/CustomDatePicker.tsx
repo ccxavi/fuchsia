@@ -9,9 +9,10 @@ export interface CustomDatePickerProps {
   value: Date;
   onClose: () => void;
   onChange: (event: any, date?: Date) => void;
+  selectionMode?: 'date' | 'month';
 }
 
-export function CustomDatePicker({ visible, value, onClose, onChange }: CustomDatePickerProps) {
+export function CustomDatePicker({ visible, value, onClose, onChange, selectionMode = 'date' }: CustomDatePickerProps) {
   const { width } = useWindowDimensions();
   
   const [currentMonth, setCurrentMonth] = useState(new Date(value));
@@ -23,9 +24,9 @@ export function CustomDatePicker({ visible, value, onClose, onChange }: CustomDa
       const valDate = new Date(value);
       setCurrentMonth(valDate);
       setYearPageStart(Math.floor(valDate.getFullYear() / 12) * 12);
-      setPickerMode('days');
+      setPickerMode(selectionMode === 'month' ? 'month' : 'days');
     }
-  }, [value, visible]);
+  }, [value, visible, selectionMode]);
 
   const changeMonth = (offset: number) => {
     setCurrentMonth(prev => new Date(prev.getFullYear(), prev.getMonth() + offset, 1));
@@ -80,11 +81,30 @@ export function CustomDatePicker({ visible, value, onClose, onChange }: CustomDa
               {pickerMode === 'month' && (
                 <View>
                   <View style={styles.header}>
-                    <Pressable onPress={() => setPickerMode('days')} style={styles.navButton}>
-                      <ChevronLeft size={20} color={FuchsiaColors.ink} />
+                    {selectionMode === 'date' ? (
+                      <Pressable onPress={() => setPickerMode('days')} style={styles.navButton}>
+                        <ChevronLeft size={20} color={FuchsiaColors.ink} />
+                      </Pressable>
+                    ) : (
+                      <Pressable onPress={() => setCurrentMonth(prev => new Date(prev.getFullYear() - 1, prev.getMonth(), 1))} style={styles.navButton}>
+                        <ChevronLeft size={20} color={FuchsiaColors.ink} />
+                      </Pressable>
+                    )}
+                    <Pressable onPress={() => {
+                      setYearPageStart(Math.floor(currentMonth.getFullYear() / 12) * 12);
+                      setPickerMode('year');
+                    }}>
+                      <ThemedText style={styles.monthText}>
+                        {selectionMode === 'month' ? currentMonth.getFullYear() : 'Select Month'}
+                      </ThemedText>
                     </Pressable>
-                    <ThemedText style={styles.monthText}>Select Month</ThemedText>
-                    <View style={{ width: 36 }} />
+                    {selectionMode === 'date' ? (
+                      <View style={{ width: 36 }} />
+                    ) : (
+                      <Pressable onPress={() => setCurrentMonth(prev => new Date(prev.getFullYear() + 1, prev.getMonth(), 1))} style={styles.navButton}>
+                        <ChevronRight size={20} color={FuchsiaColors.ink} />
+                      </Pressable>
+                    )}
                   </View>
                   <View style={styles.monthsGrid}>
                     {monthNames.map((mName, index) => {
@@ -94,8 +114,13 @@ export function CustomDatePicker({ visible, value, onClose, onChange }: CustomDa
                           key={mName}
                           style={[styles.monthPill, isSelected && styles.monthPillSelected]}
                           onPress={() => {
-                            setCurrentMonth(new Date(currentMonth.getFullYear(), index, 1));
-                            setPickerMode('days');
+                            const newDate = new Date(currentMonth.getFullYear(), index, 1);
+                            if (selectionMode === 'month') {
+                              onChange({ type: 'set' }, newDate);
+                            } else {
+                              setCurrentMonth(newDate);
+                              setPickerMode('days');
+                            }
                           }}
                         >
                           <Text style={[styles.monthPillText, isSelected && styles.monthPillTextSelected]}>
@@ -129,7 +154,7 @@ export function CustomDatePicker({ visible, value, onClose, onChange }: CustomDa
                           style={[styles.monthPill, isSelected && styles.monthPillSelected]}
                           onPress={() => {
                             setCurrentMonth(new Date(yearNum, currentMonth.getMonth(), 1));
-                            setPickerMode('days');
+                            setPickerMode(selectionMode === 'month' ? 'month' : 'days');
                           }}
                         >
                           <Text style={[styles.monthPillText, isSelected && styles.monthPillTextSelected]}>

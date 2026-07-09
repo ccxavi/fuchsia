@@ -22,8 +22,6 @@ export default function CalendarScreen() {
   const [isLoading, setIsLoading] = useState(true);
 
   const [isPickerVisible, setIsPickerVisible] = useState(false);
-  const [pickerYear, setPickerYear] = useState(currentMonth.getFullYear());
-  const [pickerMonth, setPickerMonth] = useState(currentMonth.getMonth());
   
   const [selectedDayStr, setSelectedDayStr] = useState<string | null>(null);
   const [isDayModalVisible, setIsDayModalVisible] = useState(false);
@@ -190,11 +188,10 @@ export default function CalendarScreen() {
         <Pressable onPress={() => changeMonth(-1)} style={styles.navButton}>
           <ChevronLeft size={16} color={FuchsiaColors.slate} />
         </Pressable>
-        <Pressable onPress={() => {
-          setPickerYear(currentMonth.getFullYear());
-          setPickerMonth(currentMonth.getMonth());
-          setIsPickerVisible(true);
-        }}>
+        <Pressable 
+          style={styles.monthSelector}
+          onPress={() => setIsPickerVisible(true)}
+        >  
           <ThemedText style={styles.monthText}>
             {monthNames[currentMonth.getMonth()]} {currentMonth.getFullYear()}
           </ThemedText>
@@ -377,53 +374,18 @@ export default function CalendarScreen() {
       )}
 
       {/* Month/Year Picker Modal */}
-      <Modal visible={isPickerVisible} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Pressable onPress={() => setPickerYear(y => y - 1)} style={styles.navButton}>
-                <ChevronLeft size={20} color={FuchsiaColors.ink} />
-              </Pressable>
-              <ThemedText style={styles.modalYearText}>{pickerYear}</ThemedText>
-              <Pressable onPress={() => setPickerYear(y => y + 1)} style={styles.navButton}>
-                <ChevronRight size={20} color={FuchsiaColors.ink} />
-              </Pressable>
-            </View>
-
-            <View style={styles.monthsGrid}>
-              {monthNames.map((mName, index) => {
-                const isSelected = index === pickerMonth;
-                return (
-                  <Pressable
-                    key={mName}
-                    style={[styles.monthPill, isSelected && styles.monthPillSelected]}
-                    onPress={() => setPickerMonth(index)}
-                  >
-                    <Text style={[styles.monthPillText, isSelected && styles.monthPillTextSelected]}>
-                      {mName.substring(0, 3)}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-
-            <View style={styles.modalActions}>
-              <Pressable style={styles.modalCancelButton} onPress={() => setIsPickerVisible(false)}>
-                <Text style={styles.modalCancelText}>Cancel</Text>
-              </Pressable>
-              <Pressable 
-                style={styles.modalApplyButton} 
-                onPress={() => {
-                  setCurrentMonth(new Date(pickerYear, pickerMonth, 1));
-                  setIsPickerVisible(false);
-                }}
-              >
-                <Text style={styles.modalApplyText}>Apply</Text>
-              </Pressable>
-            </View>
-          </View>
-        </View>
-      </Modal>
+      <CustomDatePicker
+        visible={isPickerVisible}
+        value={currentMonth}
+        onClose={() => setIsPickerVisible(false)}
+        selectionMode="month"
+        onChange={(event, date) => {
+          setIsPickerVisible(false);
+          if (date) {
+            setCurrentMonth(date);
+          }
+        }}
+      />
 
       {/* Day Detail Modal */}
       <Modal visible={isDayModalVisible} transparent animationType="fade">
@@ -569,6 +531,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 8,
+  },
+  monthSelector: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 12,
+    backgroundColor: FuchsiaColors.cloud,
   },
   monthText: {
     fontFamily: FuchsiaFonts.heading,
