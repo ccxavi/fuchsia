@@ -826,7 +826,7 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     padding: 24,
     width: '100%',
-    maxHeight: '80%',
+    height: '50%',
   },
   dayModalHeader: {
     flexDirection: 'row',
