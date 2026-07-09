@@ -233,6 +233,20 @@ class OutfitSuggestion(BaseModel):
         return cleaned or None
 
 
+class CalendarSuggestion(BaseModel):
+    outfit_id: str = Field(..., min_length=1)
+    date: datetime.date
+    notes: str | None = Field(default=None, max_length=500)
+
+    @field_validator("notes")
+    @classmethod
+    def validate_notes(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        cleaned = value.strip()
+        return cleaned or None
+
+
 class ChatResponse(BaseModel):
     message: ChatMessage
     model: str
@@ -240,6 +254,7 @@ class ChatResponse(BaseModel):
     memory_suggestions: list[MemorySuggestion] = []
     memories_used: list[MemoryResponse] = []
     outfit_suggestions: list[OutfitSuggestion] = []
+    calendar_suggestions: list[CalendarSuggestion] = []
 
 class ClothingItemResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)

@@ -8,8 +8,12 @@ from fastapi import HTTPException
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
 
+import datetime
+
 from app.db.base import Base
+from app.models.calendar_outfit import CalendarOutfit
 from app.models.clothing_item import ClothingItem
+from app.models.outfit import Outfit
 from app.models.wardrobe import Wardrobe
 from app.services.agent.tools import (
     STYLIST_TOOLS,
@@ -121,8 +125,11 @@ class StylistToolsTestCase(unittest.TestCase):
             {
                 "get_clothing_items",
                 "get_wardrobes",
+                "get_outfits",
+                "get_calendar",
                 "suggest_memories",
                 "suggest_outfits",
+                "suggest_calendar_entry",
                 "get_weather",
             },
         )
@@ -202,6 +209,67 @@ class StylistToolsTestCase(unittest.TestCase):
         parsed = json.loads(result)
         self.assertEqual(parsed["count"], 1)
         self.assertEqual(parsed["items"][0]["name"], "White tee")
+
+    def _seed_outfit(self, *, user_id: str = "user-1", name: str = "Casual Friday") -> Outfit:
+        outfit = Outfit(user_id=user_id, name=name)
+        self.session.add(outfit)
+        self.session.commit()
+        self.session.refresh(outfit)
+        return outfit
+
+    def test_execute_tool_get_outfits_returns_users_outfits(self) -> None:
+        self._seed_outfit()
+        self._seed_outfit(user_id="user-2", name="Not yours")
+
+        result = execute_tool("get_outfits", {}, db=self.session, user_id="user-1")
+
+        parsed = json.loads(result)
+        self.assertEqual(parsed["count"], 1)
+        self.assertEqual(parsed["outfits"][0]["name"], "Casual Friday")
+
+    def test_execute_tool_get_calendar_returns_scheduled_outfits(self) -> None:
+        outfit = self._seed_outfit()
+        self.session.add(
+            CalendarOutfit(
+                user_id="user-1",
+                outfit_id=outfit.id,
+                date=datetime.date(2026, 7, 11),
+                notes="Brunch",
+            )
+        )
+        self.session.commit()
+
+        result = execute_tool("get_calendar", {}, db=self.session, user_id="user-1")
+
+        parsed = json.loads(result)
+        self.assertEqual(parsed["count"], 1)
+        entry = parsed["entries"][0]
+        self.assertEqual(entry["date"], "2026-07-11")
+        self.assertEqual(entry["outfit_id"], outfit.id)
+        self.assertEqual(entry["outfit_name"], "Casual Friday")
+        self.assertEqual(entry["notes"], "Brunch")
+
+    def test_execute_tool_get_calendar_month_filter(self) -> None:
+        outfit = self._seed_outfit()
+        self.session.add_all(
+            [
+                CalendarOutfit(
+                    user_id="user-1", outfit_id=outfit.id, date=datetime.date(2026, 7, 11)
+                ),
+                CalendarOutfit(
+                    user_id="user-1", outfit_id=outfit.id, date=datetime.date(2026, 8, 3)
+                ),
+            ]
+        )
+        self.session.commit()
+
+        result = execute_tool(
+            "get_calendar", {"year": 2026, "month": 7}, db=self.session, user_id="user-1"
+        )
+
+        parsed = json.loads(result)
+        self.assertEqual(parsed["count"], 1)
+        self.assertEqual(parsed["entries"][0]["date"], "2026-07-11")
 
     def test_get_weather_returns_conditions_for_coords(self) -> None:
         fake = AsyncMock(

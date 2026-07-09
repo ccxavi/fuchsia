@@ -16,7 +16,10 @@ from app.db.session import get_db_session
 from app.main import app
 from app.models.user import User
 from app.services.agent.openai_compat import Provider
+import datetime
+
 from app.v1.schemas import (
+    CalendarSuggestion,
     ChatMessage,
     ChatResponse,
     MemorySuggestion,
@@ -139,6 +142,8 @@ class ChatEndpointTestCase(unittest.TestCase):
         # No coordinates supplied -> weather is unavailable to the agent.
         self.assertIsNone(kwargs["latitude"])
         self.assertIsNone(kwargs["longitude"])
+        # The handler anchors the agent with the current date for scheduling.
+        self.assertEqual(kwargs["today"], datetime.date.today())
 
     def test_chat_returns_memory_suggestions(self) -> None:
         self._override_auth()
@@ -238,6 +243,34 @@ class ChatEndpointTestCase(unittest.TestCase):
                 "wardrobe_ids": ["wardrobe-1"],
                 "rationale": "Relaxed but put-together.",
             },
+        )
+
+    def test_chat_returns_calendar_suggestions(self) -> None:
+        self._override_auth()
+        completion = ChatResponse(
+            message=ChatMessage(role="assistant", content="Scheduled it."),
+            model="deepseek-chat",
+            calendar_suggestions=[
+                CalendarSuggestion(
+                    outfit_id="outfit-1",
+                    date=datetime.date(2026, 7, 11),
+                    notes="Brunch",
+                )
+            ],
+        )
+
+        with self._patch_chat(return_value=completion):
+            response = self.client.post(
+                "/api/v1/chat",
+                json={"messages": [{"role": "user", "content": "schedule it"}]},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        entries = response.json()["calendar_suggestions"]
+        self.assertEqual(len(entries), 1)
+        self.assertEqual(
+            entries[0],
+            {"outfit_id": "outfit-1", "date": "2026-07-11", "notes": "Brunch"},
         )
 
     def test_chat_propagates_upstream_error(self) -> None:

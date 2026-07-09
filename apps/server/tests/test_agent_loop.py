@@ -7,9 +7,12 @@ from unittest.mock import AsyncMock, patch
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
+import datetime
+
 from app.db.base import Base
 from app.models.clothing_item import ClothingItem
 from app.models.memory import Memory
+from app.models.outfit import Outfit
 from app.services.agent.loop import MAX_TOOL_ROUNDS, run_stylist_chat
 from app.services.agent.openai_compat import Provider
 from app.v1.schemas import ChatMessage
@@ -116,6 +119,29 @@ def _weather_tool_call_payload() -> dict:
                             "function": {
                                 "name": "get_weather",
                                 "arguments": "{}",
+                            },
+                        }
+                    ],
+                }
+            }
+        ]
+    }
+
+
+def _suggest_calendar_payload(entries: list[dict]) -> dict:
+    return {
+        "choices": [
+            {
+                "message": {
+                    "role": "assistant",
+                    "content": None,
+                    "tool_calls": [
+                        {
+                            "id": "call_cal",
+                            "type": "function",
+                            "function": {
+                                "name": "suggest_calendar_entry",
+                                "arguments": json.dumps({"entries": entries}),
                             },
                         }
                     ],
@@ -305,6 +331,56 @@ class RunStylistChatTestCase(unittest.TestCase):
         _, second_body = post_mock.call_args_list[1].args
         tool_message = next(m for m in second_body["messages"] if m["role"] == "tool")
         self.assertIn("error", tool_message["content"])
+
+    def test_collects_and_validates_calendar_suggestions(self) -> None:
+        outfit = Outfit(user_id="user-1", name="Casual Friday")
+        self.session.add(outfit)
+        self.session.commit()
+        self.session.refresh(outfit)
+
+        with patch(
+            "app.services.agent.loop.post_chat",
+            side_effect=[
+                _suggest_calendar_payload(
+                    [
+                        {"outfit_id": outfit.id, "date": "2026-07-11", "notes": "Brunch"},
+                        {"outfit_id": "not-a-real-outfit", "date": "2026-07-12"},
+                    ]
+                ),
+                _content_payload("Scheduled!"),
+            ],
+        ):
+            result = self._run()
+
+        self.assertEqual(len(result.calendar_suggestions), 1)
+        entry = result.calendar_suggestions[0]
+        self.assertEqual(entry.outfit_id, outfit.id)
+        self.assertEqual(entry.date, datetime.date(2026, 7, 11))
+        self.assertEqual(entry.notes, "Brunch")
+
+    def test_injects_current_date_into_system_prompt(self) -> None:
+        messages = [
+            ChatMessage(role="system", content="PERSONA"),
+            ChatMessage(role="user", content="what's on this week?"),
+        ]
+
+        with patch(
+            "app.services.agent.loop.post_chat",
+            return_value=_content_payload("Nothing yet."),
+        ) as post_mock:
+            run_stylist_chat(
+                messages,
+                provider=_provider(),
+                db=self.session,
+                user_id="user-1",
+                today=datetime.date(2026, 7, 9),
+            )
+
+        _, first_body = post_mock.call_args_list[0].args
+        system_message = first_body["messages"][0]
+        self.assertEqual(system_message["role"], "system")
+        self.assertIn("2026-07-09", system_message["content"])
+        self.assertIn("PERSONA", system_message["content"])
 
     def test_executes_tool_then_returns_final_answer(self) -> None:
         with patch(

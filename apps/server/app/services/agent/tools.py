@@ -4,10 +4,12 @@ import asyncio
 import json
 from typing import Any
 
-from sqlalchemy import func, select
+from sqlalchemy import extract, func, select
 from sqlalchemy.orm import Session
 
+from app.models.calendar_outfit import CalendarOutfit
 from app.models.clothing_item import ClothingItem
+from app.models.outfit import Outfit
 from app.models.wardrobe import Wardrobe
 from app.services.weather import get_current_weather
 
@@ -208,11 +210,108 @@ GET_WEATHER_TOOL: dict[str, Any] = {
     },
 }
 
+GET_OUTFITS_TOOL: dict[str, Any] = {
+    "type": "function",
+    "function": {
+        "name": "get_outfits",
+        "description": (
+            "List the user's saved outfits — curated sets of clothing items they have "
+            "put together. Use this to resolve an outfit the user names into its id, "
+            "for example before scheduling it on the calendar. Takes no arguments."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": False,
+        },
+    },
+}
+
+GET_CALENDAR_TOOL: dict[str, Any] = {
+    "type": "function",
+    "function": {
+        "name": "get_calendar",
+        "description": (
+            "List the outfits the user has scheduled on their calendar, with the date "
+            "and any notes. Use it to see what they are already planning to wear. "
+            "Optionally filter by year and/or month; omit both to list everything."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "year": {
+                    "type": "integer",
+                    "description": "Filter by year, e.g. 2026.",
+                },
+                "month": {
+                    "type": "integer",
+                    "description": "Filter by month (1-12).",
+                },
+            },
+            "additionalProperties": False,
+        },
+    },
+}
+
+SUGGEST_CALENDAR_ENTRY_TOOL: dict[str, Any] = {
+    "type": "function",
+    "function": {
+        "name": "suggest_calendar_entry",
+        "description": (
+            "Propose scheduling one or more saved outfits on specific dates. Only "
+            "schedule outfits that already exist — reference each by an 'id' from "
+            "get_outfits, never invent one. Use a concrete calendar date (YYYY-MM-DD); "
+            "resolve relative dates like 'Saturday' using the current date you were "
+            "given. This is a proposal the user confirms; call it once you have decided."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "entries": {
+                    "type": "array",
+                    "description": "The calendar entries you are proposing.",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "outfit_id": {
+                                "type": "string",
+                                "description": (
+                                    "The exact 'id' of a saved outfit, from "
+                                    "get_outfits."
+                                ),
+                            },
+                            "date": {
+                                "type": "string",
+                                "description": (
+                                    "The date to wear it, as YYYY-MM-DD."
+                                ),
+                            },
+                            "notes": {
+                                "type": "string",
+                                "description": (
+                                    "Optional short note, e.g. the occasion."
+                                ),
+                            },
+                        },
+                        "required": ["outfit_id", "date"],
+                        "additionalProperties": False,
+                    },
+                },
+            },
+            "required": ["entries"],
+            "additionalProperties": False,
+        },
+    },
+}
+
 STYLIST_TOOLS: list[dict[str, Any]] = [
     CLOTHING_ITEMS_TOOL,
     GET_WARDROBES_TOOL,
+    GET_OUTFITS_TOOL,
+    GET_CALENDAR_TOOL,
     SUGGEST_MEMORIES_TOOL,
     SUGGEST_OUTFITS_TOOL,
+    SUGGEST_CALENDAR_ENTRY_TOOL,
     GET_WEATHER_TOOL,
 ]
 
@@ -273,6 +372,56 @@ def get_wardrobes(db: Session, user_id: str) -> list[dict[str, Any]]:
     ]
 
 
+def get_outfits(db: Session, user_id: str) -> list[dict[str, Any]]:
+    """Return the user's saved outfits as model-friendly dicts."""
+    outfits = db.scalars(
+        select(Outfit).where(Outfit.user_id == user_id).limit(MAX_ITEMS)
+    ).all()
+
+    return [
+        {
+            "id": outfit.id,
+            "name": outfit.name,
+            "is_ai_generated": outfit.is_ai_generated,
+            "item_count": outfit.clothing_items_count,
+        }
+        for outfit in outfits
+    ]
+
+
+def get_calendar(
+    db: Session,
+    user_id: str,
+    *,
+    year: int | None = None,
+    month: int | None = None,
+) -> list[dict[str, Any]]:
+    """Return the user's scheduled outfits, optionally filtered by year/month."""
+    query = (
+        select(CalendarOutfit)
+        .join(CalendarOutfit.outfit)
+        .where(CalendarOutfit.user_id == user_id)
+        .order_by(CalendarOutfit.date)
+    )
+
+    if year is not None:
+        query = query.where(extract("year", CalendarOutfit.date) == year)
+    if month is not None:
+        query = query.where(extract("month", CalendarOutfit.date) == month)
+
+    entries = db.scalars(query.limit(MAX_ITEMS)).all()
+
+    return [
+        {
+            "date": entry.date.isoformat(),
+            "outfit_id": entry.outfit_id,
+            "outfit_name": entry.outfit.name,
+            "notes": entry.notes,
+        }
+        for entry in entries
+    ]
+
+
 def _weather_payload(latitude: float | None, longitude: float | None) -> dict[str, Any]:
     """Fetch current weather for the injected coordinates as a model-friendly dict.
 
@@ -315,6 +464,21 @@ def execute_tool(
     if name == "get_wardrobes":
         wardrobes = get_wardrobes(db, user_id)
         return json.dumps({"count": len(wardrobes), "wardrobes": wardrobes})
+
+    if name == "get_outfits":
+        outfits = get_outfits(db, user_id)
+        return json.dumps({"count": len(outfits), "outfits": outfits})
+
+    if name == "get_calendar":
+        year = arguments.get("year")
+        month = arguments.get("month")
+        entries = get_calendar(
+            db,
+            user_id,
+            year=year if isinstance(year, int) else None,
+            month=month if isinstance(month, int) else None,
+        )
+        return json.dumps({"count": len(entries), "entries": entries})
 
     if name != "get_clothing_items":
         return json.dumps({"error": f"Unknown tool: {name}"})
