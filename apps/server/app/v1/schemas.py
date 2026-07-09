@@ -1,7 +1,7 @@
 import datetime
 from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 MAX_CONTENT_LENGTH = 32768
 MAX_CONTENT_PARTS = 32
@@ -140,6 +140,16 @@ class ChatRequest(BaseModel):
     messages: list[ChatMessage] = Field(..., min_length=1, max_length=128)
     temperature: float = Field(default=0.7, ge=0.0, le=2.0)
     max_tokens: int = Field(default=1024, ge=16, le=8192)
+    latitude: float | None = Field(default=None, ge=-90.0, le=90.0)
+    longitude: float | None = Field(default=None, ge=-180.0, le=180.0)
+
+    @model_validator(mode="after")
+    def validate_coordinates(self) -> "ChatRequest":
+        if (self.latitude is None) != (self.longitude is None):
+            raise ValueError(
+                "latitude and longitude must be provided together"
+            )
+        return self
 
 
 class MemorySuggestion(BaseModel):
@@ -200,12 +210,51 @@ class MemoryResponse(BaseModel):
     updated_at: datetime.datetime
 
 
+class OutfitSuggestion(BaseModel):
+    name: str = Field(..., min_length=1, max_length=255)
+    clothing_item_ids: list[str] = Field(..., min_length=1)
+    wardrobe_ids: list[str] = []
+    rationale: str | None = Field(default=None, max_length=500)
+
+    @field_validator("name")
+    @classmethod
+    def validate_name(cls, value: str) -> str:
+        cleaned = value.strip()
+        if not cleaned:
+            raise ValueError("name must not be empty")
+        return cleaned
+
+    @field_validator("rationale")
+    @classmethod
+    def validate_rationale(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        cleaned = value.strip()
+        return cleaned or None
+
+
+class CalendarSuggestion(BaseModel):
+    outfit_id: str = Field(..., min_length=1)
+    date: datetime.date
+    notes: str | None = Field(default=None, max_length=500)
+
+    @field_validator("notes")
+    @classmethod
+    def validate_notes(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        cleaned = value.strip()
+        return cleaned or None
+
+
 class ChatResponse(BaseModel):
     message: ChatMessage
     model: str
     usage: dict[str, Any] | None = None
     memory_suggestions: list[MemorySuggestion] = []
     memories_used: list[MemoryResponse] = []
+    outfit_suggestions: list[OutfitSuggestion] = []
+    calendar_suggestions: list[CalendarSuggestion] = []
 
 class ClothingItemResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)

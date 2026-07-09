@@ -16,7 +16,15 @@ from app.db.session import get_db_session
 from app.main import app
 from app.models.user import User
 from app.services.agent.openai_compat import Provider
-from app.v1.schemas import ChatMessage, ChatResponse, MemorySuggestion
+import datetime
+
+from app.v1.schemas import (
+    CalendarSuggestion,
+    ChatMessage,
+    ChatResponse,
+    MemorySuggestion,
+    OutfitSuggestion,
+)
 
 _TEXT_PROVIDER = Provider(
     name="DeepSeek",
@@ -131,6 +139,11 @@ class ChatEndpointTestCase(unittest.TestCase):
         self.assertEqual(kwargs["temperature"], 0.5)
         self.assertEqual(kwargs["max_tokens"], 1024)
         self.assertEqual(kwargs["user_id"], _authenticated_user().user.id)
+        # No coordinates supplied -> weather is unavailable to the agent.
+        self.assertIsNone(kwargs["latitude"])
+        self.assertIsNone(kwargs["longitude"])
+        # The handler anchors the agent with the current date for scheduling.
+        self.assertEqual(kwargs["today"], datetime.date.today())
 
     def test_chat_returns_memory_suggestions(self) -> None:
         self._override_auth()
@@ -152,6 +165,113 @@ class ChatEndpointTestCase(unittest.TestCase):
         suggestions = response.json()["memory_suggestions"]
         self.assertEqual(len(suggestions), 1)
         self.assertEqual(suggestions[0], {"content": "Never wears heels", "category": "preference"})
+
+    def test_chat_forwards_coordinates(self) -> None:
+        self._override_auth()
+
+        with self._patch_chat(return_value=_completion()) as run_mock:
+            response = self.client.post(
+                "/api/v1/chat",
+                json={
+                    "messages": [{"role": "user", "content": "what should I wear?"}],
+                    "latitude": 14.6,
+                    "longitude": 121.0,
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        _, kwargs = run_mock.call_args
+        self.assertEqual(kwargs["latitude"], 14.6)
+        self.assertEqual(kwargs["longitude"], 121.0)
+
+    def test_chat_rejects_out_of_range_coordinates(self) -> None:
+        self._override_auth()
+
+        response = self.client.post(
+            "/api/v1/chat",
+            json={
+                "messages": [{"role": "user", "content": "hi"}],
+                "latitude": 200.0,
+                "longitude": 0.0,
+            },
+        )
+
+        self.assertEqual(response.status_code, 422)
+
+    def test_chat_rejects_partial_coordinates(self) -> None:
+        self._override_auth()
+
+        response = self.client.post(
+            "/api/v1/chat",
+            json={
+                "messages": [{"role": "user", "content": "hi"}],
+                "latitude": 14.6,
+            },
+        )
+
+        self.assertEqual(response.status_code, 422)
+
+    def test_chat_returns_outfit_suggestions(self) -> None:
+        self._override_auth()
+        completion = ChatResponse(
+            message=ChatMessage(role="assistant", content="Try this look."),
+            model="deepseek-chat",
+            outfit_suggestions=[
+                OutfitSuggestion(
+                    name="Casual Friday",
+                    clothing_item_ids=["item-1", "item-2"],
+                    wardrobe_ids=["wardrobe-1"],
+                    rationale="Relaxed but put-together.",
+                )
+            ],
+        )
+
+        with self._patch_chat(return_value=completion):
+            response = self.client.post(
+                "/api/v1/chat",
+                json={"messages": [{"role": "user", "content": "build me an outfit"}]},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        outfits = response.json()["outfit_suggestions"]
+        self.assertEqual(len(outfits), 1)
+        self.assertEqual(
+            outfits[0],
+            {
+                "name": "Casual Friday",
+                "clothing_item_ids": ["item-1", "item-2"],
+                "wardrobe_ids": ["wardrobe-1"],
+                "rationale": "Relaxed but put-together.",
+            },
+        )
+
+    def test_chat_returns_calendar_suggestions(self) -> None:
+        self._override_auth()
+        completion = ChatResponse(
+            message=ChatMessage(role="assistant", content="Scheduled it."),
+            model="deepseek-chat",
+            calendar_suggestions=[
+                CalendarSuggestion(
+                    outfit_id="outfit-1",
+                    date=datetime.date(2026, 7, 11),
+                    notes="Brunch",
+                )
+            ],
+        )
+
+        with self._patch_chat(return_value=completion):
+            response = self.client.post(
+                "/api/v1/chat",
+                json={"messages": [{"role": "user", "content": "schedule it"}]},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        entries = response.json()["calendar_suggestions"]
+        self.assertEqual(len(entries), 1)
+        self.assertEqual(
+            entries[0],
+            {"outfit_id": "outfit-1", "date": "2026-07-11", "notes": "Brunch"},
+        )
 
     def test_chat_propagates_upstream_error(self) -> None:
         self._override_auth()

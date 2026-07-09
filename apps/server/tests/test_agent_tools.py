@@ -2,13 +2,25 @@ from __future__ import annotations
 
 import json
 import unittest
+from unittest.mock import AsyncMock, patch
 
-from sqlalchemy import create_engine
+from fastapi import HTTPException
+from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
 
+import datetime
+
 from app.db.base import Base
+from app.models.calendar_outfit import CalendarOutfit
 from app.models.clothing_item import ClothingItem
-from app.services.agent.tools import STYLIST_TOOLS, execute_tool, get_clothing_items
+from app.models.outfit import Outfit
+from app.models.wardrobe import Wardrobe
+from app.services.agent.tools import (
+    STYLIST_TOOLS,
+    execute_tool,
+    get_clothing_items,
+    get_wardrobes,
+)
 
 
 class StylistToolsTestCase(unittest.TestCase):
@@ -105,10 +117,27 @@ class StylistToolsTestCase(unittest.TestCase):
         self.assertEqual(parsed["count"], 1)
         self.assertEqual(parsed["items"][0]["name"], "Blue jeans")
 
-    def test_advertised_tools_include_wardrobe_and_memory(self) -> None:
+    def test_advertised_tools_cover_the_stylist_capabilities(self) -> None:
         names = {tool["function"]["name"] for tool in STYLIST_TOOLS}
 
-        self.assertEqual(names, {"get_clothing_items", "suggest_memories"})
+        self.assertEqual(
+            names,
+            {
+                "get_clothing_items",
+                "get_wardrobes",
+                "get_outfits",
+                "get_calendar",
+                "suggest_memories",
+                "suggest_outfits",
+                "suggest_calendar_entry",
+                "get_weather",
+            },
+        )
+
+    def test_items_include_id_so_outfits_can_reference_them(self) -> None:
+        items = get_clothing_items(self.session, "user-1")
+
+        self.assertTrue(all(isinstance(item["id"], str) and item["id"] for item in items))
 
     def test_empty_wardrobe_returns_empty(self) -> None:
         result = execute_tool(
@@ -118,6 +147,180 @@ class StylistToolsTestCase(unittest.TestCase):
         parsed = json.loads(result)
         self.assertEqual(parsed["count"], 0)
         self.assertEqual(parsed["items"], [])
+
+    def _seed_wardrobe(self) -> Wardrobe:
+        """Create a 'Summer' wardrobe for user-1 holding only the white tee."""
+        tee = self.session.scalar(
+            select(ClothingItem).where(ClothingItem.name == "White tee")
+        )
+        wardrobe = Wardrobe(user_id="user-1", name="Summer")
+        wardrobe.clothing_items.append(tee)
+        self.session.add(wardrobe)
+        self.session.commit()
+        self.session.refresh(wardrobe)
+        return wardrobe
+
+    def test_wardrobe_filter_returns_only_that_wardrobes_items(self) -> None:
+        wardrobe = self._seed_wardrobe()
+
+        items = get_clothing_items(self.session, "user-1", wardrobe_id=wardrobe.id)
+
+        self.assertEqual([item["name"] for item in items], ["White tee"])
+
+    def test_wardrobe_filter_is_scoped_to_the_user(self) -> None:
+        wardrobe = self._seed_wardrobe()
+
+        # Another user cannot read items via someone else's wardrobe id.
+        items = get_clothing_items(self.session, "user-2", wardrobe_id=wardrobe.id)
+
+        self.assertEqual(items, [])
+
+    def test_get_wardrobes_lists_users_wardrobes_with_counts(self) -> None:
+        self._seed_wardrobe()
+
+        wardrobes = get_wardrobes(self.session, "user-1")
+
+        self.assertEqual(len(wardrobes), 1)
+        self.assertEqual(wardrobes[0]["name"], "Summer")
+        self.assertEqual(wardrobes[0]["item_count"], 1)
+        self.assertIsInstance(wardrobes[0]["id"], str)
+
+    def test_execute_tool_get_wardrobes_returns_json_payload(self) -> None:
+        self._seed_wardrobe()
+
+        result = execute_tool(
+            "get_wardrobes", {}, db=self.session, user_id="user-1"
+        )
+
+        parsed = json.loads(result)
+        self.assertEqual(parsed["count"], 1)
+        self.assertEqual(parsed["wardrobes"][0]["name"], "Summer")
+
+    def test_execute_tool_clothing_items_forwards_wardrobe_id(self) -> None:
+        wardrobe = self._seed_wardrobe()
+
+        result = execute_tool(
+            "get_clothing_items",
+            {"wardrobe_id": wardrobe.id},
+            db=self.session,
+            user_id="user-1",
+        )
+
+        parsed = json.loads(result)
+        self.assertEqual(parsed["count"], 1)
+        self.assertEqual(parsed["items"][0]["name"], "White tee")
+
+    def _seed_outfit(self, *, user_id: str = "user-1", name: str = "Casual Friday") -> Outfit:
+        outfit = Outfit(user_id=user_id, name=name)
+        self.session.add(outfit)
+        self.session.commit()
+        self.session.refresh(outfit)
+        return outfit
+
+    def test_execute_tool_get_outfits_returns_users_outfits(self) -> None:
+        self._seed_outfit()
+        self._seed_outfit(user_id="user-2", name="Not yours")
+
+        result = execute_tool("get_outfits", {}, db=self.session, user_id="user-1")
+
+        parsed = json.loads(result)
+        self.assertEqual(parsed["count"], 1)
+        self.assertEqual(parsed["outfits"][0]["name"], "Casual Friday")
+
+    def test_execute_tool_get_calendar_returns_scheduled_outfits(self) -> None:
+        outfit = self._seed_outfit()
+        self.session.add(
+            CalendarOutfit(
+                user_id="user-1",
+                outfit_id=outfit.id,
+                date=datetime.date(2026, 7, 11),
+                notes="Brunch",
+            )
+        )
+        self.session.commit()
+
+        result = execute_tool("get_calendar", {}, db=self.session, user_id="user-1")
+
+        parsed = json.loads(result)
+        self.assertEqual(parsed["count"], 1)
+        entry = parsed["entries"][0]
+        self.assertEqual(entry["date"], "2026-07-11")
+        self.assertEqual(entry["outfit_id"], outfit.id)
+        self.assertEqual(entry["outfit_name"], "Casual Friday")
+        self.assertEqual(entry["notes"], "Brunch")
+
+    def test_execute_tool_get_calendar_month_filter(self) -> None:
+        outfit = self._seed_outfit()
+        self.session.add_all(
+            [
+                CalendarOutfit(
+                    user_id="user-1", outfit_id=outfit.id, date=datetime.date(2026, 7, 11)
+                ),
+                CalendarOutfit(
+                    user_id="user-1", outfit_id=outfit.id, date=datetime.date(2026, 8, 3)
+                ),
+            ]
+        )
+        self.session.commit()
+
+        result = execute_tool(
+            "get_calendar", {"year": 2026, "month": 7}, db=self.session, user_id="user-1"
+        )
+
+        parsed = json.loads(result)
+        self.assertEqual(parsed["count"], 1)
+        self.assertEqual(parsed["entries"][0]["date"], "2026-07-11")
+
+    def test_get_weather_returns_conditions_for_coords(self) -> None:
+        fake = AsyncMock(
+            return_value={
+                "temperature": 21.5,
+                "description": "Light Rain",
+                "icon_url": "https://example.test/icon.png",
+                "city": "Manila",
+            }
+        )
+        with patch("app.services.agent.tools.get_current_weather", new=fake):
+            result = execute_tool(
+                "get_weather",
+                {},
+                db=self.session,
+                user_id="user-1",
+                latitude=14.6,
+                longitude=121.0,
+            )
+
+        fake.assert_awaited_once_with(14.6, 121.0)
+        parsed = json.loads(result)
+        self.assertEqual(parsed["temperature_c"], 21.5)
+        self.assertEqual(parsed["description"], "Light Rain")
+        self.assertEqual(parsed["city"], "Manila")
+
+    def test_get_weather_without_coords_returns_error(self) -> None:
+        result = execute_tool(
+            "get_weather", {}, db=self.session, user_id="user-1"
+        )
+
+        parsed = json.loads(result)
+        self.assertIn("error", parsed)
+
+    def test_get_weather_swallows_service_errors(self) -> None:
+        fake = AsyncMock(
+            side_effect=HTTPException(status_code=503, detail="down")
+        )
+        with patch("app.services.agent.tools.get_current_weather", new=fake):
+            result = execute_tool(
+                "get_weather",
+                {},
+                db=self.session,
+                user_id="user-1",
+                latitude=14.6,
+                longitude=121.0,
+            )
+
+        # Never raises; the failure is a readable error payload for the model.
+        parsed = json.loads(result)
+        self.assertIn("error", parsed)
 
 
 if __name__ == "__main__":

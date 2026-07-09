@@ -1,13 +1,22 @@
 from __future__ import annotations
 
+import datetime
 import json
 from typing import Any
 
 from sqlalchemy.orm import Session
 
+from app.services.agent.calendar import (
+    _parse_calendar_suggestions,
+    filter_valid_calendar_suggestions,
+)
 from app.services.agent.memory import (
     _parse_suggestions,
     drop_stored_suggestions,
+)
+from app.services.agent.outfits import (
+    _parse_outfit_suggestions,
+    filter_valid_outfit_suggestions,
 )
 from app.services.agent.openai_compat import (
     Provider,
@@ -24,7 +33,14 @@ from app.services.agent.recall import (
 )
 from app.services.agent.tools import STYLIST_TOOLS, execute_tool
 from app.models.memory import Memory
-from app.v1.schemas import ChatMessage, ChatResponse, MemoryResponse, MemorySuggestion
+from app.v1.schemas import (
+    CalendarSuggestion,
+    ChatMessage,
+    ChatResponse,
+    MemoryResponse,
+    MemorySuggestion,
+    OutfitSuggestion,
+)
 
 MAX_TOOL_ROUNDS = 4
 
@@ -64,6 +80,24 @@ def _inject_memory_context(
     return memories
 
 
+def _inject_current_date(
+    serialized: list[dict[str, Any]], today: datetime.date | None
+) -> None:
+    """Fold the current date into the system prompt, in place.
+
+    Gives the model an anchor for resolving relative dates like "Saturday" or
+    "this week" when scheduling. A no-op when no date is provided or there is no
+    leading system message.
+    """
+    if today is None:
+        return
+    if not serialized or serialized[0].get("role") != "system":
+        return
+
+    line = f"The current date is {today:%A, %Y-%m-%d}."
+    serialized[0]["content"] = f"{serialized[0]['content']}\n\n{line}"
+
+
 def _dedupe_suggestions(
     suggestions: list[MemorySuggestion],
 ) -> list[MemorySuggestion]:
@@ -95,6 +129,10 @@ def _run_tool_call(
     db: Session,
     user_id: str,
     suggestions: list[MemorySuggestion],
+    outfit_suggestions: list[OutfitSuggestion],
+    calendar_suggestions: list[CalendarSuggestion],
+    latitude: float | None,
+    longitude: float | None,
 ) -> dict[str, Any]:
     function = tool_call.get("function") or {}
     name = function.get("name") or ""
@@ -106,9 +144,30 @@ def _run_tool_call(
         parsed = _parse_suggestions(raw if isinstance(raw, str) else "")
         suggestions.extend(parsed)
         content = json.dumps({"status": "noted", "count": len(parsed)})
+    elif name == "suggest_outfits":
+        # Output-only tool: record the proposed outfits and acknowledge. Item ids
+        # are validated against the user's wardrobe after the loop finishes.
+        raw = function.get("arguments")
+        parsed_outfits = _parse_outfit_suggestions(raw if isinstance(raw, str) else "")
+        outfit_suggestions.extend(parsed_outfits)
+        content = json.dumps({"status": "noted", "count": len(parsed_outfits)})
+    elif name == "suggest_calendar_entry":
+        # Output-only tool: record the proposed calendar entries and acknowledge.
+        # Outfit ids are validated against the user's outfits after the loop.
+        raw = function.get("arguments")
+        parsed_entries = _parse_calendar_suggestions(raw if isinstance(raw, str) else "")
+        calendar_suggestions.extend(parsed_entries)
+        content = json.dumps({"status": "noted", "count": len(parsed_entries)})
     else:
         arguments = _parse_arguments(function.get("arguments"))
-        content = execute_tool(name, arguments, db=db, user_id=user_id)
+        content = execute_tool(
+            name,
+            arguments,
+            db=db,
+            user_id=user_id,
+            latitude=latitude,
+            longitude=longitude,
+        )
 
     return {
         "role": "tool",
@@ -126,6 +185,10 @@ def _generate_answer(
     temperature: float | None,
     max_tokens: int | None,
     suggestions: list[MemorySuggestion],
+    outfit_suggestions: list[OutfitSuggestion],
+    calendar_suggestions: list[CalendarSuggestion],
+    latitude: float | None,
+    longitude: float | None,
 ) -> ChatResponse:
     """Run the tool loop and return the model's final text answer.
 
@@ -158,7 +221,14 @@ def _generate_answer(
         for tool_call in tool_calls:
             serialized.append(
                 _run_tool_call(
-                    tool_call, db=db, user_id=user_id, suggestions=suggestions
+                    tool_call,
+                    db=db,
+                    user_id=user_id,
+                    suggestions=suggestions,
+                    outfit_suggestions=outfit_suggestions,
+                    calendar_suggestions=calendar_suggestions,
+                    latitude=latitude,
+                    longitude=longitude,
                 )
             )
 
@@ -182,20 +252,29 @@ def run_stylist_chat(
     user_id: str,
     temperature: float | None = None,
     max_tokens: int | None = None,
+    latitude: float | None = None,
+    longitude: float | None = None,
+    today: datetime.date | None = None,
 ) -> ChatResponse:
-    """Generate the stylist's answer, collecting any memory suggestions it makes.
+    """Generate the stylist's answer, collecting any suggestions it makes.
 
     The answer is produced by the tool loop; within that same loop the model may
-    call the ``suggest_memories`` tool to propose durable facts worth remembering.
-    Because the loop's context already includes the user's relevant remembered
-    facts (see :func:`_inject_memory_context`), the model avoids re-proposing what
-    it already knows; ``drop_stored_suggestions`` is a final exact-match backstop.
+    call the output-only ``suggest_memories``, ``suggest_outfits``, and
+    ``suggest_calendar_entry`` tools to propose facts, outfits, and scheduled
+    outfits. Because the loop's context already includes the user's relevant
+    remembered facts (see :func:`_inject_memory_context`), the model avoids
+    re-proposing what it already knows; ``drop_stored_suggestions`` is a final
+    exact-match backstop. Proposed outfit and calendar ids are validated against
+    the user's own records before they are surfaced.
     """
     serialized = serialize_messages(messages, flatten=provider.flatten_content)
     used_memories = _inject_memory_context(
         serialized, messages, db=db, user_id=user_id
     )
+    _inject_current_date(serialized, today)
     suggestions: list[MemorySuggestion] = []
+    outfit_suggestions: list[OutfitSuggestion] = []
+    calendar_suggestions: list[CalendarSuggestion] = []
     response = _generate_answer(
         serialized,
         provider=provider,
@@ -204,9 +283,19 @@ def run_stylist_chat(
         temperature=temperature,
         max_tokens=max_tokens,
         suggestions=suggestions,
+        outfit_suggestions=outfit_suggestions,
+        calendar_suggestions=calendar_suggestions,
+        latitude=latitude,
+        longitude=longitude,
     )
     suggestions = drop_stored_suggestions(
         db, user_id, _dedupe_suggestions(suggestions)
+    )
+    outfit_suggestions = filter_valid_outfit_suggestions(
+        db, user_id, outfit_suggestions
+    )
+    calendar_suggestions = filter_valid_calendar_suggestions(
+        db, user_id, calendar_suggestions
     )
     return response.model_copy(
         update={
@@ -214,5 +303,7 @@ def run_stylist_chat(
             "memories_used": [
                 MemoryResponse.model_validate(memory) for memory in used_memories
             ],
+            "outfit_suggestions": outfit_suggestions,
+            "calendar_suggestions": calendar_suggestions,
         }
     )

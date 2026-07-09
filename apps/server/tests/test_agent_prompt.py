@@ -6,6 +6,23 @@ from app.services.agent.prompt import STYLIST_SYSTEM_PROMPT, build_stylist_messa
 from app.v1.schemas import ChatMessage
 
 
+class StylistSystemPromptTestCase(unittest.TestCase):
+    def test_mentions_outfit_building_tool(self) -> None:
+        self.assertIn("suggest_outfits", STYLIST_SYSTEM_PROMPT)
+
+    def test_notes_that_proposing_is_not_saving(self) -> None:
+        self.assertIn("not saving", STYLIST_SYSTEM_PROMPT)
+
+    def test_mentions_weather_tool(self) -> None:
+        self.assertIn("get_weather", STYLIST_SYSTEM_PROMPT)
+
+    def test_mentions_wardrobes_tool(self) -> None:
+        self.assertIn("get_wardrobes", STYLIST_SYSTEM_PROMPT)
+
+    def test_mentions_calendar_tool(self) -> None:
+        self.assertIn("get_calendar", STYLIST_SYSTEM_PROMPT)
+
+
 class BuildStylistMessagesTestCase(unittest.TestCase):
     def test_prepends_system_prompt_and_preserves_order(self) -> None:
         original = [

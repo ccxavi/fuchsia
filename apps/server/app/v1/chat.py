@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends
@@ -51,4 +52,7 @@ def chat(
         user_id=authenticated_user.user.id,
         temperature=payload.temperature,
         max_tokens=payload.max_tokens,
+        latitude=payload.latitude,
+        longitude=payload.longitude,
+        today=datetime.date.today(),
     )

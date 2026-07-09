@@ -2,14 +2,17 @@ from __future__ import annotations
 
 import json
 import unittest
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
+import datetime
+
 from app.db.base import Base
 from app.models.clothing_item import ClothingItem
 from app.models.memory import Memory
+from app.models.outfit import Outfit
 from app.services.agent.loop import MAX_TOOL_ROUNDS, run_stylist_chat
 from app.services.agent.openai_compat import Provider
 from app.v1.schemas import ChatMessage
@@ -79,15 +82,85 @@ def _suggest_memories_payload(memories: list[dict]) -> dict:
     }
 
 
+def _suggest_outfits_payload(outfits: list[dict]) -> dict:
+    return {
+        "choices": [
+            {
+                "message": {
+                    "role": "assistant",
+                    "content": None,
+                    "tool_calls": [
+                        {
+                            "id": "call_fit",
+                            "type": "function",
+                            "function": {
+                                "name": "suggest_outfits",
+                                "arguments": json.dumps({"outfits": outfits}),
+                            },
+                        }
+                    ],
+                }
+            }
+        ]
+    }
+
+
+def _weather_tool_call_payload() -> dict:
+    return {
+        "choices": [
+            {
+                "message": {
+                    "role": "assistant",
+                    "content": None,
+                    "tool_calls": [
+                        {
+                            "id": "call_weather",
+                            "type": "function",
+                            "function": {
+                                "name": "get_weather",
+                                "arguments": "{}",
+                            },
+                        }
+                    ],
+                }
+            }
+        ]
+    }
+
+
+def _suggest_calendar_payload(entries: list[dict]) -> dict:
+    return {
+        "choices": [
+            {
+                "message": {
+                    "role": "assistant",
+                    "content": None,
+                    "tool_calls": [
+                        {
+                            "id": "call_cal",
+                            "type": "function",
+                            "function": {
+                                "name": "suggest_calendar_entry",
+                                "arguments": json.dumps({"entries": entries}),
+                            },
+                        }
+                    ],
+                }
+            }
+        ]
+    }
+
+
 class RunStylistChatTestCase(unittest.TestCase):
     def setUp(self) -> None:
         self.engine = create_engine("sqlite:///:memory:")
         Base.metadata.create_all(self.engine)
         self.session = Session(bind=self.engine)
-        self.session.add(
-            ClothingItem(user_id="user-1", name="Blue jeans", category="Bottoms")
-        )
+        jeans = ClothingItem(user_id="user-1", name="Blue jeans", category="Bottoms")
+        self.session.add(jeans)
         self.session.commit()
+        self.session.refresh(jeans)
+        self.item_id = jeans.id
         # RAG retrieval is exercised in test_agent_recall.py; default it to a miss
         # so the answer-generation loop stays isolated and post_chat counts exact.
         recall_patcher = patch(
@@ -161,6 +234,153 @@ class RunStylistChatTestCase(unittest.TestCase):
         self.assertEqual(
             [s.content for s in result.memory_suggestions], ["Loves linen"]
         )
+
+    def test_collects_and_validates_outfit_suggestions(self) -> None:
+        # The model proposes an outfit citing one real item id and one bogus id,
+        # then answers. The validator keeps only the item the user owns.
+        with patch(
+            "app.services.agent.loop.post_chat",
+            side_effect=[
+                _suggest_outfits_payload(
+                    [
+                        {
+                            "name": "Casual Friday",
+                            "clothing_item_ids": [self.item_id, "not-a-real-id"],
+                            "rationale": "Easy and comfortable.",
+                        }
+                    ]
+                ),
+                _content_payload("Here's a casual look."),
+            ],
+        ):
+            result = self._run()
+
+        self.assertEqual(result.message.content, "Here's a casual look.")
+        self.assertEqual(len(result.outfit_suggestions), 1)
+        suggestion = result.outfit_suggestions[0]
+        self.assertEqual(suggestion.name, "Casual Friday")
+        self.assertEqual(suggestion.clothing_item_ids, [self.item_id])
+        self.assertEqual(suggestion.rationale, "Easy and comfortable.")
+
+    def test_drops_outfit_suggestions_with_no_owned_items(self) -> None:
+        with patch(
+            "app.services.agent.loop.post_chat",
+            side_effect=[
+                _suggest_outfits_payload(
+                    [{"name": "Imaginary", "clothing_item_ids": ["ghost-1"]}]
+                ),
+                _content_payload("Let me know what you own."),
+            ],
+        ):
+            result = self._run()
+
+        self.assertEqual(result.outfit_suggestions, [])
+
+    def test_weather_tool_uses_request_coordinates(self) -> None:
+        fake_weather = AsyncMock(
+            return_value={
+                "temperature": 12.0,
+                "description": "Cloudy",
+                "icon_url": "https://example.test/i.png",
+                "city": "Baguio",
+            }
+        )
+        with patch(
+            "app.services.agent.tools.get_current_weather", new=fake_weather
+        ), patch(
+            "app.services.agent.loop.post_chat",
+            side_effect=[
+                _weather_tool_call_payload(),
+                _content_payload("Bring a light jacket."),
+            ],
+        ) as post_mock:
+            result = run_stylist_chat(
+                [ChatMessage(role="user", content="what should I wear today?")],
+                provider=_provider(),
+                db=self.session,
+                user_id="user-1",
+                latitude=16.4,
+                longitude=120.6,
+            )
+
+        self.assertEqual(result.message.content, "Bring a light jacket.")
+        # Coordinates from the request reach the weather service.
+        fake_weather.assert_awaited_once_with(16.4, 120.6)
+
+        # The weather result is fed back to the model in the next round.
+        _, second_body = post_mock.call_args_list[1].args
+        tool_message = next(m for m in second_body["messages"] if m["role"] == "tool")
+        self.assertEqual(tool_message["tool_call_id"], "call_weather")
+        self.assertIn("Cloudy", tool_message["content"])
+
+    def test_weather_tool_without_coordinates_returns_error_to_model(self) -> None:
+        with patch(
+            "app.services.agent.tools.get_current_weather"
+        ) as fake_weather, patch(
+            "app.services.agent.loop.post_chat",
+            side_effect=[
+                _weather_tool_call_payload(),
+                _content_payload("Where are you based?"),
+            ],
+        ) as post_mock:
+            # No latitude/longitude passed -> default None.
+            result = self._run()
+
+        self.assertEqual(result.message.content, "Where are you based?")
+        fake_weather.assert_not_called()
+        _, second_body = post_mock.call_args_list[1].args
+        tool_message = next(m for m in second_body["messages"] if m["role"] == "tool")
+        self.assertIn("error", tool_message["content"])
+
+    def test_collects_and_validates_calendar_suggestions(self) -> None:
+        outfit = Outfit(user_id="user-1", name="Casual Friday")
+        self.session.add(outfit)
+        self.session.commit()
+        self.session.refresh(outfit)
+
+        with patch(
+            "app.services.agent.loop.post_chat",
+            side_effect=[
+                _suggest_calendar_payload(
+                    [
+                        {"outfit_id": outfit.id, "date": "2026-07-11", "notes": "Brunch"},
+                        {"outfit_id": "not-a-real-outfit", "date": "2026-07-12"},
+                    ]
+                ),
+                _content_payload("Scheduled!"),
+            ],
+        ):
+            result = self._run()
+
+        self.assertEqual(len(result.calendar_suggestions), 1)
+        entry = result.calendar_suggestions[0]
+        self.assertEqual(entry.outfit_id, outfit.id)
+        self.assertEqual(entry.date, datetime.date(2026, 7, 11))
+        self.assertEqual(entry.notes, "Brunch")
+
+    def test_injects_current_date_into_system_prompt(self) -> None:
+        messages = [
+            ChatMessage(role="system", content="PERSONA"),
+            ChatMessage(role="user", content="what's on this week?"),
+        ]
+
+        with patch(
+            "app.services.agent.loop.post_chat",
+            return_value=_content_payload("Nothing yet."),
+        ) as post_mock:
+            run_stylist_chat(
+                messages,
+                provider=_provider(),
+                db=self.session,
+                user_id="user-1",
+                today=datetime.date(2026, 7, 9),
+            )
+
+        _, first_body = post_mock.call_args_list[0].args
+        system_message = first_body["messages"][0]
+        self.assertEqual(system_message["role"], "system")
+        self.assertIn("2026-07-09", system_message["content"])
+        self.assertIn("PERSONA", system_message["content"])
 
     def test_executes_tool_then_returns_final_answer(self) -> None:
         with patch(
