@@ -228,11 +228,48 @@ export default function CalendarScreen() {
                 const dateStr = `${currentMonth.getFullYear()}-${String(currentMonth.getMonth() + 1).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
                 const isToday = dateStr === todayStr;
                 const scheduledOutfits = outfitsByDate[dateStr] || [];
-                const firstCalendarOutfit = scheduledOutfits.length > 0 ? scheduledOutfits[0] : null;
-                const outfit = firstCalendarOutfit ? firstCalendarOutfit.outfit : null;
 
-                if (outfit) {
-                  const items = (outfit.clothing_items || []).filter(item => item.image_url);
+                if (scheduledOutfits.length > 0) {
+                  // Helper to get the images to show for an outfit
+                  const getOutfitImages = (outfit: any): string[] => {
+                    if (outfit.images && outfit.images.length > 0) return [outfit.images[0].image_url];
+                    if (outfit.image_url) return [outfit.image_url];
+                    const items = (outfit.clothing_items || []).filter((item: any) => item.image_url);
+                    return items.map((item: any) => item.image_url);
+                  };
+
+                  let displayImages: string[][] = scheduledOutfits.map(co => getOutfitImages(co.outfit)).filter(imgs => imgs.length > 0);
+
+                  // Take up to 4 outfit slots for the grid
+                  const imagesToShow = displayImages.slice(0, 4);
+
+                  const renderGridItem = (images: string[], style: any, index: number) => {
+                    if (images.length === 0) return <View key={`empty-${index}`} style={[style, { backgroundColor: FuchsiaColors.mist }]} />;
+                    if (images.length === 1) return <Image key={`img-${index}`} source={{ uri: images[0] }} style={style} contentFit="cover" />;
+                    
+                    // Mini grid
+                    return (
+                      <View key={`grid-${index}`} style={[style, styles.collageGrid]}>
+                        {images.length === 2 && (
+                          <>
+                            <Image source={{ uri: images[0] }} style={styles.collageHalf} contentFit="cover" />
+                            <Image source={{ uri: images[1] }} style={styles.collageHalf} contentFit="cover" />
+                          </>
+                        )}
+                        {images.length >= 3 && (
+                          <>
+                            <Image source={{ uri: images[0] }} style={images.length === 3 ? styles.collageTopRowSpan : styles.collageQuarter} contentFit="cover" />
+                            <Image source={{ uri: images[1] }} style={styles.collageQuarter} contentFit="cover" />
+                            <Image source={{ uri: images[2] }} style={styles.collageQuarter} contentFit="cover" />
+                            {images.length >= 4 && (
+                              <Image source={{ uri: images[3] }} style={styles.collageQuarter} contentFit="cover" />
+                            )}
+                          </>
+                        )}
+                      </View>
+                    );
+                  };
+
                   return (
                     <Pressable
                       key={dateStr}
@@ -242,26 +279,24 @@ export default function CalendarScreen() {
                         setIsDayModalVisible(true);
                       }}
                     >
-                      {outfit.image_url ? (
-                        <Image source={{ uri: outfit.image_url }} style={StyleSheet.absoluteFillObject} contentFit="cover" />
-                      ) : items.length > 0 ? (
+                      {imagesToShow.length > 0 ? (
                         <View style={styles.collageGrid}>
-                          {items.length === 1 && (
-                            <Image source={{ uri: items[0].image_url as string }} style={styles.collageFull} contentFit="cover" />
+                          {imagesToShow.length === 1 && (
+                            renderGridItem(imagesToShow[0], styles.collageFull, 0)
                           )}
-                          {items.length === 2 && (
+                          {imagesToShow.length === 2 && (
                             <>
-                              <Image source={{ uri: items[0].image_url as string }} style={styles.collageHalf} contentFit="cover" />
-                              <Image source={{ uri: items[1].image_url as string }} style={styles.collageHalf} contentFit="cover" />
+                              {renderGridItem(imagesToShow[0], styles.collageHalf, 0)}
+                              {renderGridItem(imagesToShow[1], styles.collageHalf, 1)}
                             </>
                           )}
-                          {items.length >= 3 && (
+                          {imagesToShow.length >= 3 && (
                             <>
-                              <Image source={{ uri: items[0].image_url as string }} style={items.length === 3 ? styles.collageTopRowSpan : styles.collageQuarter} contentFit="cover" />
-                              <Image source={{ uri: items[1].image_url as string }} style={styles.collageQuarter} contentFit="cover" />
-                              <Image source={{ uri: items[2].image_url as string }} style={styles.collageQuarter} contentFit="cover" />
-                              {items.length >= 4 && (
-                                <Image source={{ uri: items[3].image_url as string }} style={styles.collageQuarter} contentFit="cover" />
+                              {renderGridItem(imagesToShow[0], imagesToShow.length === 3 ? styles.collageTopRowSpan : styles.collageQuarter, 0)}
+                              {renderGridItem(imagesToShow[1], styles.collageQuarter, 1)}
+                              {renderGridItem(imagesToShow[2], styles.collageQuarter, 2)}
+                              {imagesToShow.length >= 4 && (
+                                renderGridItem(imagesToShow[3], styles.collageQuarter, 3)
                               )}
                             </>
                           )}
@@ -282,9 +317,9 @@ export default function CalendarScreen() {
                         <Text style={styles.outfitCellDayNum}>{dayNum}</Text>
                       )}
                       
-                      {scheduledOutfits.length > 1 && (
+                      {scheduledOutfits.length > 4 && (
                         <View style={styles.moreBadge}>
-                          <Text style={styles.moreBadgeText}>+{scheduledOutfits.length - 1}</Text>
+                          <Text style={styles.moreBadgeText}>+{scheduledOutfits.length - 4}</Text>
                         </View>
                       )}
                     </Pressable>
@@ -407,6 +442,8 @@ export default function CalendarScreen() {
               {(selectedDayStr ? outfitsByDate[selectedDayStr] || [] : []).map(calendarOutfit => {
                 const outfit = calendarOutfit.outfit;
                 const items = (outfit.clothing_items || []).filter(item => item.image_url);
+                const firstUploadedImage = outfit.images && outfit.images.length > 0 ? outfit.images[0].image_url : null;
+                const displayImage = firstUploadedImage || outfit.image_url;
                 const isPast = selectedDayStr ? selectedDayStr < todayStr : false;
                 
                 return (
@@ -418,8 +455,8 @@ export default function CalendarScreen() {
                         router.push(`/outfit/${outfit.id}`);
                       }}
                     >
-                      {outfit.image_url ? (
-                        <Image source={{ uri: outfit.image_url }} style={StyleSheet.absoluteFillObject} contentFit="cover" />
+                      {displayImage ? (
+                        <Image source={{ uri: displayImage }} style={StyleSheet.absoluteFillObject} contentFit="cover" />
                       ) : items.length > 0 ? (
                         <View style={styles.collageGrid}>
                           {items.length === 1 && (
