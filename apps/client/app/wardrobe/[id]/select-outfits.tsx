@@ -157,7 +157,7 @@ export default function SelectOutfitsScreen() {
       );
     }
 
-    const extraCount = items.length - 3;
+    const extraCount = items.length - 4;
     return (
       <View style={{ flex: 1 }}>
         <View style={{ flex: 1, flexDirection: 'row', borderBottomWidth: 1, borderColor: '#fff' }}>
