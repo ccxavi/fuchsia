@@ -136,7 +136,7 @@ export default function AddOrEditOutfitScreen() {
         // Schedule the outfit
         await createCalendarOutfit({
           outfit_id: finalOutfitId,
-          date: scheduledDate.toISOString().split('T')[0],
+          date: `${scheduledDate.getFullYear()}-${String(scheduledDate.getMonth() + 1).padStart(2, '0')}-${String(scheduledDate.getDate()).padStart(2, '0')}`,
         });
         DeviceEventEmitter.emit('showGlobalToast', 'Outfit scheduled successfully');
       }
