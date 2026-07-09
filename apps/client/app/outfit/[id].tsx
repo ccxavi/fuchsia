@@ -7,6 +7,7 @@ import { ArrowLeft, Edit2, Trash2, Layers, Camera, X, Check, Plus, MoreHorizonta
 import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
 import { CustomDatePicker } from '@/components/ui/CustomDatePicker';
+import { CustomAlert } from '@/components/ui/CustomAlert';
 
 import { FuchsiaColors, FuchsiaFonts } from '@/constants/theme';
 import { getOutfit, deleteOutfit, updateOutfit, deleteOutfitImage, addItemToOutfit, removeItemFromOutfit, addWardrobeToOutfit, removeWardrobeFromOutfit, createCalendarOutfit, OutfitWithWardrobesResponse } from '@/api/client';
@@ -20,10 +21,7 @@ export default function OutfitDetailScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [isDeleting, setIsDeleting] = useState(false);
   const [menuVisible, setMenuVisible] = useState(false);
-  const [deleteAlertVisible, setDeleteAlertVisible] = useState(false);
-  const [infoAlertVisible, setInfoAlertVisible] = useState(false);
   const [photoToDelete, setPhotoToDelete] = useState<string | null>(null);
-  const [isDeletingPhoto, setIsDeletingPhoto] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [focusedPhotoId, setFocusedPhotoId] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -62,7 +60,14 @@ export default function OutfitDetailScreen() {
 
   const handleDelete = () => {
     setMenuVisible(false);
-    setDeleteAlertVisible(true);
+    DeviceEventEmitter.emit('showGlobalAlert', {
+      title: 'Delete this outfit?',
+      message: 'This action cannot be undone and will permanently remove this outfit.',
+      confirmText: 'Delete',
+      cancelText: 'Keep it',
+      isDestructive: true,
+      onConfirm: confirmDelete,
+    });
   };
 
   const handleAddPhoto = async () => {
@@ -93,35 +98,51 @@ export default function OutfitDetailScreen() {
   };
 
   const confirmDelete = async () => {
-    setIsDeleting(true);
+    DeviceEventEmitter.emit('showGlobalAlert', {
+      title: 'Deleting...',
+      message: 'Please wait while we delete this outfit.',
+      isLoading: true,
+    });
     try {
       await deleteOutfit(id!);
+      DeviceEventEmitter.emit('hideGlobalAlert');
+      DeviceEventEmitter.emit('showGlobalToast', 'Outfit deleted successfully');
+      DeviceEventEmitter.emit('outfitUpdated');
       router.back();
     } catch (err) {
       console.error('Failed to delete outfit:', err);
-      setIsDeleting(false);
-      setDeleteAlertVisible(false);
+      DeviceEventEmitter.emit('hideGlobalAlert');
     }
   };
 
   const promptDeleteImage = (imageId: string) => {
     setPhotoToDelete(imageId);
+    DeviceEventEmitter.emit('showGlobalAlert', {
+      title: 'Delete this photo?',
+      message: 'Are you sure you want to remove this photo from the outfit?',
+      confirmText: 'Remove',
+      cancelText: 'Keep it',
+      isDestructive: true,
+      onConfirm: () => confirmDeletePhoto(imageId),
+    });
   };
 
-  const confirmDeletePhoto = async () => {
-    if (!photoToDelete) return;
-    setIsDeletingPhoto(true);
+  const confirmDeletePhoto = async (imageId: string) => {
+    DeviceEventEmitter.emit('showGlobalAlert', {
+      title: 'Deleting...',
+      message: 'Please wait while we remove this photo.',
+      isLoading: true,
+    });
     try {
-      await deleteOutfitImage(photoToDelete);
-      if (focusedPhotoId === photoToDelete) {
+      await deleteOutfitImage(imageId);
+      if (focusedPhotoId === imageId) {
         setFocusedPhotoId(null);
       }
       await fetchOutfit();
-      setPhotoToDelete(null);
+      DeviceEventEmitter.emit('hideGlobalAlert');
     } catch (err) {
       console.error('Failed to delete image:', err);
-    } finally {
-      setIsDeletingPhoto(false);
+      DeviceEventEmitter.emit('hideGlobalAlert');
     }
   };
 
@@ -150,7 +171,7 @@ export default function OutfitDetailScreen() {
           onPress={() => setMenuVisible(true)} 
           style={styles.headerButton}
         >
-          {isDeleting ? (
+          {isUploading ? (
             <ActivityIndicator size="small" color={FuchsiaColors.slate} />
           ) : (
             <MoreHorizontal size={18} color={FuchsiaColors.slate} />
@@ -219,98 +240,24 @@ export default function OutfitDetailScreen() {
             } catch (err: any) {
               console.error('Failed to schedule outfit:', err);
               if (err.message && err.message.includes('400')) {
-                Alert.alert('Duplicate', 'This outfit is already scheduled on that day!');
+                DeviceEventEmitter.emit('showGlobalAlert', {
+                  title: 'Duplicate',
+                  message: 'This outfit is already scheduled on that day!',
+                  confirmText: 'Got it',
+                });
               } else {
-                Alert.alert('Error', 'Failed to schedule outfit');
+                DeviceEventEmitter.emit('showGlobalAlert', {
+                  title: 'Error',
+                  message: 'Failed to schedule outfit',
+                });
               }
             }
           }
         }}
       />
 
-      {/* Photo Delete Confirmation */}
-      {photoToDelete && (
-        <View style={styles.alertOverlay}>
-          <View style={styles.alertBox}>
-            <Text style={styles.alertTitle}>Delete this photo?</Text>
-            <Text style={styles.alertMessage}>
-              Are you sure you want to remove this photo from the outfit?
-            </Text>
-            <View style={styles.alertButtonsRow}>
-              <Pressable
-                style={styles.alertCancelButton}
-                onPress={() => setPhotoToDelete(null)}
-                disabled={isDeletingPhoto}
-              >
-                <Text style={styles.alertCancelText}>Keep it</Text>
-              </Pressable>
-              <Pressable
-                style={styles.alertDeleteButton}
-                onPress={confirmDeletePhoto}
-                disabled={isDeletingPhoto}
-              >
-                {isDeletingPhoto ? (
-                  <ActivityIndicator size="small" color="#fff" />
-                ) : (
-                  <Text style={styles.alertDeleteText}>Delete</Text>
-                )}
-              </Pressable>
-            </View>
-          </View>
-        </View>
-      )}
 
-      {/* Delete Confirmation */}
-      {deleteAlertVisible && (
-        <View style={styles.alertOverlay}>
-          <View style={styles.alertBox}>
-            <Text style={styles.alertTitle}>Delete this outfit?</Text>
-            <Text style={styles.alertMessage}>
-              This action cannot be undone and will permanently remove this outfit.
-            </Text>
-            <View style={styles.alertButtonsRow}>
-              <Pressable
-                style={styles.alertCancelButton}
-                onPress={() => setDeleteAlertVisible(false)}
-                disabled={isDeleting}
-              >
-                <Text style={styles.alertCancelText}>Keep it</Text>
-              </Pressable>
-              <Pressable
-                style={styles.alertDeleteButton}
-                onPress={confirmDelete}
-                disabled={isDeleting}
-              >
-                {isDeleting ? (
-                  <ActivityIndicator size="small" color="#fff" />
-                ) : (
-                  <Text style={styles.alertDeleteText}>Delete</Text>
-                )}
-              </Pressable>
-            </View>
-          </View>
-        </View>
-      )}
 
-      {/* Info Tip Alert */}
-      {infoAlertVisible && (
-        <View style={styles.alertOverlay}>
-          <View style={styles.alertBox}>
-            <Text style={styles.alertTitle}>Managing Photos</Text>
-            <Text style={styles.alertMessage}>
-              To delete a photo, simply tap and hold on the photo you wish to remove.
-            </Text>
-            <View style={styles.alertButtonsRow}>
-              <Pressable
-                style={[styles.alertCancelButton, { backgroundColor: FuchsiaColors.vibrant, borderColor: FuchsiaColors.vibrant }]}
-                onPress={() => setInfoAlertVisible(false)}
-              >
-                <Text style={[styles.alertCancelText, { color: '#fff' }]}>Got it</Text>
-              </Pressable>
-            </View>
-          </View>
-        </View>
-      )}
 
       <ScrollView
         bounces={false}
@@ -335,7 +282,12 @@ export default function OutfitDetailScreen() {
               <Text style={[styles.cardLabel, { marginBottom: 0 }]}>MY PHOTOS</Text>
               {outfit.images && outfit.images.length > 0 && (
                 <Pressable 
-                  onPress={() => setInfoAlertVisible(true)} 
+                  onPress={() => {
+                    DeviceEventEmitter.emit('showGlobalAlert', {
+                    title: 'Managing Photos',
+                    message: 'To delete a photo, simply tap and hold on the photo you wish to remove.',
+                    confirmText: 'Got it',
+                  });}} 
                   hitSlop={8}
                 >
                   <Info size={14} color={FuchsiaColors.slate} />
@@ -630,75 +582,7 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: FuchsiaColors.cloud,
   },
-  // Alert overlay
-  alertOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(15, 23, 42, 0.4)', // FuchsiaColors.deep with opacity
-    zIndex: 200,
-    justifyContent: 'center',
-    paddingHorizontal: 32,
-  },
-  alertBox: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 24,
-    width: '100%',
-    shadowColor: FuchsiaColors.deep,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.15,
-    shadowRadius: 16,
-    elevation: 10,
-    borderWidth: 1,
-    borderColor: FuchsiaColors.mist,
-  },
-  alertTitle: {
-    fontFamily: FuchsiaFonts.heading,
-    fontSize: 22,
-    fontWeight: '600',
-    color: FuchsiaColors.ink,
-    marginBottom: 8,
-  },
-  alertMessage: {
-    fontFamily: FuchsiaFonts.body,
-    fontSize: 15,
-    color: FuchsiaColors.slate,
-    lineHeight: 22,
-    marginBottom: 24,
-  },
-  alertButtonsRow: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  alertCancelButton: {
-    flex: 1,
-    height: 48,
-    borderRadius: 12,
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: FuchsiaColors.mist,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  alertCancelText: {
-    fontFamily: FuchsiaFonts.body,
-    fontSize: 15,
-    fontWeight: '600',
-    color: FuchsiaColors.ink,
-  },
-  alertDeleteButton: {
-    flex: 1,
-    height: 48,
-    borderRadius: 12,
-    backgroundColor: '#E11D48',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  alertDeleteText: {
-    fontFamily: FuchsiaFonts.body,
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#fff',
-  },
+
   // Name section
   nameSection: {
     paddingHorizontal: 20,

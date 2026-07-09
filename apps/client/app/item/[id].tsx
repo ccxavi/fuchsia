@@ -17,7 +17,6 @@ export default function ItemDetailScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [isDeleting, setIsDeleting] = useState(false);
   const [menuVisible, setMenuVisible] = useState(false);
-  const [deleteAlertVisible, setDeleteAlertVisible] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -42,7 +41,10 @@ export default function ItemDetailScreen() {
       setItem(data);
     } catch (err) {
       console.error('Failed to fetch item details:', err);
-      Alert.alert('Error', 'Failed to load item details.');
+      DeviceEventEmitter.emit('showGlobalAlert', {
+        title: 'Error',
+        message: 'Failed to load item details.',
+      });
       router.back();
     } finally {
       setIsLoading(false);
@@ -50,19 +52,35 @@ export default function ItemDetailScreen() {
   };
 
   const handleDelete = () => {
-    setDeleteAlertVisible(true);
+    setMenuVisible(false);
+    DeviceEventEmitter.emit('showGlobalAlert', {
+      title: 'Delete this item?',
+      message: 'This action cannot be undone and will permanently remove this item from your closet.',
+      confirmText: 'Delete',
+      cancelText: 'Keep it',
+      isDestructive: true,
+      onConfirm: confirmDelete,
+    });
   };
 
   const confirmDelete = async () => {
-    setIsDeleting(true);
+    DeviceEventEmitter.emit('showGlobalAlert', {
+      title: 'Deleting...',
+      message: 'Please wait while we delete this item.',
+      isLoading: true,
+    });
     try {
       await deleteClothingItem(id!);
+      DeviceEventEmitter.emit('hideGlobalAlert');
+      DeviceEventEmitter.emit('showGlobalToast', 'Item deleted successfully');
       router.back();
     } catch (err) {
       console.error('Failed to delete item:', err);
-      Alert.alert('Error', 'Could not delete the item. Please try again.');
-      setIsDeleting(false);
-      setDeleteAlertVisible(false);
+      DeviceEventEmitter.emit('hideGlobalAlert');
+      DeviceEventEmitter.emit('showGlobalAlert', {
+        title: 'Error',
+        message: 'Could not delete the item. Please try again.',
+      });
     }
   };
 
@@ -127,34 +145,6 @@ export default function ItemDetailScreen() {
             <Trash2 size={16} color="#E11D48" />
             <Text style={[styles.dropdownItemText, { color: '#E11D48' }]}>Delete Item</Text>
           </Pressable>
-        </View>
-      )}
-
-      {/* Custom Delete Confirmation Alert */}
-      {deleteAlertVisible && (
-        <View style={styles.alertOverlay}>
-          <View style={styles.alertBox}>
-            <Text style={styles.alertTitle}>Delete this item?</Text>
-            <Text style={styles.alertMessage}>
-              This action cannot be undone and will permanently remove this item from your closet.
-            </Text>
-            <View style={styles.alertButtonsRow}>
-              <Pressable 
-                style={styles.alertCancelButton} 
-                onPress={() => setDeleteAlertVisible(false)}
-                disabled={isDeleting}
-              >
-                <Text style={styles.alertCancelText}>Keep it</Text>
-              </Pressable>
-              <Pressable 
-                style={styles.alertDeleteButton} 
-                onPress={confirmDelete}
-                disabled={isDeleting}
-              >
-                {isDeleting ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.alertDeleteText}>Delete</Text>}
-              </Pressable>
-            </View>
-          </View>
         </View>
       )}
 

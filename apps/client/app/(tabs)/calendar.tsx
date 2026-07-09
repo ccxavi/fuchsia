@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator, useWindowDimensions, Modal, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator, useWindowDimensions, Modal, Alert, DeviceEventEmitter } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useState } from 'react';
 import { router, useFocusEffect } from 'expo-router';
@@ -11,6 +11,7 @@ import { ThemedText } from '@/components/themed-text';
 import { FuchsiaColors, FuchsiaFonts } from '@/constants/theme';
 import { getCalendarOutfits, CalendarOutfitWithOutfitResponse, updateCalendarOutfit, deleteCalendarOutfit } from '@/api/client';
 import { CustomDatePicker } from '@/components/ui/CustomDatePicker';
+import { CustomAlert } from '@/components/ui/CustomAlert';
 
 export default function CalendarScreen() {
   const insets = useSafeAreaInsets();
@@ -59,7 +60,10 @@ export default function CalendarScreen() {
           const isDuplicate = existingOutfitsForDate.some(co => co.outfit.id === calendarOutfitToMove.outfit.id);
           
           if (isDuplicate) {
-            Alert.alert('Duplicate Outfit', 'This outfit is already scheduled on that day!');
+            DeviceEventEmitter.emit('showGlobalAlert', {
+              title: 'Duplicate Outfit',
+              message: 'This outfit is already scheduled on that day!',
+            });
             setRescheduleOutfitId(null);
             return;
           }
@@ -77,7 +81,10 @@ export default function CalendarScreen() {
         }
       } catch (err) {
         console.error('Failed to reschedule:', err);
-        Alert.alert('Error', 'Failed to reschedule outfit');
+        DeviceEventEmitter.emit('showGlobalAlert', {
+          title: 'Error',
+          message: 'Failed to reschedule outfit',
+        });
       } finally {
         setIsLoading(false);
         setRescheduleOutfitId(null);
@@ -88,33 +95,35 @@ export default function CalendarScreen() {
   };
 
   const handleRemove = (id: string) => {
-    Alert.alert(
-      'Remove Outfit',
-      'Are you sure you want to remove this outfit from the schedule?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Remove', 
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              setIsLoading(true);
-              await deleteCalendarOutfit(id);
-              await fetchOutfits(currentMonth);
-              const remainingOutfits = outfitsByDate[selectedDayStr!]?.filter(o => o.id !== id) || [];
-              if (remainingOutfits.length === 0) {
-                setIsDayModalVisible(false);
-              }
-            } catch (err) {
-              console.error('Failed to remove outfit:', err);
-              Alert.alert('Error', 'Failed to remove outfit');
-            } finally {
-              setIsLoading(false);
-            }
-          }
-        }
-      ]
-    );
+    DeviceEventEmitter.emit('showGlobalAlert', {
+      title: 'Remove Outfit',
+      message: 'Are you sure you want to remove this outfit from the schedule?',
+      confirmText: 'Remove',
+      cancelText: 'Cancel',
+      isDestructive: true,
+      onConfirm: () => confirmRemove(id),
+    });
+  };
+
+  const confirmRemove = async (id: string) => {
+    DeviceEventEmitter.emit('showGlobalAlert', {
+      title: 'Removing...',
+      message: 'Please wait while we remove this outfit from your schedule.',
+      isLoading: true,
+    });
+    try {
+      await deleteCalendarOutfit(id);
+      await fetchOutfits(currentMonth);
+      const remainingOutfits = outfitsByDate[selectedDayStr!]?.filter(o => o.id !== id) || [];
+      if (remainingOutfits.length === 0) {
+        setIsDayModalVisible(false);
+      }
+      DeviceEventEmitter.emit('hideGlobalAlert');
+    } catch (err) {
+      console.error('Failed to remove outfit:', err);
+      DeviceEventEmitter.emit('hideGlobalAlert');
+      DeviceEventEmitter.emit('showGlobalToast', 'Failed to remove outfit');
+    }
   };
 
   const outfitsByDate = outfits.reduce((acc, calendarOutfit) => {
