@@ -430,9 +430,19 @@ export default function CalendarScreen() {
         <View style={styles.modalOverlay}>
           <View style={styles.dayModalContent}>
             <View style={styles.dayModalHeader}>
-              <ThemedText style={styles.dayModalTitle}>
-                {selectedDayStr ? new Date(selectedDayStr + 'T12:00:00Z').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' }) : ''}
-              </ThemedText>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 1 }}>
+                <ThemedText style={styles.dayModalTitle}>
+                  {selectedDayStr ? new Date(selectedDayStr + 'T12:00:00Z').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' }) : ''}
+                </ThemedText>
+                {selectedDayStr && (
+                  <>
+                    <Text style={{ fontSize: 16, color: FuchsiaColors.slate }}>•</Text>
+                    <Text style={{ fontFamily: FuchsiaFonts.body, fontSize: 16, color: FuchsiaColors.slate }}>
+                      {(outfitsByDate[selectedDayStr] || []).length} {(outfitsByDate[selectedDayStr] || []).length === 1 ? 'outfit' : 'outfits'}
+                    </Text>
+                  </>
+                )}
+              </View>
               <Pressable onPress={() => setIsDayModalVisible(false)} style={styles.closeModalButton}>
                 <X size={20} color={FuchsiaColors.slate} />
               </Pressable>
