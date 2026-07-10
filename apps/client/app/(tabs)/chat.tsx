@@ -386,8 +386,9 @@ const styles = StyleSheet.create({
     fontFamily: FuchsiaFonts.body,
     fontSize: 15,
     color: FuchsiaColors.ink,
-    paddingTop: 10,
-    paddingBottom: 10,
+    paddingTop: Platform.OS === 'ios' ? 10 : 8,
+    paddingBottom: Platform.OS === 'ios' ? 10 : 8,
+    textAlignVertical: 'center',
   },
   plusBtn: {
     width: 40,
