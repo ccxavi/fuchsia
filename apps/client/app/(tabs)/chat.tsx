@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, StyleSheet, TextInput, TouchableOpacity, FlatList, KeyboardAvoidingView, Platform, ActivityIndicator, Image, Animated } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { View, StyleSheet, TextInput, TouchableOpacity, FlatList, KeyboardAvoidingView, Platform, ActivityIndicator, Image, Animated, Keyboard } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
 import { ThemedText } from '@/components/themed-text';
@@ -66,9 +66,34 @@ export default function ChatScreen() {
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [imageBase64, setImageBase64] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isKeyboardVisible, setKeyboardVisible] = useState(false);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
   const flatListRef = useRef<FlatList>(null);
   
   const [location, setLocation] = useState<Location.LocationObject | null>(null);
+
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+
+    const showSub = Keyboard.addListener(showEvent, (e) => {
+      setKeyboardVisible(true);
+      setKeyboardHeight(e.endCoordinates.height);
+    });
+    const hideSub = Keyboard.addListener(hideEvent, () => {
+      setKeyboardVisible(false);
+      setKeyboardHeight(0);
+    });
+
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
+
+  const androidBottomPadding = Platform.OS === 'android' && keyboardHeight > 0 
+    ? keyboardHeight + insets.bottom 
+    : 0;
 
   useEffect(() => {
     (async () => {
@@ -178,11 +203,13 @@ export default function ChatScreen() {
   };
 
   return (
-    <KeyboardAvoidingView 
-      style={[styles.container, { paddingTop: insets.top }]} 
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
-    >
+    <SafeAreaView style={[styles.container, { paddingBottom: androidBottomPadding }]} edges={['top']}>
+      <KeyboardAvoidingView 
+        style={styles.container} 
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+        enabled={Platform.OS === 'ios'}
+      >
       <FlatList
         ref={flatListRef}
         data={messages}
@@ -202,7 +229,13 @@ export default function ChatScreen() {
         </View>
       )}
 
-      <View style={[styles.inputSection, { paddingBottom: Math.max(insets.bottom, 24) + 80 }]}>
+      <View style={[
+        styles.inputSection, 
+        { 
+          paddingBottom: isKeyboardVisible ? 12 : Math.max(insets.bottom, 12),
+          marginBottom: isKeyboardVisible ? 0 : 80 
+        }
+      ]}>
         {imageUri && (
           <View style={styles.imagePreviewContainer}>
             <Image source={{ uri: imageUri }} style={styles.imagePreview} />
@@ -240,7 +273,8 @@ export default function ChatScreen() {
           </TouchableOpacity>
         </View>
       </View>
-    </KeyboardAvoidingView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
