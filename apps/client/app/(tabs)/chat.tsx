@@ -225,14 +225,18 @@ export default function ChatScreen() {
             maxLength={500}
           />
           <TouchableOpacity 
-            style={[
-              styles.sendBtn, 
-              (!input.trim() && !imageBase64) || isLoading ? styles.sendButtonDisabled : {}
-            ]} 
+            style={[{ opacity: (!input.trim() && !imageBase64) || isLoading ? 0.5 : 1 }]} 
             onPress={sendMessage}
             disabled={(!input.trim() && !imageBase64) || isLoading}
           >
-            <Send size={18} color="#fff" />
+            <LinearGradient
+              colors={['#86003C', '#B5004D', '#D4145A']}
+              start={{ x: 0, y: 0.5 }}
+              end={{ x: 1, y: 0.5 }}
+              style={styles.sendBtn}
+            >
+              <Send size={18} color="#fff" />
+            </LinearGradient>
           </TouchableOpacity>
         </View>
       </View>
@@ -354,8 +358,7 @@ const styles = StyleSheet.create({
   sendBtn: {
     width: 40,
     height: 40,
-    borderRadius: 14,
-    backgroundColor: FuchsiaColors.deep,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
   },
