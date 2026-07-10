@@ -580,3 +580,46 @@ export async function deleteCalendarOutfit(id: string): Promise<void> {
     method: 'DELETE',
   });
 }
+
+// ── Chat ────────────────────────────────────────────────────────────
+
+export type TextPart = {
+  type: 'text';
+  text: string;
+};
+
+export type ImagePart = {
+  type: 'image_url';
+  image_url: {
+    url: string;
+  };
+};
+
+export type ContentPart = TextPart | ImagePart;
+
+export interface ChatMessage {
+  role: 'system' | 'user' | 'assistant';
+  content: string | ContentPart[];
+}
+
+export interface ChatRequest {
+  messages: ChatMessage[];
+  temperature?: number;
+  max_tokens?: number;
+  latitude?: number | null;
+  longitude?: number | null;
+}
+
+export interface ChatResponse {
+  message: ChatMessage;
+}
+
+export async function postChat(data: ChatRequest): Promise<ChatResponse> {
+  return apiFetch<ChatResponse>('/chat', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(data),
+  });
+}
