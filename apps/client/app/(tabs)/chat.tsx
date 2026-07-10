@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
 import { ThemedText } from '@/components/themed-text';
+import { MarkdownText } from '@/components/ui/MarkdownText';
 import { FuchsiaColors, FuchsiaFonts } from '@/constants/theme';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Send, Image as ImageIcon, X, Sparkles } from 'lucide-react-native';
@@ -107,14 +108,14 @@ export default function ChatScreen() {
     const textColor = isUser ? '#fff' : FuchsiaColors.ink;
     
     if (typeof content === 'string') {
-      return <ThemedText style={[styles.messageText, { color: textColor }]}>{content}</ThemedText>;
+      return <MarkdownText style={[styles.messageText, { color: textColor }]}>{content}</MarkdownText>;
     }
     
     return (
       <View style={{ gap: 8 }}>
         {content.map((part, index) => {
           if (part.type === 'text') {
-            return <ThemedText key={index} style={[styles.messageText, { color: textColor }]}>{part.text}</ThemedText>;
+            return <MarkdownText key={index} style={[styles.messageText, { color: textColor }]}>{part.text}</MarkdownText>;
           }
           if (part.type === 'image_url') {
             return (
