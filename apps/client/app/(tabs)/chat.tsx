@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, StyleSheet, TextInput, TouchableOpacity, FlatList, KeyboardAvoidingView, Platform, ActivityIndicator, Image } from 'react-native';
+import { View, StyleSheet, TextInput, TouchableOpacity, FlatList, KeyboardAvoidingView, Platform, ActivityIndicator, Image, Animated } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
@@ -9,6 +9,38 @@ import { FuchsiaColors, FuchsiaFonts } from '@/constants/theme';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Send, Image as ImageIcon, X, Sparkles } from 'lucide-react-native';
 import { ChatMessage, postChat, ContentPart } from '@/api/client';
+function TypingIndicator() {
+  const dot1 = useRef(new Animated.Value(0)).current;
+  const dot2 = useRef(new Animated.Value(0)).current;
+  const dot3 = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const animateDot = (anim: Animated.Value) => {
+      return Animated.sequence([
+        Animated.timing(anim, { toValue: -4, duration: 250, useNativeDriver: true }),
+        Animated.timing(anim, { toValue: 0, duration: 250, useNativeDriver: true }),
+      ]);
+    };
+
+    Animated.loop(
+      Animated.stagger(150, [
+        animateDot(dot1),
+        animateDot(dot2),
+        animateDot(dot3),
+      ])
+    ).start();
+  }, []);
+
+  const dotStyle = { width: 6, height: 6, borderRadius: 3, backgroundColor: FuchsiaColors.deep, marginHorizontal: 2 };
+
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', height: 20 }}>
+      <Animated.View style={[dotStyle, { transform: [{ translateY: dot1 }] }]} />
+      <Animated.View style={[dotStyle, { transform: [{ translateY: dot2 }] }]} />
+      <Animated.View style={[dotStyle, { transform: [{ translateY: dot3 }] }]} />
+    </View>
+  );
+}
 
 function HeroCard() {
   return (
@@ -164,8 +196,9 @@ export default function ChatScreen() {
       
       {isLoading && (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="small" color={FuchsiaColors.deep} />
-          <ThemedText style={styles.loadingText}>Stylist is typing...</ThemedText>
+          <View style={[styles.messageBubble, styles.aiBubble, { paddingHorizontal: 16, paddingVertical: 12 }]}>
+            <TypingIndicator />
+          </View>
         </View>
       )}
 
@@ -273,11 +306,8 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   loadingContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 24,
+    paddingHorizontal: 16,
     paddingVertical: 8,
-    gap: 8,
   },
   loadingText: {
     fontFamily: FuchsiaFonts.body,
