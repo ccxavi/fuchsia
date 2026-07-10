@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator, useWindowDimensions, Modal, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator, useWindowDimensions, Modal, Alert, DeviceEventEmitter } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useState } from 'react';
 import { router, useFocusEffect } from 'expo-router';
@@ -10,7 +10,8 @@ import React from 'react';
 import { ThemedText } from '@/components/themed-text';
 import { FuchsiaColors, FuchsiaFonts } from '@/constants/theme';
 import { getCalendarOutfits, CalendarOutfitWithOutfitResponse, updateCalendarOutfit, deleteCalendarOutfit } from '@/api/client';
-import DateTimePicker from '@react-native-community/datetimepicker';
+import { CustomDatePicker } from '@/components/ui/CustomDatePicker';
+import { CustomAlert } from '@/components/ui/CustomAlert';
 
 export default function CalendarScreen() {
   const insets = useSafeAreaInsets();
@@ -21,8 +22,6 @@ export default function CalendarScreen() {
   const [isLoading, setIsLoading] = useState(true);
 
   const [isPickerVisible, setIsPickerVisible] = useState(false);
-  const [pickerYear, setPickerYear] = useState(currentMonth.getFullYear());
-  const [pickerMonth, setPickerMonth] = useState(currentMonth.getMonth());
   
   const [selectedDayStr, setSelectedDayStr] = useState<string | null>(null);
   const [isDayModalVisible, setIsDayModalVisible] = useState(false);
@@ -59,7 +58,10 @@ export default function CalendarScreen() {
           const isDuplicate = existingOutfitsForDate.some(co => co.outfit.id === calendarOutfitToMove.outfit.id);
           
           if (isDuplicate) {
-            Alert.alert('Duplicate Outfit', 'This outfit is already scheduled on that day!');
+            DeviceEventEmitter.emit('showGlobalAlert', {
+              title: 'Duplicate Outfit',
+              message: 'This outfit is already scheduled on that day!',
+            });
             setRescheduleOutfitId(null);
             return;
           }
@@ -77,7 +79,10 @@ export default function CalendarScreen() {
         }
       } catch (err) {
         console.error('Failed to reschedule:', err);
-        Alert.alert('Error', 'Failed to reschedule outfit');
+        DeviceEventEmitter.emit('showGlobalAlert', {
+          title: 'Error',
+          message: 'Failed to reschedule outfit',
+        });
       } finally {
         setIsLoading(false);
         setRescheduleOutfitId(null);
@@ -88,33 +93,35 @@ export default function CalendarScreen() {
   };
 
   const handleRemove = (id: string) => {
-    Alert.alert(
-      'Remove Outfit',
-      'Are you sure you want to remove this outfit from the schedule?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Remove', 
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              setIsLoading(true);
-              await deleteCalendarOutfit(id);
-              await fetchOutfits(currentMonth);
-              const remainingOutfits = outfitsByDate[selectedDayStr!]?.filter(o => o.id !== id) || [];
-              if (remainingOutfits.length === 0) {
-                setIsDayModalVisible(false);
-              }
-            } catch (err) {
-              console.error('Failed to remove outfit:', err);
-              Alert.alert('Error', 'Failed to remove outfit');
-            } finally {
-              setIsLoading(false);
-            }
-          }
-        }
-      ]
-    );
+    DeviceEventEmitter.emit('showGlobalAlert', {
+      title: 'Remove Outfit',
+      message: 'Are you sure you want to remove this outfit from the schedule?',
+      confirmText: 'Remove',
+      cancelText: 'Cancel',
+      isDestructive: true,
+      onConfirm: () => confirmRemove(id),
+    });
+  };
+
+  const confirmRemove = async (id: string) => {
+    DeviceEventEmitter.emit('showGlobalAlert', {
+      title: 'Removing...',
+      message: 'Please wait while we remove this outfit from your schedule.',
+      isLoading: true,
+    });
+    try {
+      await deleteCalendarOutfit(id);
+      await fetchOutfits(currentMonth);
+      const remainingOutfits = outfitsByDate[selectedDayStr!]?.filter(o => o.id !== id) || [];
+      if (remainingOutfits.length === 0) {
+        setIsDayModalVisible(false);
+      }
+      DeviceEventEmitter.emit('hideGlobalAlert');
+    } catch (err) {
+      console.error('Failed to remove outfit:', err);
+      DeviceEventEmitter.emit('hideGlobalAlert');
+      DeviceEventEmitter.emit('showGlobalToast', 'Failed to remove outfit');
+    }
   };
 
   const outfitsByDate = outfits.reduce((acc, calendarOutfit) => {
@@ -181,11 +188,10 @@ export default function CalendarScreen() {
         <Pressable onPress={() => changeMonth(-1)} style={styles.navButton}>
           <ChevronLeft size={16} color={FuchsiaColors.slate} />
         </Pressable>
-        <Pressable onPress={() => {
-          setPickerYear(currentMonth.getFullYear());
-          setPickerMonth(currentMonth.getMonth());
-          setIsPickerVisible(true);
-        }}>
+        <Pressable 
+          style={styles.monthSelector}
+          onPress={() => setIsPickerVisible(true)}
+        >  
           <ThemedText style={styles.monthText}>
             {monthNames[currentMonth.getMonth()]} {currentMonth.getFullYear()}
           </ThemedText>
@@ -219,11 +225,48 @@ export default function CalendarScreen() {
                 const dateStr = `${currentMonth.getFullYear()}-${String(currentMonth.getMonth() + 1).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
                 const isToday = dateStr === todayStr;
                 const scheduledOutfits = outfitsByDate[dateStr] || [];
-                const firstCalendarOutfit = scheduledOutfits.length > 0 ? scheduledOutfits[0] : null;
-                const outfit = firstCalendarOutfit ? firstCalendarOutfit.outfit : null;
 
-                if (outfit) {
-                  const items = (outfit.clothing_items || []).filter(item => item.image_url);
+                if (scheduledOutfits.length > 0) {
+                  // Helper to get the images to show for an outfit
+                  const getOutfitImages = (outfit: any): string[] => {
+                    if (outfit.images && outfit.images.length > 0) return [outfit.images[0].image_url];
+                    if (outfit.image_url) return [outfit.image_url];
+                    const items = (outfit.clothing_items || []).filter((item: any) => item.image_url);
+                    return items.map((item: any) => item.image_url);
+                  };
+
+                  let displayImages: string[][] = scheduledOutfits.map(co => getOutfitImages(co.outfit)).filter(imgs => imgs.length > 0);
+
+                  // Take up to 4 outfit slots for the grid
+                  const imagesToShow = displayImages.slice(0, 4);
+
+                  const renderGridItem = (images: string[], style: any, index: number) => {
+                    if (images.length === 0) return <View key={`empty-${index}`} style={[style, { backgroundColor: FuchsiaColors.mist }]} />;
+                    if (images.length === 1) return <Image key={`img-${index}`} source={{ uri: images[0] }} style={style} contentFit="cover" />;
+                    
+                    // Mini grid
+                    return (
+                      <View key={`grid-${index}`} style={[style, styles.collageGrid]}>
+                        {images.length === 2 && (
+                          <>
+                            <Image source={{ uri: images[0] }} style={styles.collageHalf} contentFit="cover" />
+                            <Image source={{ uri: images[1] }} style={styles.collageHalf} contentFit="cover" />
+                          </>
+                        )}
+                        {images.length >= 3 && (
+                          <>
+                            <Image source={{ uri: images[0] }} style={images.length === 3 ? styles.collageTopRowSpan : styles.collageQuarter} contentFit="cover" />
+                            <Image source={{ uri: images[1] }} style={styles.collageQuarter} contentFit="cover" />
+                            <Image source={{ uri: images[2] }} style={styles.collageQuarter} contentFit="cover" />
+                            {images.length >= 4 && (
+                              <Image source={{ uri: images[3] }} style={styles.collageQuarter} contentFit="cover" />
+                            )}
+                          </>
+                        )}
+                      </View>
+                    );
+                  };
+
                   return (
                     <Pressable
                       key={dateStr}
@@ -233,26 +276,24 @@ export default function CalendarScreen() {
                         setIsDayModalVisible(true);
                       }}
                     >
-                      {outfit.image_url ? (
-                        <Image source={{ uri: outfit.image_url }} style={StyleSheet.absoluteFillObject} contentFit="cover" />
-                      ) : items.length > 0 ? (
+                      {imagesToShow.length > 0 ? (
                         <View style={styles.collageGrid}>
-                          {items.length === 1 && (
-                            <Image source={{ uri: items[0].image_url as string }} style={styles.collageFull} contentFit="cover" />
+                          {imagesToShow.length === 1 && (
+                            renderGridItem(imagesToShow[0], styles.collageFull, 0)
                           )}
-                          {items.length === 2 && (
+                          {imagesToShow.length === 2 && (
                             <>
-                              <Image source={{ uri: items[0].image_url as string }} style={styles.collageHalf} contentFit="cover" />
-                              <Image source={{ uri: items[1].image_url as string }} style={styles.collageHalf} contentFit="cover" />
+                              {renderGridItem(imagesToShow[0], styles.collageHalf, 0)}
+                              {renderGridItem(imagesToShow[1], styles.collageHalf, 1)}
                             </>
                           )}
-                          {items.length >= 3 && (
+                          {imagesToShow.length >= 3 && (
                             <>
-                              <Image source={{ uri: items[0].image_url as string }} style={items.length === 3 ? styles.collageTopRowSpan : styles.collageQuarter} contentFit="cover" />
-                              <Image source={{ uri: items[1].image_url as string }} style={styles.collageQuarter} contentFit="cover" />
-                              <Image source={{ uri: items[2].image_url as string }} style={styles.collageQuarter} contentFit="cover" />
-                              {items.length >= 4 && (
-                                <Image source={{ uri: items[3].image_url as string }} style={styles.collageQuarter} contentFit="cover" />
+                              {renderGridItem(imagesToShow[0], imagesToShow.length === 3 ? styles.collageTopRowSpan : styles.collageQuarter, 0)}
+                              {renderGridItem(imagesToShow[1], styles.collageQuarter, 1)}
+                              {renderGridItem(imagesToShow[2], styles.collageQuarter, 2)}
+                              {imagesToShow.length >= 4 && (
+                                renderGridItem(imagesToShow[3], styles.collageQuarter, 3)
                               )}
                             </>
                           )}
@@ -273,9 +314,9 @@ export default function CalendarScreen() {
                         <Text style={styles.outfitCellDayNum}>{dayNum}</Text>
                       )}
                       
-                      {scheduledOutfits.length > 1 && (
+                      {scheduledOutfits.length > 4 && (
                         <View style={styles.moreBadge}>
-                          <Text style={styles.moreBadgeText}>+{scheduledOutfits.length - 1}</Text>
+                          <Text style={styles.moreBadgeText}>+{scheduledOutfits.length - 4}</Text>
                         </View>
                       )}
                     </Pressable>
@@ -333,62 +374,37 @@ export default function CalendarScreen() {
       )}
 
       {/* Month/Year Picker Modal */}
-      <Modal visible={isPickerVisible} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Pressable onPress={() => setPickerYear(y => y - 1)} style={styles.navButton}>
-                <ChevronLeft size={20} color={FuchsiaColors.ink} />
-              </Pressable>
-              <ThemedText style={styles.modalYearText}>{pickerYear}</ThemedText>
-              <Pressable onPress={() => setPickerYear(y => y + 1)} style={styles.navButton}>
-                <ChevronRight size={20} color={FuchsiaColors.ink} />
-              </Pressable>
-            </View>
-
-            <View style={styles.monthsGrid}>
-              {monthNames.map((mName, index) => {
-                const isSelected = index === pickerMonth;
-                return (
-                  <Pressable
-                    key={mName}
-                    style={[styles.monthPill, isSelected && styles.monthPillSelected]}
-                    onPress={() => setPickerMonth(index)}
-                  >
-                    <Text style={[styles.monthPillText, isSelected && styles.monthPillTextSelected]}>
-                      {mName.substring(0, 3)}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-
-            <View style={styles.modalActions}>
-              <Pressable style={styles.modalCancelButton} onPress={() => setIsPickerVisible(false)}>
-                <Text style={styles.modalCancelText}>Cancel</Text>
-              </Pressable>
-              <Pressable 
-                style={styles.modalApplyButton} 
-                onPress={() => {
-                  setCurrentMonth(new Date(pickerYear, pickerMonth, 1));
-                  setIsPickerVisible(false);
-                }}
-              >
-                <Text style={styles.modalApplyText}>Apply</Text>
-              </Pressable>
-            </View>
-          </View>
-        </View>
-      </Modal>
+      <CustomDatePicker
+        visible={isPickerVisible}
+        value={currentMonth}
+        onClose={() => setIsPickerVisible(false)}
+        selectionMode="month"
+        onChange={(event, date) => {
+          setIsPickerVisible(false);
+          if (date) {
+            setCurrentMonth(date);
+          }
+        }}
+      />
 
       {/* Day Detail Modal */}
       <Modal visible={isDayModalVisible} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.dayModalContent}>
             <View style={styles.dayModalHeader}>
-              <ThemedText style={styles.dayModalTitle}>
-                {selectedDayStr ? new Date(selectedDayStr + 'T12:00:00Z').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' }) : ''}
-              </ThemedText>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 1 }}>
+                <ThemedText style={styles.dayModalTitle}>
+                  {selectedDayStr ? new Date(selectedDayStr + 'T12:00:00Z').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' }) : ''}
+                </ThemedText>
+                {selectedDayStr && (
+                  <>
+                    <Text style={{ fontSize: 16, color: FuchsiaColors.slate }}>•</Text>
+                    <Text style={{ fontFamily: FuchsiaFonts.body, fontSize: 16, color: FuchsiaColors.slate }}>
+                      {(outfitsByDate[selectedDayStr] || []).length} {(outfitsByDate[selectedDayStr] || []).length === 1 ? 'outfit' : 'outfits'}
+                    </Text>
+                  </>
+                )}
+              </View>
               <Pressable onPress={() => setIsDayModalVisible(false)} style={styles.closeModalButton}>
                 <X size={20} color={FuchsiaColors.slate} />
               </Pressable>
@@ -398,6 +414,8 @@ export default function CalendarScreen() {
               {(selectedDayStr ? outfitsByDate[selectedDayStr] || [] : []).map(calendarOutfit => {
                 const outfit = calendarOutfit.outfit;
                 const items = (outfit.clothing_items || []).filter(item => item.image_url);
+                const firstUploadedImage = outfit.images && outfit.images.length > 0 ? outfit.images[0].image_url : null;
+                const displayImage = firstUploadedImage || outfit.image_url;
                 const isPast = selectedDayStr ? selectedDayStr < todayStr : false;
                 
                 return (
@@ -409,8 +427,8 @@ export default function CalendarScreen() {
                         router.push(`/outfit/${outfit.id}`);
                       }}
                     >
-                      {outfit.image_url ? (
-                        <Image source={{ uri: outfit.image_url }} style={StyleSheet.absoluteFillObject} contentFit="cover" />
+                      {displayImage ? (
+                        <Image source={{ uri: displayImage }} style={StyleSheet.absoluteFillObject} contentFit="cover" />
                       ) : items.length > 0 ? (
                         <View style={styles.collageGrid}>
                           {items.length === 1 && (
@@ -471,14 +489,13 @@ export default function CalendarScreen() {
         </View>
       </Modal>
 
-      {showReschedulePicker && (
-        <DateTimePicker
-          value={selectedDayStr ? new Date(selectedDayStr + 'T12:00:00Z') : new Date()}
-          mode="date"
-          display="default"
-          onChange={handleRescheduleDateChange}
-        />
-      )}
+      {/* Reschedule Date Picker */}
+      <CustomDatePicker
+        visible={showReschedulePicker}
+        value={selectedDayStr ? new Date(selectedDayStr + 'T12:00:00Z') : new Date()}
+        onClose={() => setShowReschedulePicker(false)}
+        onChange={handleRescheduleDateChange}
+      />
     </View>
   );
 }
@@ -514,6 +531,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 8,
+  },
+  monthSelector: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 12,
+    backgroundColor: FuchsiaColors.cloud,
   },
   monthText: {
     fontFamily: FuchsiaFonts.heading,
@@ -781,7 +804,7 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     padding: 24,
     width: '100%',
-    maxHeight: '80%',
+    height: '50%',
   },
   dayModalHeader: {
     flexDirection: 'row',

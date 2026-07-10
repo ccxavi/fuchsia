@@ -31,6 +31,8 @@ import {
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useToast } from '@/src/hooks/useToast';
 import { Toast } from '@/src/components/ui/Toast';
+import { useGlobalAlert } from '@/src/hooks/useGlobalAlert';
+import { CustomAlert } from '@/components/ui/CustomAlert';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -59,6 +61,7 @@ export default function RootLayout() {
   const fontsReady = dmMonoLoaded && playfairLoaded && interLoaded && outfitLoaded;
 
   const { toastVisible, toastMessage, fadeAnim, showToast } = useToast();
+  const { alertConfig, hideAlert } = useGlobalAlert();
 
   useEffect(() => {
     if (fontsReady) {
@@ -93,6 +96,22 @@ export default function RootLayout() {
         <Stack.Screen name="wardrobe/[id]/select-outfits" options={{ headerShown: false, presentation: 'modal' }} />
       </Stack>
       <Toast visible={toastVisible} message={toastMessage} fadeAnim={fadeAnim} />
+      <CustomAlert 
+        visible={!!alertConfig}
+        title={alertConfig?.title || ''}
+        message={alertConfig?.message || ''}
+        onCancel={() => {
+          if (alertConfig?.onCancel) {
+            alertConfig.onCancel();
+          }
+          hideAlert();
+        }}
+        onConfirm={alertConfig?.onConfirm}
+        confirmText={alertConfig?.confirmText}
+        cancelText={alertConfig?.cancelText}
+        isDestructive={alertConfig?.isDestructive}
+        isLoading={alertConfig?.isLoading}
+      />
       <StatusBar style="auto" />
     </ThemeProvider>
   );

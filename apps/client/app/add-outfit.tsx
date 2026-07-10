@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { router, useLocalSearchParams } from 'expo-router';
 import { ArrowLeft, Plus, X, Check, Search, Settings, ChevronDown, ChevronUp, ShoppingBag, Calendar } from 'lucide-react-native';
 import { Image } from 'expo-image';
-import DateTimePicker from '@react-native-community/datetimepicker';
+import { CustomDatePicker } from '@/components/ui/CustomDatePicker';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { FadeInDown, FadeOutDown, Layout } from 'react-native-reanimated';
 
@@ -136,7 +136,7 @@ export default function AddOrEditOutfitScreen() {
         // Schedule the outfit
         await createCalendarOutfit({
           outfit_id: finalOutfitId,
-          date: scheduledDate.toISOString().split('T')[0],
+          date: `${scheduledDate.getFullYear()}-${String(scheduledDate.getMonth() + 1).padStart(2, '0')}-${String(scheduledDate.getDate()).padStart(2, '0')}`,
         });
         DeviceEventEmitter.emit('showGlobalToast', 'Outfit scheduled successfully');
       }
@@ -315,17 +315,15 @@ export default function AddOrEditOutfitScreen() {
                 </Pressable>
               )}
             </Pressable>
-            {showDatePicker && (
-              <DateTimePicker
-                value={scheduledDate || new Date()}
-                mode="date"
-                display="default"
-                onChange={(event, date) => {
-                  setShowDatePicker(false);
-                  if (date) setScheduledDate(date);
-                }}
-              />
-            )}
+            <CustomDatePicker
+              visible={showDatePicker}
+              value={scheduledDate || new Date()}
+              onClose={() => setShowDatePicker(false)}
+              onChange={(event, date) => {
+                setShowDatePicker(false);
+                if (date) setScheduledDate(date);
+              }}
+            />
           </View>
         </View>
 
