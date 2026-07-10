@@ -55,7 +55,7 @@ export default function ItemDetailScreen() {
     setMenuVisible(false);
     DeviceEventEmitter.emit('showGlobalAlert', {
       title: 'Delete this item?',
-      message: 'This action cannot be undone and will permanently remove this item from your closet.',
+      message: 'This action cannot be undone. It will be permanently removed from your closet, any past or scheduled outfits, and any wardrobes it belongs to.',
       confirmText: 'Delete',
       cancelText: 'Keep it',
       isDestructive: true,
