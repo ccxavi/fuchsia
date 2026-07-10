@@ -4,6 +4,7 @@ import datetime
 import json
 from typing import Any
 
+from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from app.services.agent.calendar import (
@@ -32,6 +33,7 @@ from app.services.agent.recall import (
     retrieve_relevant_memories,
 )
 from app.services.agent.tools import STYLIST_TOOLS, execute_tool
+from app.services.agent_audit import InvocationStats, record_agent_invocation
 from app.models.memory import Memory
 from app.v1.schemas import (
     CalendarSuggestion,
@@ -189,13 +191,24 @@ def _generate_answer(
     calendar_suggestions: list[CalendarSuggestion],
     latitude: float | None,
     longitude: float | None,
+    stats: InvocationStats,
 ) -> ChatResponse:
     """Run the tool loop and return the model's final text answer.
 
     Loops up to ``MAX_TOOL_ROUNDS`` while the model requests tools; once it
     returns a plain answer that answer is returned. If the model never stops
     requesting tools, a final request without tools forces a text answer.
+
+    ``stats`` is updated in place after every LLM call and tool dispatch so the
+    caller can audit true per-request token usage even across multiple rounds.
     """
+
+    def _tracked_post(body: dict[str, Any]) -> dict[str, Any]:
+        payload = post_chat(provider, body)
+        stats.llm_calls += 1
+        stats.add_usage(payload.get("usage"))
+        return payload
+
     for _ in range(MAX_TOOL_ROUNDS):
         body = build_body(
             provider.model,
@@ -204,13 +217,14 @@ def _generate_answer(
             max_tokens=max_tokens,
             tools=STYLIST_TOOLS,
         )
-        payload = post_chat(provider, body)
+        payload = _tracked_post(body)
         message = first_choice_message(payload)
 
         tool_calls = message.get("tool_calls")
         if not tool_calls:
             return parse_chat_response(payload, fallback_model=provider.model)
 
+        stats.tool_calls += len(tool_calls)
         serialized.append(
             {
                 "role": "assistant",
@@ -240,7 +254,7 @@ def _generate_answer(
         max_tokens=max_tokens,
         tools=None,
     )
-    payload = post_chat(provider, body)
+    payload = _tracked_post(body)
     return parse_chat_response(payload, fallback_model=provider.model)
 
 
@@ -275,18 +289,52 @@ def run_stylist_chat(
     suggestions: list[MemorySuggestion] = []
     outfit_suggestions: list[OutfitSuggestion] = []
     calendar_suggestions: list[CalendarSuggestion] = []
-    response = _generate_answer(
-        serialized,
-        provider=provider,
-        db=db,
+    stats = InvocationStats()
+    try:
+        response = _generate_answer(
+            serialized,
+            provider=provider,
+            db=db,
+            user_id=user_id,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            suggestions=suggestions,
+            outfit_suggestions=outfit_suggestions,
+            calendar_suggestions=calendar_suggestions,
+            latitude=latitude,
+            longitude=longitude,
+            stats=stats,
+        )
+    except HTTPException as exc:
+        # Audit the failed invocation (with whatever usage accrued) before the
+        # error propagates back to the client unchanged.
+        record_agent_invocation(
+            db,
+            user_id=user_id,
+            provider=provider.name,
+            model=provider.model,
+            user_message=_latest_user_text(messages),
+            response_message=None,
+            stats=stats,
+            status="error",
+            error_detail=str(exc.detail),
+            temperature=temperature,
+            max_tokens=max_tokens,
+        )
+        raise
+
+    record_agent_invocation(
+        db,
         user_id=user_id,
+        provider=provider.name,
+        model=provider.model,
+        user_message=_latest_user_text(messages),
+        response_message=flatten_text_content(response.message.content),
+        stats=stats,
+        status="success",
+        error_detail=None,
         temperature=temperature,
         max_tokens=max_tokens,
-        suggestions=suggestions,
-        outfit_suggestions=outfit_suggestions,
-        calendar_suggestions=calendar_suggestions,
-        latitude=latitude,
-        longitude=longitude,
     )
     suggestions = drop_stored_suggestions(
         db, user_id, _dedupe_suggestions(suggestions)

@@ -96,3 +96,47 @@ class AlembicMigrationTestCase(unittest.TestCase):
                 )
             finally:
                 engine.dispose()
+
+    def test_upgrade_creates_agent_invocations_table(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_directory:
+            database_path = Path(temp_directory) / "test.sqlite3"
+            database_url = f"sqlite:///{database_path}"
+            config = Config(str(Path(__file__).resolve().parent.parent / "alembic.ini"))
+
+            with patch.dict(os.environ, {"DATABASE_URL": database_url}, clear=True):
+                with patch("app.core.config.settings.database_url", database_url):
+                    command.upgrade(config, "head")
+
+            engine = create_engine(database_url)
+            try:
+                inspector = inspect(engine)
+
+                self.assertIn("agent_invocations", inspector.get_table_names())
+                columns = {
+                    column["name"]
+                    for column in inspector.get_columns("agent_invocations")
+                }
+                self.assertEqual(
+                    columns,
+                    {
+                        "id",
+                        "user_id",
+                        "provider",
+                        "model",
+                        "user_message",
+                        "response_message",
+                        "prompt_tokens",
+                        "completion_tokens",
+                        "total_tokens",
+                        "llm_call_count",
+                        "tool_call_count",
+                        "temperature",
+                        "max_tokens",
+                        "status",
+                        "error_detail",
+                        "created_at",
+                        "updated_at",
+                    },
+                )
+            finally:
+                engine.dispose()

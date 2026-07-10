@@ -8,6 +8,7 @@ from app.models.outfit_item import OutfitItem
 from app.models.calendar_outfit import CalendarOutfit
 from app.models.outfit_image import OutfitImage
 from app.models.memory import Memory
+from app.models.agent_invocation import AgentInvocation
 
 __all__ = [
     "User",
@@ -20,4 +21,5 @@ __all__ = [
     "CalendarOutfit",
     "OutfitImage",
     "Memory",
+    "AgentInvocation",
 ]

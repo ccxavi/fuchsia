@@ -4,12 +4,14 @@ import json
 import unittest
 from unittest.mock import AsyncMock, patch
 
-from sqlalchemy import create_engine
+from fastapi import HTTPException
+from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
 
 import datetime
 
 from app.db.base import Base
+from app.models.agent_invocation import AgentInvocation
 from app.models.clothing_item import ClothingItem
 from app.models.memory import Memory
 from app.models.outfit import Outfit
@@ -455,6 +457,62 @@ class RunStylistChatTestCase(unittest.TestCase):
         _, first_body = post_mock.call_args_list[0].args
         self.assertEqual(first_body["messages"][0]["content"], "PERSONA")
         self.assertEqual(result.memories_used, [])
+
+    def test_records_audit_row_with_summed_tokens(self) -> None:
+        # One tool round then the final answer, each reporting its own usage.
+        tool_round = _tool_call_payload()
+        tool_round["usage"] = {
+            "prompt_tokens": 5,
+            "completion_tokens": 3,
+            "total_tokens": 8,
+        }
+        final = _content_payload("You own blue jeans.")
+        final["usage"] = {
+            "prompt_tokens": 7,
+            "completion_tokens": 2,
+            "total_tokens": 9,
+        }
+
+        with patch(
+            "app.services.agent.loop.post_chat", side_effect=[tool_round, final]
+        ):
+            self._run()
+
+        rows = list(self.session.scalars(select(AgentInvocation)).all())
+        self.assertEqual(len(rows), 1)
+        row = rows[0]
+        self.assertEqual(row.status, "success")
+        self.assertEqual(row.user_id, "user-1")
+        self.assertEqual(row.provider, "Test")
+        self.assertEqual(row.model, "test-model")
+        self.assertEqual(row.user_message, "what do I own?")
+        self.assertEqual(row.response_message, "You own blue jeans.")
+        self.assertEqual(row.llm_call_count, 2)
+        self.assertEqual(row.tool_call_count, 1)
+        # Tokens are summed across BOTH rounds, not just the final one.
+        self.assertEqual(row.prompt_tokens, 12)
+        self.assertEqual(row.completion_tokens, 5)
+        self.assertEqual(row.total_tokens, 17)
+        self.assertIsNone(row.error_detail)
+
+    def test_records_audit_row_on_failure(self) -> None:
+        with patch(
+            "app.services.agent.loop.post_chat",
+            side_effect=HTTPException(status_code=502, detail="DeepSeek is down"),
+        ):
+            with self.assertRaises(HTTPException):
+                self._run()
+
+        rows = list(self.session.scalars(select(AgentInvocation)).all())
+        self.assertEqual(len(rows), 1)
+        row = rows[0]
+        self.assertEqual(row.status, "error")
+        self.assertEqual(row.error_detail, "DeepSeek is down")
+        self.assertIsNone(row.response_message)
+        self.assertEqual(row.user_message, "what do I own?")
+        # post_chat raised before the usage counter incremented.
+        self.assertEqual(row.llm_call_count, 0)
+        self.assertEqual(row.total_tokens, 0)
 
     def test_falls_back_to_no_tools_after_max_rounds(self) -> None:
         payloads = [_tool_call_payload()] * MAX_TOOL_ROUNDS + [
