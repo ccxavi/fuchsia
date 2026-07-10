@@ -612,10 +612,46 @@ export interface ChatRequest {
 
 export interface ChatResponse {
   message: ChatMessage;
+  memory_suggestions?: { content: string; category?: string }[];
 }
 
 export async function postChat(data: ChatRequest): Promise<ChatResponse> {
   return apiFetch<ChatResponse>('/chat', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(data),
+  });
+}
+
+// ── Memory ──────────────────────────────────────────────────────────
+
+export type MemoryResponse = {
+  id: string;
+  user_id: string;
+  content: string;
+  category: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export async function getMemories(): Promise<MemoryResponse[]> {
+  return apiFetch<MemoryResponse[]>('/memories');
+}
+
+export async function deleteMemory(id: string): Promise<void> {
+  return apiFetch<void>(`/memories/${id}`, {
+    method: 'DELETE',
+  });
+}
+
+export type MemoryIngestRequest = {
+  memories: { content: string; category?: string }[];
+};
+
+export async function ingestMemories(data: MemoryIngestRequest): Promise<MemoryResponse[]> {
+  return apiFetch<MemoryResponse[]>('/memories', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

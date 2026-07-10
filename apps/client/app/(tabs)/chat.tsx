@@ -8,7 +8,7 @@ import { MarkdownText } from '@/components/ui/MarkdownText';
 import { FuchsiaColors, FuchsiaFonts } from '@/constants/theme';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Send, Image as ImageIcon, X, Sparkles } from 'lucide-react-native';
-import { ChatMessage, postChat, ContentPart } from '@/api/client';
+import { ChatMessage, postChat, ContentPart, ingestMemories } from '@/api/client';
 function TypingIndicator() {
   const dot1 = useRef(new Animated.Value(0)).current;
   const dot2 = useRef(new Animated.Value(0)).current;
@@ -154,6 +154,14 @@ export default function ChatScreen() {
       });
       
       setMessages((prev) => [...prev, response.message]);
+
+      if (response.memory_suggestions && response.memory_suggestions.length > 0) {
+        try {
+          await ingestMemories({ memories: response.memory_suggestions });
+        } catch (memError) {
+          console.error("Failed to ingest memory suggestions:", memError);
+        }
+      }
     } catch (error) {
       console.error("Chat error:", error);
     } finally {
