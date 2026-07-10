@@ -646,6 +646,21 @@ export async function deleteMemory(id: string): Promise<void> {
   });
 }
 
+export type MemoryUpdateRequest = {
+  content?: string;
+  category?: string;
+};
+
+export async function updateMemory(id: string, data: MemoryUpdateRequest): Promise<MemoryResponse> {
+  return apiFetch<MemoryResponse>(`/memories/${id}`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(data),
+  });
+}
+
 export type MemoryIngestRequest = {
   memories: { content: string; category?: string }[];
 };
