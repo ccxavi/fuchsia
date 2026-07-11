@@ -346,12 +346,12 @@ export default function CalendarScreen() {
           <View style={styles.statsBar}>
             <View style={styles.statItem}>
               <Shirt size={14} color={FuchsiaColors.deep} />
-              <ThemedText style={styles.statText}>{totalOutfitsThisMonth} days logged</ThemedText>
+              <ThemedText style={styles.statText}>{totalOutfitsThisMonth} {totalOutfitsThisMonth === 1 ? 'day logged' : 'days logged'}</ThemedText>
             </View>
             <ThemedText style={styles.statDot}>·</ThemedText>
             <View style={styles.statItem}>
               <Sparkles size={14} color={FuchsiaColors.deep} />
-              <ThemedText style={styles.statText}>{aiPicksThisMonth} AI picks</ThemedText>
+              <ThemedText style={styles.statText}>{aiPicksThisMonth} {aiPicksThisMonth === 1 ? 'AI pick' : 'AI picks'}</ThemedText>
             </View>
           </View>
           {isViewingCurrentMonth && !todaysOutfit && (
