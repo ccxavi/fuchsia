@@ -7,7 +7,8 @@ import { ThemedText } from '@/components/themed-text';
 import { MarkdownText } from '@/components/ui/MarkdownText';
 import { FuchsiaColors, FuchsiaFonts } from '@/constants/theme';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Send, Image as ImageIcon, X, Sparkles } from 'lucide-react-native';
+import { Image as ImageIcon, X, Sparkles } from 'lucide-react-native';
+import { MaterialIcons } from '@expo/vector-icons';
 import { ChatMessage, postChat, ContentPart, ingestMemories } from '@/api/client';
 function TypingIndicator() {
   const dot1 = useRef(new Animated.Value(0)).current;
@@ -276,7 +277,7 @@ export default function ChatScreen() {
               end={{ x: 1, y: 0.5 }}
               style={styles.sendBtn}
             >
-              <Send size={18} color="#fff" />
+              <MaterialIcons name={isLoading ? 'hourglass-empty' : 'send'} size={18} color="#fff" />
             </LinearGradient>
           </TouchableOpacity>
         </View>
