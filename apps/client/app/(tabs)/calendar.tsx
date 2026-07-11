@@ -361,8 +361,8 @@ export default function CalendarScreen() {
                 Ask fuchsia for a recommendation or log what you're wearing.
               </ThemedText>
               <View style={styles.todayPreviewActions}>
-                <Pressable style={styles.primaryAction} onPress={() => router.push('/')}>
-                  <Text style={styles.primaryActionText}>Get Outfit</Text>
+                <Pressable style={styles.primaryAction} onPress={() => router.push('/chat')}>
+                  <Text style={styles.primaryActionText}>Ask Fuchsia</Text>
                 </Pressable>
                 <Pressable style={styles.secondaryAction} onPress={() => router.push('/add-outfit')}>
                   <Text style={styles.secondaryActionText}>Log Manually</Text>
