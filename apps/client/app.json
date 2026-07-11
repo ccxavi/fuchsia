@@ -47,7 +47,14 @@
           "locationAlwaysAndWhenInUsePermission": "Allow Fuchsia to use your location to provide accurate weather-based outfit recommendations."
         }
       ],
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "Allow Fuchsia to access your microphone for dictation.",
+          "speechRecognitionPermission": "Allow Fuchsia to securely recognize your speech."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

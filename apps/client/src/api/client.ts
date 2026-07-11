@@ -1,7 +1,7 @@
 import * as SecureStore from 'expo-secure-store';
 import { router } from 'expo-router';
 
-const API_BASE = 'https://fuchsia-api.giann.dev/api/v1';
+const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 
 let refreshPromise: Promise<string | null> | null = null;
 
@@ -578,5 +578,116 @@ export async function updateCalendarOutfit(id: string, data: CalendarOutfitUpdat
 export async function deleteCalendarOutfit(id: string): Promise<void> {
   return apiFetch<void>(`/calendar/${id}`, {
     method: 'DELETE',
+  });
+}
+
+// ── Chat ────────────────────────────────────────────────────────────
+
+export type TextPart = {
+  type: 'text';
+  text: string;
+};
+
+export type ImagePart = {
+  type: 'image_url';
+  image_url: {
+    url: string;
+  };
+};
+
+export type ContentPart = TextPart | ImagePart;
+
+export interface OutfitSuggestion {
+  name: string;
+  clothing_item_ids: string[];
+  wardrobe_ids?: string[];
+  rationale?: string;
+}
+
+export interface CalendarSuggestion {
+  outfit_id: string;
+  date: string; // YYYY-MM-DD
+  notes?: string;
+}
+
+export interface ChatMessage {
+  role: 'system' | 'user' | 'assistant';
+  content: string | ContentPart[];
+  outfit_suggestions?: OutfitSuggestion[];
+  calendar_suggestions?: CalendarSuggestion[];
+}
+
+export interface ChatRequest {
+  messages: ChatMessage[];
+  temperature?: number;
+  max_tokens?: number;
+  latitude?: number | null;
+  longitude?: number | null;
+}
+
+export interface ChatResponse {
+  message: ChatMessage;
+  memory_suggestions?: { content: string; category?: string }[];
+  outfit_suggestions?: OutfitSuggestion[];
+  calendar_suggestions?: CalendarSuggestion[];
+}
+
+export async function postChat(data: ChatRequest): Promise<ChatResponse> {
+  return apiFetch<ChatResponse>('/chat', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(data),
+  });
+}
+
+// ── Memory ──────────────────────────────────────────────────────────
+
+export type MemoryResponse = {
+  id: string;
+  user_id: string;
+  content: string;
+  category: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export async function getMemories(): Promise<MemoryResponse[]> {
+  return apiFetch<MemoryResponse[]>('/memories');
+}
+
+export async function deleteMemory(id: string): Promise<void> {
+  return apiFetch<void>(`/memories/${id}`, {
+    method: 'DELETE',
+  });
+}
+
+export type MemoryUpdateRequest = {
+  content?: string;
+  category?: string;
+};
+
+export async function updateMemory(id: string, data: MemoryUpdateRequest): Promise<MemoryResponse> {
+  return apiFetch<MemoryResponse>(`/memories/${id}`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(data),
+  });
+}
+
+export type MemoryIngestRequest = {
+  memories: { content: string; category?: string }[];
+};
+
+export async function ingestMemories(data: MemoryIngestRequest): Promise<MemoryResponse[]> {
+  return apiFetch<MemoryResponse[]>('/memories', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(data),
   });
 }

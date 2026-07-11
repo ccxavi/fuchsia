@@ -1,24 +1,45 @@
-import { View, StyleSheet } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import { ThemedText } from '@/components/themed-text';
 import { FuchsiaColors, FuchsiaFonts } from '@/constants/theme';
-import { User } from 'lucide-react-native';
+import { User, BrainCircuit, ChevronRight } from 'lucide-react-native';
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
-      <View style={styles.content}>
+    <ScrollView 
+      style={[styles.container, { paddingTop: insets.top }]}
+      contentContainerStyle={styles.content}
+    >
+      <View style={styles.header}>
         <View style={styles.iconContainer}>
           <User size={32} color={FuchsiaColors.vibrant} />
         </View>
-        <ThemedText style={styles.title}>Profile Coming Soon</ThemedText>
+        <ThemedText style={styles.title}>My Profile</ThemedText>
         <ThemedText style={styles.subtitle}>
-          Manage your account and preferences here. Stay tuned!
+          Manage your account and preferences.
         </ThemedText>
       </View>
-    </View>
+
+      <View style={styles.settingsGroup}>
+        <ThemedText style={styles.groupTitle}>AI Stylist</ThemedText>
+        <TouchableOpacity 
+          style={styles.settingsItem}
+          onPress={() => router.push('/memory')}
+        >
+          <View style={styles.settingsItemLeft}>
+            <View style={styles.itemIcon}>
+              <BrainCircuit size={20} color={FuchsiaColors.slate} />
+            </View>
+            <ThemedText style={styles.settingsItemText}>Manage AI Memory</ThemedText>
+          </View>
+          <ChevronRight size={20} color={FuchsiaColors.slate} />
+        </TouchableOpacity>
+      </View>
+    </ScrollView>
   );
 }
 
@@ -28,11 +49,14 @@ const styles = StyleSheet.create({
     backgroundColor: FuchsiaColors.cloud,
   },
   content: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
     padding: 24,
-    gap: 16,
+    gap: 32,
+    paddingBottom: 120, // Tab bar padding
+  },
+  header: {
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 20,
   },
   iconContainer: {
     width: 64,
@@ -55,5 +79,44 @@ const styles = StyleSheet.create({
     color: FuchsiaColors.slate,
     textAlign: 'center',
     lineHeight: 22,
+  },
+  settingsGroup: {
+    gap: 12,
+  },
+  groupTitle: {
+    fontFamily: FuchsiaFonts.body,
+    fontSize: 13,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    color: FuchsiaColors.slate,
+    marginLeft: 4,
+  },
+  settingsItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#fff',
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.05)',
+  },
+  settingsItemLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  itemIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: FuchsiaColors.cloud,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  settingsItemText: {
+    fontFamily: FuchsiaFonts.body,
+    fontSize: 16,
+    color: FuchsiaColors.ink,
   },
 });
