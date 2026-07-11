@@ -26,7 +26,7 @@ import {
 } from '@/api/client';
 
 export default function AddOrEditOutfitScreen() {
-  const { id, wardrobeId } = useLocalSearchParams<{ id?: string; wardrobeId?: string }>();
+  const { id, wardrobeId, itemId } = useLocalSearchParams<{ id?: string; wardrobeId?: string; itemId?: string }>();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
 
@@ -65,14 +65,26 @@ export default function AddOrEditOutfitScreen() {
       .catch(err => console.error('Failed to fetch wardrobes:', err));
     if (wardrobeId) {
       getWardrobeClothingItems(wardrobeId as string)
-        .then(setAllItems)
+        .then(items => {
+          setAllItems(items);
+          if (!id && itemId) {
+            const preselect = items.find(i => i.id === itemId);
+            if (preselect) setSelectedItems(prev => [...prev, preselect]);
+          }
+        })
         .catch(err => console.error('Failed to fetch wardrobe items:', err));
     } else {
       getClothingItems()
-        .then(setAllItems)
+        .then(items => {
+          setAllItems(items);
+          if (!id && itemId) {
+            const preselect = items.find(i => i.id === itemId);
+            if (preselect) setSelectedItems(prev => [...prev, preselect]);
+          }
+        })
         .catch(err => console.error('Failed to fetch items:', err));
     }
-  }, [id, wardrobeId]);
+  }, [id, wardrobeId, itemId]);
 
   const fetchOutfit = async () => {
     try {

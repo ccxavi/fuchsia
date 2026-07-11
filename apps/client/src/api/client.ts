@@ -278,16 +278,17 @@ export type ClothingItemResponse = {
   updated_at: string;
 };
 
-export type ClothingItemWithWardrobesResponse = ClothingItemResponse & {
+export type ClothingItemWithDetailsResponse = ClothingItemResponse & {
   wardrobes: WardrobeResponse[];
+  outfits: OutfitWithItemsResponse[];
 };
 
 export async function getClothingItems(): Promise<ClothingItemResponse[]> {
   return apiFetch<ClothingItemResponse[]>('/clothing-items');
 }
 
-export async function getClothingItem(id: string): Promise<ClothingItemWithWardrobesResponse> {
-  return apiFetch<ClothingItemWithWardrobesResponse>(`/clothing-items/${id}`);
+export async function getClothingItem(id: string): Promise<ClothingItemWithDetailsResponse> {
+  return apiFetch<ClothingItemWithDetailsResponse>(`/clothing-items/${id}`);
 }
 
 export async function deleteClothingItem(id: string): Promise<void> {
