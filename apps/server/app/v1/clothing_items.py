@@ -11,7 +11,8 @@ from app.db.session import get_db_session
 from app.models.clothing_item import ClothingItem
 from app.models.wardrobe import Wardrobe
 from app.services.supabase_storage import upload_file_to_supabase
-from app.v1.schemas import ClothingItemResponse, ClothingItemWithWardrobesResponse
+from app.models.outfit import Outfit
+from app.v1.schemas import ClothingItemResponse, ClothingItemWithDetailsResponse
 from sqlalchemy.orm import selectinload
 
 router = APIRouter()
@@ -124,7 +125,7 @@ def get_clothing_items(
     return items
 
 
-@router.get("/{item_id}", response_model=ClothingItemWithWardrobesResponse)
+@router.get("/{item_id}", response_model=ClothingItemWithDetailsResponse)
 def get_clothing_item(
     item_id: str,
     user: AuthenticatedUser = Depends(get_current_authenticated_user),
@@ -132,7 +133,11 @@ def get_clothing_item(
 ):
     item = db.scalar(
         select(ClothingItem)
-        .options(selectinload(ClothingItem.wardrobes))
+        .options(
+            selectinload(ClothingItem.wardrobes),
+            selectinload(ClothingItem.outfits).selectinload(Outfit.clothing_items),
+            selectinload(ClothingItem.outfits).selectinload(Outfit.images),
+        )
         .where(
             ClothingItem.id == item_id, ClothingItem.user_id == user.user.id
         )

@@ -303,6 +303,8 @@ class OutfitResponse(BaseModel):
     is_ai_generated: bool
     clothing_items_count: int
     wardrobes_count: int
+    times_worn: int = 0
+    last_worn: datetime.date | None = None
     created_at: datetime.datetime
     updated_at: datetime.datetime
 
@@ -335,8 +337,9 @@ class WardrobeWithDetailsResponse(WardrobeResponse):
     outfits: list[OutfitWithItemsResponse] = []
 
 
-class ClothingItemWithWardrobesResponse(ClothingItemResponse):
+class ClothingItemWithDetailsResponse(ClothingItemResponse):
     wardrobes: list[WardrobeResponse] = []
+    outfits: list[OutfitWithItemsResponse] = []
 
 
 class CalendarOutfitCreateRequest(BaseModel):
