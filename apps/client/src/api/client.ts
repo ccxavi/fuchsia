@@ -404,6 +404,7 @@ export async function getOutfit(id: string): Promise<OutfitWithWardrobesResponse
 
 export type OutfitCreateRequest = {
   name: string;
+  is_ai_generated?: boolean;
   clothing_item_ids?: string[];
   wardrobe_ids?: string[];
   imageUri?: string;
@@ -412,6 +413,9 @@ export type OutfitCreateRequest = {
 export async function createOutfit(data: OutfitCreateRequest): Promise<OutfitResponse> {
   const formData = new FormData();
   formData.append('name', data.name);
+  if (data.is_ai_generated !== undefined) {
+    formData.append('is_ai_generated', String(data.is_ai_generated));
+  }
 
   if (data.clothing_item_ids && data.clothing_item_ids.length > 0) {
     data.clothing_item_ids.forEach(id => formData.append('clothing_item_ids', id));

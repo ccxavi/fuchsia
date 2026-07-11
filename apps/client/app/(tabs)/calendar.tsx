@@ -177,6 +177,8 @@ export default function CalendarScreen() {
 
   const cellWidth = (width - 40 - (6 * 4)) / 7; // 40 = px-5*2, 6 gaps of 4px
 
+  const isViewingCurrentMonth = currentMonth.getFullYear() === todayDateObj.getFullYear() && currentMonth.getMonth() === todayDateObj.getMonth();
+
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.header}>
@@ -344,24 +346,23 @@ export default function CalendarScreen() {
           <View style={styles.statsBar}>
             <View style={styles.statItem}>
               <Shirt size={14} color={FuchsiaColors.deep} />
-              <ThemedText style={styles.statText}>{totalOutfitsThisMonth} outfits</ThemedText>
+              <ThemedText style={styles.statText}>{totalOutfitsThisMonth} {totalOutfitsThisMonth === 1 ? 'day logged' : 'days logged'}</ThemedText>
             </View>
             <ThemedText style={styles.statDot}>·</ThemedText>
             <View style={styles.statItem}>
               <Sparkles size={14} color={FuchsiaColors.deep} />
-              <ThemedText style={styles.statText}>{aiPicksThisMonth} AI picks</ThemedText>
+              <ThemedText style={styles.statText}>{aiPicksThisMonth} {aiPicksThisMonth === 1 ? 'AI pick' : 'AI picks'}</ThemedText>
             </View>
           </View>
-
-          {!todaysOutfit && (
+          {isViewingCurrentMonth && !todaysOutfit && (
             <View style={styles.todayPreviewCard}>
               <ThemedText style={styles.todayPreviewTitle}>NO OUTFIT LOGGED TODAY</ThemedText>
               <ThemedText style={styles.todayPreviewSubtitle}>
                 Ask fuchsia for a recommendation or log what you're wearing.
               </ThemedText>
               <View style={styles.todayPreviewActions}>
-                <Pressable style={styles.primaryAction} onPress={() => router.push('/')}>
-                  <Text style={styles.primaryActionText}>Get Outfit</Text>
+                <Pressable style={styles.primaryAction} onPress={() => router.push('/chat')}>
+                  <Text style={styles.primaryActionText}>Ask Fuchsia</Text>
                 </Pressable>
                 <Pressable style={styles.secondaryAction} onPress={() => router.push('/add-outfit')}>
                   <Text style={styles.secondaryActionText}>Log Manually</Text>
