@@ -597,9 +597,17 @@ export type ImagePart = {
 
 export type ContentPart = TextPart | ImagePart;
 
+export interface OutfitSuggestion {
+  name: string;
+  clothing_item_ids: string[];
+  wardrobe_ids?: string[];
+  rationale?: string;
+}
+
 export interface ChatMessage {
   role: 'system' | 'user' | 'assistant';
   content: string | ContentPart[];
+  outfit_suggestions?: OutfitSuggestion[];
 }
 
 export interface ChatRequest {
@@ -613,6 +621,7 @@ export interface ChatRequest {
 export interface ChatResponse {
   message: ChatMessage;
   memory_suggestions?: { content: string; category?: string }[];
+  outfit_suggestions?: OutfitSuggestion[];
 }
 
 export async function postChat(data: ChatRequest): Promise<ChatResponse> {

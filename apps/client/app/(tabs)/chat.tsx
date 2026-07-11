@@ -9,7 +9,7 @@ import { FuchsiaColors, FuchsiaFonts } from '@/constants/theme';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Image as ImageIcon, X, Sparkles } from 'lucide-react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import { ChatMessage, postChat, ContentPart, ingestMemories } from '@/api/client';
+import { ChatMessage, postChat, ContentPart, ingestMemories, getClothingItems, ClothingItemResponse, OutfitSuggestion, createOutfit } from '@/api/client';
 function TypingIndicator() {
   const dot1 = useRef(new Animated.Value(0)).current;
   const dot2 = useRef(new Animated.Value(0)).current;
@@ -60,6 +60,95 @@ function HeroCard() {
   );
 }
 
+function OutfitSuggestionCard({ suggestion, closetItems, onSuggestAnother }: { suggestion: OutfitSuggestion, closetItems: Record<string, ClothingItemResponse>, onSuggestAnother?: () => void }) {
+  const [isSaving, setIsSaving] = useState(false);
+  const [isSaved, setIsSaved] = useState(false);
+  const [isIgnored, setIsIgnored] = useState(false);
+
+  const handleSave = async () => {
+    if (isSaving || isSaved) return;
+    setIsSaving(true);
+    try {
+      await createOutfit({
+        name: suggestion.name,
+        clothing_item_ids: suggestion.clothing_item_ids,
+        wardrobe_ids: suggestion.wardrobe_ids,
+      });
+      setIsSaved(true);
+    } catch (err) {
+      console.error("Failed to save outfit:", err);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const images = suggestion.clothing_item_ids
+    .map(id => closetItems[id]?.image_url)
+    .filter((url): url is string => !!url);
+
+  return (
+    <View style={styles.outfitCard}>
+      <View style={styles.outfitCardHeader}>
+        <Sparkles size={16} color={FuchsiaColors.deep} />
+        <ThemedText style={styles.outfitCardTitle}>{suggestion.name}</ThemedText>
+      </View>
+      
+      {images.length > 0 && (
+        <View style={styles.outfitCardImages}>
+          {images.map((url, idx) => (
+            <Image key={idx} source={{ uri: url }} style={styles.outfitCardImage} />
+          ))}
+        </View>
+      )}
+
+      {suggestion.rationale && (
+        <ThemedText style={styles.outfitCardRationale}>{suggestion.rationale}</ThemedText>
+      )}
+
+      {isIgnored ? (
+        <View style={{ flexDirection: 'row', gap: 8 }}>
+          <View style={[styles.outfitCardBtnSecondary, { flex: 1, borderColor: FuchsiaColors.slate, opacity: 0.6 }]}>
+            <ThemedText style={[styles.outfitCardBtnTextSecondary, { color: FuchsiaColors.slate }]}>
+              Dismissed
+            </ThemedText>
+          </View>
+        </View>
+      ) : (
+        <View style={{ flexDirection: 'row', gap: 8 }}>
+          {onSuggestAnother && !isSaved && (
+            <TouchableOpacity 
+              style={[styles.outfitCardBtnSecondary, { flex: 1 }]} 
+              onPress={() => {
+                setIsIgnored(true);
+                onSuggestAnother();
+              }}
+              disabled={isSaving}
+            >
+              <ThemedText style={styles.outfitCardBtnTextSecondary}>
+                Suggest Another
+              </ThemedText>
+            </TouchableOpacity>
+          )}
+
+          <TouchableOpacity 
+            style={[styles.outfitCardBtn, isSaved && styles.outfitCardBtnSaved, { flex: 1 }]} 
+            onPress={handleSave}
+            disabled={isSaving || isSaved}
+          >
+            {isSaving ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <ThemedText style={styles.outfitCardBtnText}>
+                {isSaved ? "Saved to Closet!" : "Save to Closet"}
+              </ThemedText>
+            )}
+          </TouchableOpacity>
+        </View>
+      )}
+    </View>
+  );
+}
+
 export default function ChatScreen() {
   const insets = useSafeAreaInsets();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -72,6 +161,15 @@ export default function ChatScreen() {
   const flatListRef = useRef<FlatList>(null);
   
   const [location, setLocation] = useState<Location.LocationObject | null>(null);
+  const [closetItems, setClosetItems] = useState<Record<string, ClothingItemResponse>>({});
+
+  useEffect(() => {
+    getClothingItems().then((items) => {
+      const map: Record<string, ClothingItemResponse> = {};
+      items.forEach(i => map[i.id] = i);
+      setClosetItems(map);
+    }).catch(err => console.error("Failed to load closet items:", err));
+  }, []);
 
   useEffect(() => {
     const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
@@ -154,7 +252,11 @@ export default function ChatScreen() {
         longitude: location?.coords.longitude,
       });
       
-      setMessages((prev) => [...prev, response.message]);
+      const newMessage: ChatMessage = {
+        ...response.message,
+        outfit_suggestions: response.outfit_suggestions,
+      };
+      setMessages((prev) => [...prev, newMessage]);
 
       if (response.memory_suggestions && response.memory_suggestions.length > 0) {
         try {
@@ -169,7 +271,46 @@ export default function ChatScreen() {
       setIsLoading(false);
     }
   };
+  const sendDirectMessage = async (displayMessage: string, hiddenPrompt?: string) => {
+    if (isLoading) return;
 
+    const uiMessage: ChatMessage = { role: 'user', content: displayMessage };
+    const updatedUIMessages = [...messages, uiMessage];
+    
+    setMessages(updatedUIMessages);
+    setIsLoading(true);
+
+    try {
+      // Send the explicit hidden prompt to the backend to force tool usage, 
+      // without exposing the awkward instructions to the user.
+      const backendMessage: ChatMessage = { role: 'user', content: hiddenPrompt || displayMessage };
+      const backendMessages = [...messages, backendMessage];
+
+      const response = await postChat({
+        messages: backendMessages,
+        latitude: location?.coords.latitude,
+        longitude: location?.coords.longitude,
+      });
+      
+      const newMessage: ChatMessage = {
+        ...response.message,
+        outfit_suggestions: response.outfit_suggestions,
+      };
+      setMessages((prev) => [...prev, newMessage]);
+
+      if (response.memory_suggestions && response.memory_suggestions.length > 0) {
+        try {
+          await ingestMemories({ memories: response.memory_suggestions });
+        } catch (memError) {
+          console.error("Failed to ingest memory suggestions:", memError);
+        }
+      }
+    } catch (error) {
+      console.error("Chat error:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
   const renderMessageContent = (content: string | ContentPart[], isUser: boolean) => {
     const textColor = isUser ? '#fff' : FuchsiaColors.ink;
     
@@ -202,11 +343,28 @@ export default function ChatScreen() {
   const renderMessage = ({ item }: { item: ChatMessage }) => {
     const isUser = item.role === 'user';
     return (
-      <View style={[
-        styles.messageBubble, 
-        isUser ? styles.userBubble : styles.aiBubble
-      ]}>
-        {renderMessageContent(item.content, isUser)}
+      <View style={{ marginBottom: 16 }}>
+        <View style={[
+          styles.messageBubble, 
+          isUser ? styles.userBubble : styles.aiBubble
+        ]}>
+          {renderMessageContent(item.content, isUser)}
+        </View>
+        {item.outfit_suggestions && item.outfit_suggestions.length > 0 && (
+          <View style={{ marginTop: 12, gap: 12 }}>
+            {item.outfit_suggestions.map((suggestion, idx) => (
+              <OutfitSuggestionCard 
+                key={idx} 
+                suggestion={suggestion} 
+                closetItems={closetItems} 
+                onSuggestAnother={() => sendDirectMessage(
+                  "Show me a different option.", 
+                  "Show me a different option. Please use your suggest_outfits tool to officially propose it so I can save it."
+                )}
+              />
+            ))}
+          </View>
+        )}
       </View>
     );
   };
@@ -360,6 +518,73 @@ const styles = StyleSheet.create({
     fontFamily: FuchsiaFonts.body,
     fontSize: 14,
     color: FuchsiaColors.slate,
+  },
+  outfitCard: {
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.08)',
+    borderRadius: 16,
+    padding: 16,
+    width: '85%',
+    alignSelf: 'flex-start',
+  },
+  outfitCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 12,
+  },
+  outfitCardTitle: {
+    fontFamily: FuchsiaFonts.heading,
+    fontSize: 16,
+    color: FuchsiaColors.ink,
+  },
+  outfitCardImages: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 12,
+  },
+  outfitCardImage: {
+    width: 60,
+    height: 60,
+    borderRadius: 8,
+    backgroundColor: FuchsiaColors.cloud,
+  },
+  outfitCardRationale: {
+    fontFamily: FuchsiaFonts.body,
+    fontSize: 13,
+    color: FuchsiaColors.slate,
+    fontStyle: 'italic',
+    marginBottom: 12,
+    lineHeight: 18,
+  },
+  outfitCardBtn: {
+    backgroundColor: FuchsiaColors.deep,
+    paddingVertical: 10,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  outfitCardBtnSecondary: {
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: FuchsiaColors.deep,
+    paddingVertical: 10,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  outfitCardBtnSaved: {
+    backgroundColor: '#10B981',
+  },
+  outfitCardBtnText: {
+    color: '#fff',
+    fontFamily: FuchsiaFonts.heading,
+    fontSize: 14,
+  },
+  outfitCardBtnTextSecondary: {
+    color: FuchsiaColors.deep,
+    fontFamily: FuchsiaFonts.heading,
+    fontSize: 14,
   },
   inputSection: {
     borderTopWidth: 1,
