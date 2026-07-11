@@ -9,8 +9,8 @@ if TYPE_CHECKING:
     from app.models.calendar_outfit import CalendarOutfit
     from app.models.outfit_image import OutfitImage
 
-from sqlalchemy import Boolean, ForeignKey, String
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy import Boolean, ForeignKey, String, select, func
+from sqlalchemy.orm import Mapped, mapped_column, relationship, column_property
 
 from app.db.base import Base, TimestampMixin
 
@@ -71,3 +71,23 @@ class Outfit(TimestampMixin, Base):
     @property
     def wardrobes_count(self) -> int:
         return len(self.wardrobes)
+
+# Late import to avoid circular dependencies when defining column_properties
+from app.models.calendar_outfit import CalendarOutfit
+import datetime
+
+Outfit.times_worn = column_property(
+    select(func.count(CalendarOutfit.id))
+    .where(CalendarOutfit.outfit_id == Outfit.id)
+    .correlate_except(CalendarOutfit)
+    .scalar_subquery(),
+    deferred=False
+)
+
+Outfit.last_worn = column_property(
+    select(func.max(CalendarOutfit.date))
+    .where(CalendarOutfit.outfit_id == Outfit.id)
+    .correlate_except(CalendarOutfit)
+    .scalar_subquery(),
+    deferred=False
+)
