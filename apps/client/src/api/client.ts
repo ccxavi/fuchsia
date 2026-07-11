@@ -156,6 +156,8 @@ export type OutfitResponse = {
   image_url?: string | null;
   clothing_items_count: number;
   wardrobes_count: number;
+  times_worn?: number;
+  last_worn?: string | null;
   created_at: string;
   updated_at: string;
 };
