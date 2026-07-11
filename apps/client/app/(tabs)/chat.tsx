@@ -420,7 +420,7 @@ export default function ChatScreen() {
 
     try {
       const response = await postChat({
-        messages: updatedMessages,
+        messages: updatedMessages.slice(-6),
         latitude: location?.coords.latitude,
         longitude: location?.coords.longitude,
       });
@@ -461,7 +461,7 @@ export default function ChatScreen() {
       const backendMessages = [...messages, backendMessage];
 
       const response = await postChat({
-        messages: backendMessages,
+        messages: backendMessages.slice(-6),
         latitude: location?.coords.latitude,
         longitude: location?.coords.longitude,
       });
