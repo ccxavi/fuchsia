@@ -463,11 +463,11 @@ export default function OutfitDetailScreen() {
           <Text style={styles.cardLabel}>Wear History</Text>
           <View style={styles.statsRow}>
             <View style={styles.statBox}>
-              <Text style={styles.statValue}>0</Text>
+              <Text style={styles.statValue}>{outfit.times_worn || 0}</Text>
               <Text style={styles.statLabel}>Times worn</Text>
             </View>
             <View style={styles.statBox}>
-              <Text style={styles.statValue}>—</Text>
+              <Text style={styles.statValue}>{outfit.last_worn ? new Date(outfit.last_worn).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '—'}</Text>
               <Text style={styles.statLabel}>Last worn</Text>
             </View>
             <View style={styles.statBox}>
