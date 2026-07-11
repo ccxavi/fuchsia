@@ -79,6 +79,7 @@ import datetime
 Outfit.times_worn = column_property(
     select(func.count(CalendarOutfit.id))
     .where(CalendarOutfit.outfit_id == Outfit.id)
+    .where(CalendarOutfit.date <= datetime.date.today())
     .correlate_except(CalendarOutfit)
     .scalar_subquery(),
     deferred=False
@@ -87,6 +88,7 @@ Outfit.times_worn = column_property(
 Outfit.last_worn = column_property(
     select(func.max(CalendarOutfit.date))
     .where(CalendarOutfit.outfit_id == Outfit.id)
+    .where(CalendarOutfit.date <= datetime.date.today())
     .correlate_except(CalendarOutfit)
     .scalar_subquery(),
     deferred=False
