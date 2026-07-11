@@ -106,6 +106,7 @@ function OutfitSuggestionCard({ suggestion, closetItems, onSuggestAnother }: { s
     try {
       await createOutfit({
         name: suggestion.name,
+        is_ai_generated: true,
         clothing_item_ids: suggestion.clothing_item_ids,
         wardrobe_ids: suggestion.wardrobe_ids,
       });
