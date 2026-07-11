@@ -1,4 +1,4 @@
-import { View, StyleSheet, TextInput, Pressable, ScrollView, ActivityIndicator, Modal, useWindowDimensions, DeviceEventEmitter, Text } from 'react-native';
+import { View, StyleSheet, TextInput, Pressable, ScrollView, ActivityIndicator, Modal, useWindowDimensions, DeviceEventEmitter, Text, KeyboardAvoidingView, Platform, Keyboard } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useState, useEffect } from 'react';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -51,6 +51,8 @@ export default function AddOrEditOutfitScreen() {
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [pickerSearchQuery, setPickerSearchQuery] = useState('');
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
 
   const [isLoading, setIsLoading] = useState(false);
   const [isFetching, setIsFetching] = useState(!!id);
@@ -85,6 +87,20 @@ export default function AddOrEditOutfitScreen() {
         .catch(err => console.error('Failed to fetch items:', err));
     }
   }, [id, wardrobeId, itemId]);
+
+  useEffect(() => {
+    if (Platform.OS !== 'android') return;
+    const showSub = Keyboard.addListener('keyboardDidShow', (e) => {
+      setKeyboardHeight(e.endCoordinates.height);
+    });
+    const hideSub = Keyboard.addListener('keyboardDidHide', () => {
+      setKeyboardHeight(0);
+    });
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
 
   const fetchOutfit = async () => {
     try {
@@ -238,7 +254,11 @@ export default function AddOrEditOutfitScreen() {
   const selectedItemsData = allItems.filter(i => pickerSelectedIds.has(i.id));
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
+    <KeyboardAvoidingView 
+      style={[styles.container, { paddingTop: insets.top }]} 
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 64 : 0}
+    >
       {/* Header */}
       <View style={styles.header}>
         <Pressable onPress={() => router.back()} style={styles.backButton}>
@@ -419,6 +439,9 @@ export default function AddOrEditOutfitScreen() {
           </LinearGradient>
         </Pressable>
       </View>
+
+      {/* Manual Android Keyboard Spacer */}
+      {Platform.OS === 'android' && <View style={{ height: keyboardHeight }} />}
 
       {/* Item Picker Modal (Full Screen) */}
       <Modal
@@ -702,7 +725,7 @@ export default function AddOrEditOutfitScreen() {
           </View>
         </View>
       </Modal>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
