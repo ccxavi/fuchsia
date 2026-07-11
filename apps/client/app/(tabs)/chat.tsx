@@ -7,9 +7,10 @@ import { ThemedText } from '@/components/themed-text';
 import { MarkdownText } from '@/components/ui/MarkdownText';
 import { FuchsiaColors, FuchsiaFonts } from '@/constants/theme';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Image as ImageIcon, X, Sparkles, Calendar } from 'lucide-react-native';
+import { Image as ImageIcon, X, Sparkles, Calendar, Mic, Plus, Square } from 'lucide-react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { ChatMessage, postChat, ContentPart, ingestMemories, getClothingItems, ClothingItemResponse, OutfitSuggestion, createOutfit, CalendarSuggestion, createCalendarOutfit, getOutfits, OutfitWithItemsResponse } from '@/api/client';
+import { ExpoSpeechRecognitionModule, useSpeechRecognitionEvent } from 'expo-speech-recognition';
 function TypingIndicator() {
   const dot1 = useRef(new Animated.Value(0)).current;
   const dot2 = useRef(new Animated.Value(0)).current;
@@ -39,6 +40,40 @@ function TypingIndicator() {
       <Animated.View style={[dotStyle, { transform: [{ translateY: dot1 }] }]} />
       <Animated.View style={[dotStyle, { transform: [{ translateY: dot2 }] }]} />
       <Animated.View style={[dotStyle, { transform: [{ translateY: dot3 }] }]} />
+    </View>
+  );
+}
+
+function AnimatedWavelength() {
+  const animations = useRef([...Array(6)].map(() => new Animated.Value(0))).current;
+
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.stagger(100, animations.map(anim => 
+        Animated.sequence([
+          Animated.timing(anim, { toValue: 1, duration: 300, useNativeDriver: false }),
+          Animated.timing(anim, { toValue: 0, duration: 300, useNativeDriver: false })
+        ])
+      ))
+    );
+    loop.start();
+    return () => loop.stop();
+  }, []);
+
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', height: 40, gap: 4, flex: 1, paddingLeft: 12 }}>
+      <ThemedText style={{ marginRight: 8, color: FuchsiaColors.deep, fontFamily: FuchsiaFonts.body, fontSize: 15 }}>Listening...</ThemedText>
+      {animations.map((anim, i) => (
+        <Animated.View 
+          key={i} 
+          style={{ 
+            width: 4, 
+            borderRadius: 2, 
+            backgroundColor: FuchsiaColors.deep, 
+            height: anim.interpolate({ inputRange: [0, 1], outputRange: [6, 20] }) 
+          }} 
+        />
+      ))}
     </View>
   );
 }
@@ -251,9 +286,44 @@ export default function ChatScreen() {
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [imageBase64, setImageBase64] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [showAttachments, setShowAttachments] = useState(false);
   const [isKeyboardVisible, setKeyboardVisible] = useState(false);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const [recognizing, setRecognizing] = useState(false);
   const flatListRef = useRef<FlatList>(null);
+
+  useSpeechRecognitionEvent('start', () => setRecognizing(true));
+  useSpeechRecognitionEvent('end', () => setRecognizing(false));
+  useSpeechRecognitionEvent('error', (event) => {
+    console.log('Speech error:', event.error, event.message);
+    setRecognizing(false);
+  });
+  useSpeechRecognitionEvent('result', (event) => {
+    const transcript = event.results[0]?.transcript;
+    if (transcript) {
+      setInput(transcript);
+    }
+  });
+
+  const toggleRecording = async () => {
+    if (recognizing) {
+      ExpoSpeechRecognitionModule.stop();
+    } else {
+      const hasPermission = await ExpoSpeechRecognitionModule.requestPermissionsAsync();
+      if (!hasPermission.granted) {
+        alert('Microphone permission is required for dictation.');
+        return;
+      }
+      ExpoSpeechRecognitionModule.start({
+        lang: 'en-US',
+        interimResults: true,
+        androidIntentOptions: {
+          EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS: 3000,
+          EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS: 3000,
+        }
+      });
+    }
+  };
   
   const [location, setLocation] = useState<Location.LocationObject | null>(null);
   const [closetItems, setClosetItems] = useState<Record<string, ClothingItemResponse>>({});
@@ -527,32 +597,68 @@ export default function ChatScreen() {
             </TouchableOpacity>
           </View>
         )}
-        <View style={styles.inputBar}>
-          <TouchableOpacity style={styles.plusBtn} onPress={pickImage}>
-            <ImageIcon size={20} color={FuchsiaColors.slate} />
-          </TouchableOpacity>
-          <TextInput
-            style={styles.textInput}
-            value={input}
-            onChangeText={setInput}
-            placeholder="Ask your stylist..."
-            placeholderTextColor={FuchsiaColors.slate}
-            multiline
-            maxLength={500}
-          />
+        <View style={[styles.inputBar, { zIndex: 10 }]}>
+          {!recognizing && (
+            <View style={{ position: 'relative', zIndex: 100 }}>
+              {showAttachments && (
+                <View style={styles.attachmentMenu}>
+                  <TouchableOpacity style={styles.attachmentMenuItem} onPress={() => { pickImage(); setShowAttachments(false); }}>
+                    <View style={styles.attachmentIconContainer}>
+                      <ImageIcon size={20} color={FuchsiaColors.slate} />
+                    </View>
+                    <ThemedText style={styles.attachmentMenuText}>Upload Photo</ThemedText>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.attachmentMenuItem} onPress={() => { toggleRecording(); setShowAttachments(false); }}>
+                    <View style={styles.attachmentIconContainer}>
+                      <Mic size={20} color={FuchsiaColors.slate} />
+                    </View>
+                    <ThemedText style={styles.attachmentMenuText}>Voice Dictation</ThemedText>
+                  </TouchableOpacity>
+                </View>
+              )}
+              <TouchableOpacity style={styles.plusBtn} onPress={() => setShowAttachments(!showAttachments)}>
+                <Plus 
+                  size={20} 
+                  color={showAttachments ? FuchsiaColors.deep : FuchsiaColors.slate} 
+                  style={{ transform: [{ rotate: showAttachments ? '45deg' : '0deg' }] }} 
+                />
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {recognizing ? (
+            <AnimatedWavelength />
+          ) : (
+            <TextInput
+              style={styles.textInput}
+              value={input}
+              onChangeText={setInput}
+              placeholder="Ask your stylist..."
+              placeholderTextColor={FuchsiaColors.slate}
+              multiline
+              maxLength={500}
+            />
+          )}
+
           <TouchableOpacity 
-            style={[{ opacity: (!input.trim() && !imageBase64) || isLoading ? 0.5 : 1 }]} 
-            onPress={sendMessage}
-            disabled={(!input.trim() && !imageBase64) || isLoading}
+            style={[{ opacity: (!input.trim() && !imageBase64 && !recognizing) || isLoading ? 0.5 : 1 }]} 
+            onPress={recognizing ? toggleRecording : sendMessage}
+            disabled={(!input.trim() && !imageBase64 && !recognizing) || isLoading}
           >
-            <LinearGradient
-              colors={['#86003C', '#B5004D', '#D4145A']}
-              start={{ x: 0, y: 0.5 }}
-              end={{ x: 1, y: 0.5 }}
-              style={styles.sendBtn}
-            >
-              <MaterialIcons name={isLoading ? 'hourglass-empty' : 'send'} size={18} color="#fff" />
-            </LinearGradient>
+            {recognizing ? (
+              <View style={[styles.sendBtn, { backgroundColor: '#FEE2E2' }]}>
+                <Square size={16} color="#DC2626" fill="#DC2626" />
+              </View>
+            ) : (
+              <LinearGradient
+                colors={['#86003C', '#B5004D', '#D4145A']}
+                start={{ x: 0, y: 0.5 }}
+                end={{ x: 1, y: 0.5 }}
+                style={styles.sendBtn}
+              >
+                <MaterialIcons name={isLoading ? 'hourglass-empty' : 'send'} size={18} color="#fff" />
+              </LinearGradient>
+            )}
           </TouchableOpacity>
         </View>
       </View>
@@ -736,7 +842,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 10,
-    backgroundColor: 'transparent',
+    backgroundColor: 'rgba(0,0,0,0.05)',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -750,6 +856,44 @@ const styles = StyleSheet.create({
   sendButtonDisabled: {
     backgroundColor: FuchsiaColors.slate,
     opacity: 0.5,
+  },
+  attachmentMenu: {
+    position: 'absolute',
+    bottom: '100%',
+    left: 0,
+    marginBottom: 16,
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.05)',
+    width: 180,
+    zIndex: 1000,
+  },
+  attachmentMenuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 8,
+    gap: 12,
+  },
+  attachmentIconContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    backgroundColor: 'rgba(0,0,0,0.04)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  attachmentMenuText: {
+    fontFamily: FuchsiaFonts.body,
+    fontSize: 16,
+    color: FuchsiaColors.ink,
+    paddingRight: 16,
   },
   imagePreviewContainer: {
     flexDirection: 'row',
