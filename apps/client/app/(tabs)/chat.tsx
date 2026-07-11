@@ -200,10 +200,6 @@ function CalendarSuggestionCard({ suggestion, savedOutfits, onDismiss }: { sugge
         </View>
       )}
 
-      {suggestion.notes && (
-        <ThemedText style={styles.outfitCardRationale}>{suggestion.notes}</ThemedText>
-      )}
-
       {isIgnored ? (
         <View style={{ flexDirection: 'row', gap: 8 }}>
           <View style={[styles.outfitCardBtnSecondary, { flex: 1, borderColor: FuchsiaColors.slate, opacity: 0.6 }]}>
