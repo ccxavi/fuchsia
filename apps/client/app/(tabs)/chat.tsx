@@ -359,7 +359,7 @@ export default function ChatScreen() {
                 closetItems={closetItems} 
                 onSuggestAnother={() => sendDirectMessage(
                   "Show me a different option.", 
-                  "Show me a different option. Please use your suggest_outfits tool to officially propose it so I can save it."
+                  "Show me a different option. CRITICAL: You must choose different clothing items than your previous suggestions. Do not repeat the same outfit. Please use your suggest_outfits tool to officially propose it so I can save it."
                 )}
               />
             ))}
