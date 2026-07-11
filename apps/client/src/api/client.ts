@@ -1,7 +1,7 @@
 import * as SecureStore from 'expo-secure-store';
 import { router } from 'expo-router';
 
-const API_BASE = 'https://fuchsia-api.giann.dev/api/v1';
+const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 
 let refreshPromise: Promise<string | null> | null = null;
 
