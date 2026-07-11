@@ -1,19 +1,20 @@
-import { View, Text, StyleSheet, Pressable, ScrollView, ActivityIndicator, Alert, useWindowDimensions, Platform, DeviceEventEmitter } from 'react-native';
+import { View, Text, StyleSheet, Pressable, ScrollView, ActivityIndicator, Alert, useWindowDimensions, Platform, DeviceEventEmitter, Modal } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useState, useEffect } from 'react';
 import { Image } from 'expo-image';
-import { ArrowLeft, Trash2, Palette, Folder, Layers, Upload, Plus, MoreHorizontal, Edit2 } from 'lucide-react-native';
+import { ArrowLeft, Trash2, Palette, Folder, Layers, Upload, Plus, MoreHorizontal, Edit2, X, Check } from 'lucide-react-native';
 
+import { LinearGradient } from 'expo-linear-gradient';
 import { FuchsiaColors, FuchsiaFonts } from '@/constants/theme';
-import { getClothingItem, deleteClothingItem, ClothingItemResponse } from '@/api/client';
+import { getClothingItem, deleteClothingItem, ClothingItemWithDetailsResponse, OutfitWithItemsResponse, WardrobeResponse, getWardrobes, addItemToWardrobe, removeItemFromWardrobe } from '@/api/client';
 
 export default function ItemDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   
-  const [item, setItem] = useState<ClothingItemResponse | null>(null);
+  const [item, setItem] = useState<ClothingItemWithDetailsResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isDeleting, setIsDeleting] = useState(false);
   const [menuVisible, setMenuVisible] = useState(false);
@@ -99,6 +100,96 @@ export default function ItemDetailScreen() {
   });
 
   const placeholderImage = `https://placehold.co/800x800/FDF2F8/86003C/png?text=${encodeURIComponent(item.name)}`;
+
+  const renderOutfitImage = (item: OutfitWithItemsResponse) => {
+    const items = item.clothing_items || [];
+    
+    // If user uploaded a custom image, prioritize it over the 2x2 grid collage
+    if (item.images && item.images.length > 0) {
+      const coverImage = item.images[0];
+      return <Image source={{ uri: coverImage.image_url }} style={StyleSheet.absoluteFill} contentFit="cover" />;
+    }
+
+    if (items.length === 0) {
+      return (
+        <LinearGradient
+          colors={['#D4145A', '#86003C']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center' }]}
+        >
+          <Text style={{ fontFamily: FuchsiaFonts.heading, fontSize: 14, color: '#fff', textAlign: 'center', paddingHorizontal: 8 }} numberOfLines={2}>{item.name}</Text>
+        </LinearGradient>
+      );
+    }
+
+    if (items.length === 1) {
+      return (
+        <View style={[{ flex: 1, backgroundColor: FuchsiaColors.mist }]}>
+          <Image source={{ uri: items[0].image_url || '' }} style={StyleSheet.absoluteFill} contentFit="cover" />
+        </View>
+      );
+    }
+
+    if (items.length === 2) {
+      return (
+        <View style={{ flex: 1, flexDirection: 'row' }}>
+          <View style={{ flex: 1, borderRightWidth: 1, borderColor: '#fff', backgroundColor: FuchsiaColors.mist }}>
+            <Image source={{ uri: items[0].image_url || '' }} style={{ flex: 1 }} contentFit="cover" />
+          </View>
+          <View style={{ flex: 1, borderLeftWidth: 1, borderColor: '#fff', backgroundColor: FuchsiaColors.mist }}>
+            <Image source={{ uri: items[1].image_url || '' }} style={{ flex: 1 }} contentFit="cover" />
+          </View>
+        </View>
+      );
+    }
+
+    if (items.length === 3) {
+      return (
+        <View style={{ flex: 1 }}>
+          <View style={{ flex: 1, borderBottomWidth: 1, borderColor: '#fff', backgroundColor: FuchsiaColors.mist }}>
+            <Image source={{ uri: items[0].image_url || '' }} style={{ flex: 1 }} contentFit="cover" />
+          </View>
+          <View style={{ flex: 1, flexDirection: 'row', borderTopWidth: 1, borderColor: '#fff' }}>
+            <View style={{ flex: 1, borderRightWidth: 1, borderColor: '#fff', backgroundColor: FuchsiaColors.mist }}>
+              <Image source={{ uri: items[1].image_url || '' }} style={{ flex: 1 }} contentFit="cover" />
+            </View>
+            <View style={{ flex: 1, borderLeftWidth: 1, borderColor: '#fff', backgroundColor: FuchsiaColors.mist }}>
+              <Image source={{ uri: items[2].image_url || '' }} style={{ flex: 1 }} contentFit="cover" />
+            </View>
+          </View>
+        </View>
+      );
+    }
+
+    // 4 or more items
+    const extraCount = items.length - 4;
+    return (
+      <View style={{ flex: 1 }}>
+        <View style={{ flex: 1, flexDirection: 'row', borderBottomWidth: 1, borderColor: '#fff' }}>
+          <View style={{ flex: 1, borderRightWidth: 1, borderColor: '#fff', backgroundColor: FuchsiaColors.mist }}>
+            <Image source={{ uri: items[0].image_url || '' }} style={{ flex: 1 }} contentFit="cover" />
+          </View>
+          <View style={{ flex: 1, borderLeftWidth: 1, borderColor: '#fff', backgroundColor: FuchsiaColors.mist }}>
+            <Image source={{ uri: items[1].image_url || '' }} style={{ flex: 1 }} contentFit="cover" />
+          </View>
+        </View>
+        <View style={{ flex: 1, flexDirection: 'row', borderTopWidth: 1, borderColor: '#fff' }}>
+          <View style={{ flex: 1, borderRightWidth: 1, borderColor: '#fff', backgroundColor: FuchsiaColors.mist }}>
+            <Image source={{ uri: items[2].image_url || '' }} style={{ flex: 1 }} contentFit="cover" />
+          </View>
+          <View style={{ flex: 1, borderLeftWidth: 1, borderColor: '#fff', backgroundColor: FuchsiaColors.mist }}>
+            <Image source={{ uri: items[3].image_url || '' }} style={{ flex: 1 }} contentFit="cover" />
+            {items.length > 4 && (
+              <View style={{ ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center' }}>
+                <Text style={{ fontFamily: FuchsiaFonts.heading, fontSize: 16, color: '#fff', fontWeight: 'bold' }}>+{extraCount}</Text>
+              </View>
+            )}
+          </View>
+        </View>
+      </View>
+    );
+  };
 
   return (
     <View style={styles.container}>
@@ -219,33 +310,106 @@ export default function ItemDetailScreen() {
               horizontal 
               showsHorizontalScrollIndicator={false} 
               contentContainerStyle={styles.styledInScroll}
+              snapToInterval={160 + 16}
+              decelerationRate="fast"
             >
-              {/* Dummy Outfit */}
-              <Pressable style={styles.outfitCard}>
-                <View style={styles.outfitImageContainer}>
-                  <Image 
-                    source={{ uri: 'https://placehold.co/300x400/FDF2F8/86003C/png?text=Outfit' }} 
-                    style={StyleSheet.absoluteFill} 
-                    contentFit="cover"
-                  />
-                </View>
-                <View style={styles.outfitInfo}>
-                  <Text style={styles.outfitTitle} numberOfLines={1}>Sunday Brunch</Text>
-                </View>
-              </Pressable>
+              {item.outfits?.map(outfit => (
+                <Pressable 
+                  key={outfit.id} 
+                  style={styles.outfitCard}
+                  onPress={() => router.push(`/outfit/${outfit.id}`)}
+                >
+                  <View style={styles.outfitImageContainer}>
+                    {renderOutfitImage(outfit)}
+                  </View>
+                  <View style={styles.outfitInfo}>
+                    <Text style={styles.outfitTitle} numberOfLines={1}>{outfit.name}</Text>
+                    <Text style={styles.outfitSubtitle}>{outfit.clothing_items_count} Items</Text>
+                  </View>
+                </Pressable>
+              ))}
 
               {/* Style It Button */}
-              <Pressable style={styles.addOutfitCard}>
-                <View style={styles.addOutfitInner}>
-                  <Plus size={20} color={FuchsiaColors.slate} />
+              <View style={styles.outfitCard}>
+                <Pressable 
+                  style={styles.addOutfitInner}
+                  onPress={() => router.push({ pathname: '/add-outfit', params: { itemId: id } })}
+                >
+                  <Plus size={24} color={FuchsiaColors.slate} />
                   <Text style={styles.addOutfitText}>STYLE IT</Text>
-                </View>
-              </Pressable>
+                </Pressable>
+              </View>
             </ScrollView>
           </View>
 
+          {/* Packed In / Wardrobes Section */}
+          {item.wardrobes?.length > 0 && (
+            <View style={styles.styledInSection}>
+              <View style={styles.styledInHeader}>
+                <Text style={styles.styledInTitle}>Packed In</Text>
+              </View>
+              <ScrollView 
+                horizontal 
+                showsHorizontalScrollIndicator={false} 
+                contentContainerStyle={styles.styledInScroll}
+              >
+                {item.wardrobes.map(wardrobe => (
+                  <Pressable 
+                    key={wardrobe.id} 
+                    style={styles.wardrobeCard}
+                    onPress={() => router.push(`/wardrobe/${wardrobe.id}`)}
+                  >
+                    {wardrobe.image_url ? (
+                      <View style={styles.wardrobeImage}>
+                        <Image 
+                          source={{ uri: wardrobe.image_url }} 
+                          style={[StyleSheet.absoluteFillObject, styles.wardrobeImageStyle]} 
+                          contentFit="cover" 
+                        />
+                        <LinearGradient
+                          colors={['transparent', 'rgba(0,0,0,0.8)']}
+                          style={[StyleSheet.absoluteFillObject, styles.wardrobeGradient]}
+                        >
+                          <Text style={styles.wardrobeCardTitle}>{wardrobe.name}</Text>
+                          <Text style={styles.wardrobeCardSubtitle}>{wardrobe.clothing_items_count} Items</Text>
+                        </LinearGradient>
+                      </View>
+                    ) : (
+                      <LinearGradient
+                        colors={['#D4145A', '#86003C']}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={styles.wardrobeImage}
+                      >
+                        <LinearGradient
+                          colors={['transparent', 'rgba(0,0,0,0.4)']}
+                          style={styles.wardrobeGradient}
+                        >
+                          <Text style={styles.wardrobeCardTitle}>{wardrobe.name}</Text>
+                          <Text style={styles.wardrobeCardSubtitle}>{wardrobe.clothing_items_count} Items</Text>
+                        </LinearGradient>
+                      </LinearGradient>
+                    )}
+                  </Pressable>
+                ))}
+
+                {/* Pack It Button */}
+                <Pressable 
+                  style={styles.addWardrobeCard}
+                  onPress={() => router.push(`/item/${id}/select-wardrobes`)}
+                >
+                  <View style={styles.addWardrobeInner}>
+                    <Plus size={20} color={FuchsiaColors.slate} />
+                    <Text style={styles.addOutfitText}>PACK IT</Text>
+                  </View>
+                </Pressable>
+              </ScrollView>
+            </View>
+          )}
+
         </View>
       </ScrollView>
+
     </View>
   );
 }
@@ -496,59 +660,197 @@ const styles = StyleSheet.create({
   },
   styledInScroll: {
     gap: 16,
-    paddingRight: 20, // To allow scrolling completely to the edge
+    paddingRight: 20,
   },
   outfitCard: {
-    width: 140,
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 6,
-    borderWidth: 1,
-    borderColor: 'rgba(229, 229, 239, 0.5)', // mist/50
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
+    width: 160,
+    flexDirection: 'column',
+    gap: 8,
   },
   outfitImageContainer: {
-    aspectRatio: 3 / 4,
+    width: 160,
+    aspectRatio: 4 / 5,
+    borderRadius: 20,
     backgroundColor: FuchsiaColors.cloud,
-    borderRadius: 12,
     overflow: 'hidden',
-    marginBottom: 8,
   },
   outfitInfo: {
     paddingHorizontal: 4,
-    paddingBottom: 4,
   },
   outfitTitle: {
-    fontFamily: FuchsiaFonts.heading,
+    fontFamily: FuchsiaFonts.body,
     fontWeight: '600',
-    fontSize: 12,
+    fontSize: 14,
     color: FuchsiaColors.ink,
   },
-  addOutfitCard: {
-    width: 140,
-    backgroundColor: 'transparent',
+  outfitSubtitle: {
+    fontFamily: FuchsiaFonts.body,
+    fontSize: 12,
+    color: FuchsiaColors.slate,
+    marginTop: 2,
   },
   addOutfitInner: {
-    flex: 1,
-    aspectRatio: 3 / 4,
-    borderRadius: 12,
+    width: '100%',
+    aspectRatio: 4 / 5,
+    borderRadius: 20,
     borderWidth: 2,
     borderColor: FuchsiaColors.mist,
     borderStyle: 'dashed',
-    backgroundColor: 'rgba(248, 248, 252, 0.5)', // cloud/50
+    backgroundColor: 'rgba(248, 248, 252, 0.5)',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 4,
+    gap: 8,
   },
   addOutfitText: {
     fontFamily: FuchsiaFonts.body,
     fontWeight: '600',
-    fontSize: 10,
+    fontSize: 12,
     color: FuchsiaColors.slate,
-    letterSpacing: 0.5,
+  },
+  addWardrobeCard: {
+    width: 240,
+    height: 140,
+    backgroundColor: 'transparent',
+  },
+  addWardrobeInner: {
+    flex: 1,
+    borderRadius: 20,
+    borderWidth: 2,
+    borderColor: FuchsiaColors.mist,
+    borderStyle: 'dashed',
+    backgroundColor: 'rgba(248, 248, 252, 0.5)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+  },
+  wardrobeCard: {
+    height: 140,
+    width: 240,
+    borderRadius: 20,
+    backgroundColor: FuchsiaColors.ink,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  wardrobeImage: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'flex-end',
+  },
+  wardrobeImageStyle: {
+    opacity: 0.8,
+  },
+  wardrobeGradient: {
+    padding: 16,
+    justifyContent: 'flex-end',
+  },
+  wardrobeCardTitle: {
+    fontFamily: FuchsiaFonts.heading,
+    fontWeight: '700',
+    fontSize: 16,
+    color: '#fff',
+    textShadowColor: 'rgba(0,0,0,0.3)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  },
+  wardrobeCardSubtitle: {
+    fontFamily: FuchsiaFonts.body,
+    fontWeight: '500',
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.8)',
+    marginTop: 4,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.4)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    maxHeight: '80%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 24,
+    paddingVertical: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: FuchsiaColors.cloud,
+  },
+  modalTitle: {
+    fontFamily: FuchsiaFonts.heading,
+    fontSize: 18,
+    fontWeight: '600',
+    color: FuchsiaColors.ink,
+  },
+  modalCloseButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: FuchsiaColors.mist,
+    backgroundColor: '#fff',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalScrollContent: {
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+  },
+  wardrobeListItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 16,
+    marginBottom: 8,
+    backgroundColor: FuchsiaColors.cloud,
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  wardrobeListItemSelected: {
+    borderColor: FuchsiaColors.deep,
+    backgroundColor: FuchsiaColors.blush,
+  },
+  wardrobeListImage: {
+    width: 40,
+    height: 40,
+    borderRadius: 8,
+    overflow: 'hidden',
+    marginRight: 12,
+  },
+  wardrobeListText: {
+    fontFamily: FuchsiaFonts.body,
+    fontSize: 16,
+    fontWeight: '500',
+    color: FuchsiaColors.ink,
+  },
+  checkbox: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: FuchsiaColors.mist,
+    backgroundColor: '#fff',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checkboxSelected: {
+    backgroundColor: FuchsiaColors.deep,
+    borderColor: FuchsiaColors.deep,
+  },
+  emptyMessage: {
+    fontFamily: FuchsiaFonts.body,
+    fontSize: 14,
+    color: FuchsiaColors.slate,
+    textAlign: 'center',
+    marginTop: 24,
   }
 });

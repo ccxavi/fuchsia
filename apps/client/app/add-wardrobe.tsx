@@ -1,4 +1,4 @@
-import { View, StyleSheet, TextInput, Pressable, KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator, DeviceEventEmitter } from 'react-native';
+import { View, StyleSheet, TextInput, Pressable, KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator, DeviceEventEmitter, Keyboard } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useState, useEffect } from 'react';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -22,6 +22,7 @@ export default function AddWardrobeScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [isFetching, setIsFetching] = useState(isEditing);
   const [error, setError] = useState('');
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
 
   useEffect(() => {
     async function loadData() {
@@ -41,6 +42,20 @@ export default function AddWardrobeScreen() {
     }
     loadData();
   }, [id]);
+
+  useEffect(() => {
+    if (Platform.OS !== 'android') return;
+    const showSub = Keyboard.addListener('keyboardDidShow', (e) => {
+      setKeyboardHeight(e.endCoordinates.height);
+    });
+    const hideSub = Keyboard.addListener('keyboardDidHide', () => {
+      setKeyboardHeight(0);
+    });
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
 
   const handlePickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -123,6 +138,7 @@ export default function AddWardrobeScreen() {
     <KeyboardAvoidingView 
       style={styles.container} 
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 64 : 0}
     >
       <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
         <Pressable onPress={() => router.back()} style={styles.backButton}>
@@ -210,6 +226,9 @@ export default function AddWardrobeScreen() {
           </LinearGradient>
         </Pressable>
       </View>
+
+      {/* Manual Android Keyboard Spacer */}
+      {Platform.OS === 'android' && <View style={{ height: keyboardHeight }} />}
     </KeyboardAvoidingView>
   );
 }
