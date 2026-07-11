@@ -344,7 +344,7 @@ export default function CalendarScreen() {
           <View style={styles.statsBar}>
             <View style={styles.statItem}>
               <Shirt size={14} color={FuchsiaColors.deep} />
-              <ThemedText style={styles.statText}>{totalOutfitsThisMonth} outfits</ThemedText>
+              <ThemedText style={styles.statText}>{totalOutfitsThisMonth} days logged</ThemedText>
             </View>
             <ThemedText style={styles.statDot}>·</ThemedText>
             <View style={styles.statItem}>
