@@ -177,6 +177,8 @@ export default function CalendarScreen() {
 
   const cellWidth = (width - 40 - (6 * 4)) / 7; // 40 = px-5*2, 6 gaps of 4px
 
+  const isViewingCurrentMonth = currentMonth.getFullYear() === todayDateObj.getFullYear() && currentMonth.getMonth() === todayDateObj.getMonth();
+
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.header}>
@@ -352,8 +354,7 @@ export default function CalendarScreen() {
               <ThemedText style={styles.statText}>{aiPicksThisMonth} AI picks</ThemedText>
             </View>
           </View>
-
-          {!todaysOutfit && (
+          {isViewingCurrentMonth && !todaysOutfit && (
             <View style={styles.todayPreviewCard}>
               <ThemedText style={styles.todayPreviewTitle}>NO OUTFIT LOGGED TODAY</ThemedText>
               <ThemedText style={styles.todayPreviewSubtitle}>
