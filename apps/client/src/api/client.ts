@@ -604,10 +604,17 @@ export interface OutfitSuggestion {
   rationale?: string;
 }
 
+export interface CalendarSuggestion {
+  outfit_id: string;
+  date: string; // YYYY-MM-DD
+  notes?: string;
+}
+
 export interface ChatMessage {
   role: 'system' | 'user' | 'assistant';
   content: string | ContentPart[];
   outfit_suggestions?: OutfitSuggestion[];
+  calendar_suggestions?: CalendarSuggestion[];
 }
 
 export interface ChatRequest {
@@ -622,6 +629,7 @@ export interface ChatResponse {
   message: ChatMessage;
   memory_suggestions?: { content: string; category?: string }[];
   outfit_suggestions?: OutfitSuggestion[];
+  calendar_suggestions?: CalendarSuggestion[];
 }
 
 export async function postChat(data: ChatRequest): Promise<ChatResponse> {

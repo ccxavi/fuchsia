@@ -7,9 +7,9 @@ import { ThemedText } from '@/components/themed-text';
 import { MarkdownText } from '@/components/ui/MarkdownText';
 import { FuchsiaColors, FuchsiaFonts } from '@/constants/theme';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Image as ImageIcon, X, Sparkles } from 'lucide-react-native';
+import { Image as ImageIcon, X, Sparkles, Calendar } from 'lucide-react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import { ChatMessage, postChat, ContentPart, ingestMemories, getClothingItems, ClothingItemResponse, OutfitSuggestion, createOutfit } from '@/api/client';
+import { ChatMessage, postChat, ContentPart, ingestMemories, getClothingItems, ClothingItemResponse, OutfitSuggestion, createOutfit, CalendarSuggestion, createCalendarOutfit, getOutfits, OutfitWithItemsResponse } from '@/api/client';
 function TypingIndicator() {
   const dot1 = useRef(new Animated.Value(0)).current;
   const dot2 = useRef(new Animated.Value(0)).current;
@@ -149,6 +149,105 @@ function OutfitSuggestionCard({ suggestion, closetItems, onSuggestAnother }: { s
   );
 }
 
+function CalendarSuggestionCard({ suggestion, savedOutfits, onDismiss }: { suggestion: CalendarSuggestion, savedOutfits: Record<string, OutfitWithItemsResponse>, onDismiss?: () => void }) {
+  const [isSaving, setIsSaving] = useState(false);
+  const [isSaved, setIsSaved] = useState(false);
+  const [isIgnored, setIsIgnored] = useState(false);
+
+  const outfit = savedOutfits[suggestion.outfit_id];
+
+  const handleSave = async () => {
+    if (isSaving || isSaved) return;
+    setIsSaving(true);
+    try {
+      await createCalendarOutfit({
+        outfit_id: suggestion.outfit_id,
+        date: suggestion.date,
+        notes: suggestion.notes,
+      });
+      setIsSaved(true);
+    } catch (err) {
+      console.error("Failed to save calendar entry:", err);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const images = outfit?.clothing_items
+    .map(i => i.image_url)
+    .filter((url): url is string => !!url) || [];
+
+  return (
+    <View style={styles.outfitCard}>
+      <View style={styles.outfitCardHeader}>
+        <Calendar size={16} color={FuchsiaColors.deep} />
+        <ThemedText style={styles.outfitCardTitle}>
+          Schedule for {suggestion.date}
+        </ThemedText>
+      </View>
+      
+      {outfit && (
+        <ThemedText style={{ fontFamily: FuchsiaFonts.heading, fontSize: 14, color: FuchsiaColors.ink, marginBottom: 8 }}>
+          {outfit.name}
+        </ThemedText>
+      )}
+
+      {images.length > 0 && (
+        <View style={styles.outfitCardImages}>
+          {images.map((url, idx) => (
+            <Image key={idx} source={{ uri: url }} style={styles.outfitCardImage} />
+          ))}
+        </View>
+      )}
+
+      {suggestion.notes && (
+        <ThemedText style={styles.outfitCardRationale}>{suggestion.notes}</ThemedText>
+      )}
+
+      {isIgnored ? (
+        <View style={{ flexDirection: 'row', gap: 8 }}>
+          <View style={[styles.outfitCardBtnSecondary, { flex: 1, borderColor: FuchsiaColors.slate, opacity: 0.6 }]}>
+            <ThemedText style={[styles.outfitCardBtnTextSecondary, { color: FuchsiaColors.slate }]}>
+              Dismissed
+            </ThemedText>
+          </View>
+        </View>
+      ) : (
+        <View style={{ flexDirection: 'row', gap: 8 }}>
+          {onDismiss && !isSaved && (
+            <TouchableOpacity 
+              style={[styles.outfitCardBtnSecondary, { flex: 1 }]} 
+              onPress={() => {
+                setIsIgnored(true);
+                onDismiss();
+              }}
+              disabled={isSaving}
+            >
+              <ThemedText style={styles.outfitCardBtnTextSecondary}>
+                Dismiss
+              </ThemedText>
+            </TouchableOpacity>
+          )}
+
+          <TouchableOpacity 
+            style={[styles.outfitCardBtn, isSaved && styles.outfitCardBtnSaved, { flex: 1 }]} 
+            onPress={handleSave}
+            disabled={isSaving || isSaved}
+          >
+            {isSaving ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <ThemedText style={styles.outfitCardBtnText}>
+                {isSaved ? "Scheduled!" : "Add to Calendar"}
+              </ThemedText>
+            )}
+          </TouchableOpacity>
+        </View>
+      )}
+    </View>
+  );
+}
+
 export default function ChatScreen() {
   const insets = useSafeAreaInsets();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -162,6 +261,7 @@ export default function ChatScreen() {
   
   const [location, setLocation] = useState<Location.LocationObject | null>(null);
   const [closetItems, setClosetItems] = useState<Record<string, ClothingItemResponse>>({});
+  const [savedOutfits, setSavedOutfits] = useState<Record<string, OutfitWithItemsResponse>>({});
 
   useEffect(() => {
     getClothingItems().then((items) => {
@@ -169,6 +269,12 @@ export default function ChatScreen() {
       items.forEach(i => map[i.id] = i);
       setClosetItems(map);
     }).catch(err => console.error("Failed to load closet items:", err));
+    
+    getOutfits().then((items) => {
+      const map: Record<string, OutfitWithItemsResponse> = {};
+      items.forEach(i => map[i.id] = i);
+      setSavedOutfits(map);
+    }).catch(err => console.error("Failed to load saved outfits:", err));
   }, []);
 
   useEffect(() => {
@@ -255,6 +361,7 @@ export default function ChatScreen() {
       const newMessage: ChatMessage = {
         ...response.message,
         outfit_suggestions: response.outfit_suggestions,
+        calendar_suggestions: response.calendar_suggestions,
       };
       setMessages((prev) => [...prev, newMessage]);
 
@@ -295,6 +402,7 @@ export default function ChatScreen() {
       const newMessage: ChatMessage = {
         ...response.message,
         outfit_suggestions: response.outfit_suggestions,
+        calendar_suggestions: response.calendar_suggestions,
       };
       setMessages((prev) => [...prev, newMessage]);
 
@@ -361,6 +469,18 @@ export default function ChatScreen() {
                   "Show me a different option.", 
                   "Show me a different option. CRITICAL: You must choose different clothing items than your previous suggestions. Do not repeat the same outfit. Please use your suggest_outfits tool to officially propose it so I can save it."
                 )}
+              />
+            ))}
+          </View>
+        )}
+        {item.calendar_suggestions && item.calendar_suggestions.length > 0 && (
+          <View style={{ marginTop: 12, gap: 12 }}>
+            {item.calendar_suggestions.map((suggestion, idx) => (
+              <CalendarSuggestionCard 
+                key={idx} 
+                suggestion={suggestion} 
+                savedOutfits={savedOutfits} 
+                onDismiss={() => sendDirectMessage("Actually, nevermind.")}
               />
             ))}
           </View>
