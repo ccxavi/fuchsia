@@ -10,6 +10,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { FuchsiaColors, FuchsiaFonts } from '@/constants/theme';
 import { CLOTHING_CATEGORIES } from '@/constants/categories';
 import { getClothingItems, getWardrobes, getOutfits, ClothingItemResponse, WardrobeResponse, OutfitWithItemsResponse } from '@/api/client';
+import { GridSkeleton, WardrobeListSkeleton } from '@/components/ui/Skeleton';
 
 
 export default function ClosetScreen() {
@@ -415,9 +416,7 @@ export default function ClosetScreen() {
       {renderTabs()}
       <View style={styles.flex1}>
         {isLoading ? (
-          <View style={styles.centerContainer}>
-            <ActivityIndicator size="large" color={FuchsiaColors.vibrant} />
-          </View>
+          activeTab === 'items' ? <GridSkeleton /> : activeTab === 'outfits' ? <GridSkeleton /> : <WardrobeListSkeleton />
         ) : (
           <>
             {activeTab === 'outfits' && renderOutfits()}

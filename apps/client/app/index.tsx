@@ -1,7 +1,8 @@
 import { Redirect } from 'expo-router';
 import { useEffect, useState } from 'react';
 import * as SecureStore from 'expo-secure-store';
-import { View, ActivityIndicator } from 'react-native';
+import { View } from 'react-native';
+import { Skeleton } from '@/components/ui/Skeleton';
 
 export default function Root() {
   const [isReady, setIsReady] = useState(false);
@@ -26,7 +27,7 @@ export default function Root() {
   if (!isReady) {
     return (
       <View style={{ flex: 1, backgroundColor: '#FAFAFA', justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" color="#0B0B0D" />
+        <Skeleton width={64} height={64} borderRadius={32} />
       </View>
     );
   }

@@ -11,6 +11,7 @@ import Animated, { FadeInDown, FadeOutDown, Layout } from 'react-native-reanimat
 import { ThemedText } from '@/components/themed-text';
 import { FuchsiaColors, FuchsiaFonts } from '@/constants/theme';
 import { CLOTHING_CATEGORIES } from '@/constants/categories';
+import { OutfitFormSkeleton, Skeleton } from '@/components/ui/Skeleton';
 import {
   createOutfit,
   updateOutfit,
@@ -243,8 +244,16 @@ export default function AddOrEditOutfitScreen() {
 
   if (isFetching) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={FuchsiaColors.vibrant} />
+      <View style={[styles.container, { paddingTop: insets.top }]}>
+        <View style={styles.header}>
+          <Skeleton width={40} height={40} borderRadius={12} />
+          <Skeleton width={120} height={20} />
+          <View style={{ width: 40 }} />
+        </View>
+        <OutfitFormSkeleton />
+        <View style={[styles.footer, { paddingBottom: (insets.bottom || 24) + 16 }]}>
+          <Skeleton width="100%" height={52} borderRadius={12} />
+        </View>
       </View>
     );
   }

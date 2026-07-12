@@ -9,6 +9,7 @@ import { Image } from 'expo-image';
 
 import { ThemedText } from '@/components/themed-text';
 import { FuchsiaColors, FuchsiaFonts } from '@/constants/theme';
+import { WardrobeFormSkeleton, Skeleton } from '@/components/ui/Skeleton';
 import { createWardrobe, getWardrobe, updateWardrobe } from '@/api/client';
 
 export default function AddWardrobeScreen() {
@@ -128,8 +129,16 @@ export default function AddWardrobeScreen() {
 
   if (isFetching) {
     return (
-      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
-        <ActivityIndicator size="large" color={FuchsiaColors.vibrant} />
+      <View style={[styles.container, { paddingTop: insets.top }]}>
+        <View style={styles.header}>
+          <Skeleton width={40} height={40} borderRadius={12} />
+          <Skeleton width={120} height={20} />
+          <View style={{ width: 40 }} />
+        </View>
+        <WardrobeFormSkeleton />
+        <View style={[styles.footer, { paddingBottom: (insets.bottom || 24) + 16 }]}>
+          <Skeleton width="100%" height={52} borderRadius={12} />
+        </View>
       </View>
     );
   }
