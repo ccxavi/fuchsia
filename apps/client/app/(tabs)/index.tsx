@@ -206,15 +206,15 @@ export default function HomeScreen() {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
+      <View style={styles.header}>
+        <ThemedText style={styles.headerTitle}>{greetingTime}, {userName}</ThemedText>
+        <View style={{ width: 40, height: 40 }} />
+      </View>
       <ScrollView
         style={styles.scrollContainer}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Header Row */}
-        <View style={styles.headerRow}>
-          <ThemedText style={styles.greeting}>{greetingTime}, {userName}</ThemedText>
-        </View>
 
         {/* Weather + Context Card */}
         <View style={styles.weatherCard}>
@@ -426,18 +426,21 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingHorizontal: 20,
-    paddingTop: 16,
+    paddingTop: 8,
     paddingBottom: 100,
     gap: 20,
   },
 
   // Header
-  headerRow: {
+  header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 12,
   },
-  greeting: {
+  headerTitle: {
     fontFamily: FuchsiaFonts.heading,
     fontSize: 24,
     color: FuchsiaColors.ink,
