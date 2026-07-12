@@ -453,9 +453,11 @@ export const CalendarSkeleton = ({ calendarDays }: { calendarDays?: (number | nu
           </View>
         </View>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12, backgroundColor: FuchsiaColors.blush, borderRadius: 12, paddingVertical: 14, paddingHorizontal: 16, marginBottom: 24 }}>
-           <Skeleton width={80} height={14} />
+           <Skeleton width={60} height={14} />
            <Text style={{ color: FuchsiaColors.mist, fontSize: 14 }}>·</Text>
-           <Skeleton width={80} height={14} />
+           <Skeleton width={60} height={14} />
+           <Text style={{ color: FuchsiaColors.mist, fontSize: 14 }}>·</Text>
+           <Skeleton width={60} height={14} />
         </View>
       </ScrollView>
     </View>
