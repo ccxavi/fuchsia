@@ -5,7 +5,7 @@ import { Image } from 'expo-image';
 import * as SecureStore from 'expo-secure-store';
 import { useState, useCallback } from 'react';
 import { jwtDecode } from 'jwt-decode';
-import { getMe } from '@/api/client';
+import { getMe, getClothingItems, getWardrobes, getOutfits } from '@/api/client';
 import { ThemedText } from '@/components/themed-text';
 import { FuchsiaColors, FuchsiaFonts } from '@/constants/theme';
 import { User, BrainCircuit, ChevronRight, LogOut } from 'lucide-react-native';
@@ -17,9 +17,27 @@ export default function ProfileScreen() {
   const [userName, setUserName] = useState<string>('');
   const [userEmail, setUserEmail] = useState<string>('');
   const [userPhoto, setUserPhoto] = useState<string | null>(null);
+  const [stats, setStats] = useState({ items: 0, wardrobes: 0, outfits: 0 });
 
   useFocusEffect(
     useCallback(() => {
+      const fetchStats = async () => {
+        try {
+          const [items, wardrobes, outfits] = await Promise.all([
+            getClothingItems(),
+            getWardrobes(),
+            getOutfits(),
+          ]);
+          setStats({
+            items: items.length,
+            wardrobes: wardrobes.length,
+            outfits: outfits.length,
+          });
+        } catch (error) {
+          console.error('Error fetching stats:', error);
+        }
+      };
+
       const fetchUser = async () => {
         try {
           const data = await getMe();
@@ -52,6 +70,7 @@ export default function ProfileScreen() {
       };
 
       fetchUser();
+      fetchStats();
     }, [])
   );
 
@@ -78,6 +97,23 @@ export default function ProfileScreen() {
         <ThemedText style={styles.subtitle}>
           {userEmail || 'Manage your account and preferences.'}
         </ThemedText>
+      </View>
+
+      <View style={styles.statsContainer}>
+        <View style={styles.statBox}>
+          <ThemedText style={styles.statValue}>{stats.outfits}</ThemedText>
+          <ThemedText style={styles.statLabel}>Outfits</ThemedText>
+        </View>
+        <View style={styles.statDivider} />
+        <View style={styles.statBox}>
+          <ThemedText style={styles.statValue}>{stats.wardrobes}</ThemedText>
+          <ThemedText style={styles.statLabel}>Wardrobes</ThemedText>
+        </View>
+        <View style={styles.statDivider} />
+        <View style={styles.statBox}>
+          <ThemedText style={styles.statValue}>{stats.items}</ThemedText>
+          <ThemedText style={styles.statLabel}>Items</ThemedText>
+        </View>
       </View>
 
       <View style={styles.settingsGroup}>
@@ -151,6 +187,37 @@ const styles = StyleSheet.create({
     color: FuchsiaColors.slate,
     textAlign: 'center',
     lineHeight: 22,
+  },
+  statsContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    paddingVertical: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.05)',
+  },
+  statBox: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  statDivider: {
+    width: 1,
+    backgroundColor: 'rgba(0,0,0,0.05)',
+    marginVertical: 4,
+  },
+  statValue: {
+    fontFamily: FuchsiaFonts.heading,
+    fontSize: 20,
+    color: FuchsiaColors.ink,
+    marginBottom: 4,
+  },
+  statLabel: {
+    fontFamily: FuchsiaFonts.body,
+    fontSize: 12,
+    color: FuchsiaColors.slate,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   settingsGroup: {
     gap: 12,
