@@ -59,6 +59,49 @@ export default function HomeScreen() {
     return { tag: isNight ? 'Clear night' : 'Mild', subTag: 'Perfect weather' };
   };
 
+  const getDailyInsight = (code: number, temp: number) => {
+    const hour = new Date().getHours();
+    const isNight = hour < 6 || hour >= 18;
+    const roundedTemp = Math.round(temp);
+
+    if ((code >= 51 && code <= 67) || (code >= 80 && code <= 82)) {
+      return {
+        title: "Don't forget your umbrella",
+        desc: `It's rainy and ${roundedTemp}°C out there. A water-resistant jacket and sturdy boots will keep you comfortable today.`,
+      };
+    }
+    if (code >= 71 && code <= 77) {
+      return {
+        title: "Bundle up, it's snowing!",
+        desc: `With temperatures around ${roundedTemp}°C and snow falling, layer up with thermal wear, a heavy coat, and a warm scarf.`,
+      };
+    }
+    if (code >= 95) {
+      return {
+        title: "Stormy weather ahead",
+        desc: `It's stormy and ${roundedTemp}°C outside. If you must go out, prioritize safety and wear waterproof, wind-resistant layers.`,
+      };
+    }
+    
+    if (temp > 25) {
+      return {
+        title: isNight ? "Warm evening ahead" : "Stay cool and stylish",
+        desc: `With today's ${roundedTemp}°C heat, light linen or cotton fabrics are your best friend. Tap the sparkles below to ask me for summer outfit ideas!`,
+      };
+    }
+    if (temp < 15) {
+      return {
+        title: isNight ? "Chilly night out" : "Crisp and cool",
+        desc: `It's a crisp ${roundedTemp}°C outside. A stylish sweater or a light jacket will be perfect to keep you cozy.`,
+      };
+    }
+    
+    return {
+      title: isNight ? "A pleasant evening" : "Perfect mild weather",
+      desc: `It's a beautiful ${roundedTemp}°C right now. Almost any outfit works perfectly in this weather!`,
+    };
+  };
+
   const currentDate = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
 
   useFocusEffect(
@@ -240,10 +283,28 @@ export default function HomeScreen() {
             </View>
             <ThemedText style={styles.dailyTipLabel}>Daily Insight</ThemedText>
           </View>
-          <ThemedText style={styles.dailyTipTitle}>Stay cool and stylish</ThemedText>
-          <ThemedText style={styles.dailyTipDesc}>
-            With today&apos;s 32°C heat, light linen or cotton fabrics are your best friend. Tap the sparkles below to ask me for summer outfit ideas!
-          </ThemedText>
+          {weatherData.loading ? (
+            <View style={{ gap: 8 }}>
+              <Skeleton width={180} height={24} borderRadius={4} />
+              <Skeleton width="100%" height={16} borderRadius={4} />
+              <Skeleton width="80%" height={16} borderRadius={4} />
+            </View>
+          ) : weatherData.city === 'Weather Error' || weatherData.city === 'Location Denied' ? (
+            <>
+              <ThemedText style={styles.dailyTipTitle}>Plan your outfits</ThemedText>
+              <ThemedText style={styles.dailyTipDesc}>
+                Enable location services to get personalized outfit recommendations based on your local weather!
+              </ThemedText>
+            </>
+          ) : (() => {
+            const insight = getDailyInsight(weatherData.conditionCode, weatherData.temperature);
+            return (
+              <>
+                <ThemedText style={styles.dailyTipTitle}>{insight.title}</ThemedText>
+                <ThemedText style={styles.dailyTipDesc}>{insight.desc}</ThemedText>
+              </>
+            );
+          })()}
         </View>
 
         {/* Recent Looks */}
