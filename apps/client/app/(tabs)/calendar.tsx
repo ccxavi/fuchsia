@@ -169,15 +169,23 @@ export default function CalendarScreen() {
 
   const currentMonthStr = `${currentMonth.getFullYear()}-${String(currentMonth.getMonth() + 1).padStart(2, '0')}`;
   
-  let totalOutfitsThisMonth = 0;
+  let daysLoggedThisMonth = 0;
   let aiPicksThisMonth = 0;
+  const uniqueOutfitsSet = new Set<string>();
 
   Object.entries(outfitsByDate).forEach(([dateStr, calendarOutfits]) => {
     if (dateStr.startsWith(currentMonthStr)) {
-      totalOutfitsThisMonth += calendarOutfits.length;
+      if (calendarOutfits.length > 0) {
+        daysLoggedThisMonth += 1;
+      }
+      calendarOutfits.forEach(co => {
+        if (co.outfit?.id) uniqueOutfitsSet.add(co.outfit.id);
+      });
       aiPicksThisMonth += calendarOutfits.filter(co => co.outfit.is_ai_generated).length;
     }
   });
+
+  const totalUniqueOutfitsThisMonth = uniqueOutfitsSet.size;
 
   const todayDateObj = new Date();
   const todayStr = `${todayDateObj.getFullYear()}-${String(todayDateObj.getMonth() + 1).padStart(2, '0')}-${String(todayDateObj.getDate()).padStart(2, '0')}`;
@@ -356,8 +364,13 @@ export default function CalendarScreen() {
 
           <View style={styles.statsBar}>
             <View style={styles.statItem}>
+              <Calendar size={14} color={FuchsiaColors.deep} />
+              <ThemedText style={styles.statText}>{daysLoggedThisMonth} {daysLoggedThisMonth === 1 ? 'day' : 'days'}</ThemedText>
+            </View>
+            <ThemedText style={styles.statDot}>·</ThemedText>
+            <View style={styles.statItem}>
               <Shirt size={14} color={FuchsiaColors.deep} />
-              <ThemedText style={styles.statText}>{totalOutfitsThisMonth} {totalOutfitsThisMonth === 1 ? 'day logged' : 'days logged'}</ThemedText>
+              <ThemedText style={styles.statText}>{totalUniqueOutfitsThisMonth} {totalUniqueOutfitsThisMonth === 1 ? 'outfit' : 'outfits'}</ThemedText>
             </View>
             <ThemedText style={styles.statDot}>·</ThemedText>
             <View style={styles.statItem}>
