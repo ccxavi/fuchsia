@@ -1,13 +1,20 @@
 import { View, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import * as SecureStore from 'expo-secure-store';
 import { ThemedText } from '@/components/themed-text';
 import { FuchsiaColors, FuchsiaFonts } from '@/constants/theme';
-import { User, BrainCircuit, ChevronRight } from 'lucide-react-native';
+import { User, BrainCircuit, ChevronRight, LogOut } from 'lucide-react-native';
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+
+  const handleLogout = async () => {
+    await SecureStore.deleteItemAsync('access_token');
+    await SecureStore.deleteItemAsync('refresh_token');
+    router.replace('/welcome');
+  };
 
   return (
     <ScrollView 
@@ -35,6 +42,22 @@ export default function ProfileScreen() {
               <BrainCircuit size={20} color={FuchsiaColors.slate} />
             </View>
             <ThemedText style={styles.settingsItemText}>Manage AI Memory</ThemedText>
+          </View>
+          <ChevronRight size={20} color={FuchsiaColors.slate} />
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.settingsGroup}>
+        <ThemedText style={styles.groupTitle}>Account</ThemedText>
+        <TouchableOpacity 
+          style={styles.settingsItem}
+          onPress={handleLogout}
+        >
+          <View style={styles.settingsItemLeft}>
+            <View style={styles.itemIcon}>
+              <LogOut size={20} color={FuchsiaColors.slate} />
+            </View>
+            <ThemedText style={styles.settingsItemText}>Log Out</ThemedText>
           </View>
           <ChevronRight size={20} color={FuchsiaColors.slate} />
         </TouchableOpacity>

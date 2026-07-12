@@ -2,7 +2,7 @@ import { StyleSheet, View, ScrollView, Pressable, Animated, Text } from 'react-n
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Sparkles, Lightbulb, Palette, LogOut, History } from 'lucide-react-native';
+import { Sparkles, Lightbulb, Palette, History } from 'lucide-react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import { useState, useEffect, useCallback } from 'react';
@@ -204,12 +204,6 @@ export default function HomeScreen() {
   }, [])
   );
 
-  const handleLogout = async () => {
-    await SecureStore.deleteItemAsync('access_token');
-    await SecureStore.deleteItemAsync('refresh_token');
-    router.replace('/welcome');
-  };
-
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <ScrollView
@@ -220,9 +214,6 @@ export default function HomeScreen() {
         {/* Header Row */}
         <View style={styles.headerRow}>
           <ThemedText style={styles.greeting}>{greetingTime}, {userName}</ThemedText>
-          <Pressable onPress={handleLogout} style={({ pressed }) => [styles.logoutButton, pressed && { opacity: 0.7 }]}>
-            <LogOut size={20} color={FuchsiaColors.slate} />
-          </Pressable>
         </View>
 
         {/* Weather + Context Card */}
@@ -445,16 +436,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-  },
-  logoutButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: FuchsiaColors.mist,
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   greeting: {
     fontFamily: FuchsiaFonts.heading,
