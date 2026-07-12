@@ -1,14 +1,14 @@
-import { StyleSheet, View, ScrollView, Pressable, Animated } from 'react-native';
+import { StyleSheet, View, ScrollView, Pressable, Animated, Text } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Sparkles, Lightbulb, Palette, LogOut } from 'lucide-react-native';
+import { Sparkles, Lightbulb, Palette, LogOut, History } from 'lucide-react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import { useState, useEffect, useCallback } from 'react';
 import * as Location from 'expo-location';
 import { jwtDecode } from 'jwt-decode';
-import { getMe } from '@/api/client';
+import { getMe, getCalendarOutfits, CalendarOutfitWithOutfitResponse } from '@/api/client';
 
 import { ThemedText } from '@/components/themed-text';
 import { FuchsiaColors, FuchsiaFonts } from '@/constants/theme';
@@ -19,6 +19,9 @@ export default function HomeScreen() {
 
   const [userName, setUserName] = useState<string>('there');
   const [greetingTime, setGreetingTime] = useState<string>('Good morning');
+
+  const [recentLooks, setRecentLooks] = useState<CalendarOutfitWithOutfitResponse[]>([]);
+  const [loadingLooks, setLoadingLooks] = useState(true);
 
   const [weatherData, setWeatherData] = useState<{
     temperature: number;
@@ -54,6 +57,49 @@ export default function HomeScreen() {
     if (temp > 25) return { tag: isNight ? 'Warm night' : 'Hot', subTag: 'Light fabrics' };
     if (temp < 15) return { tag: isNight ? 'Cold night' : 'Cold', subTag: 'Layers needed' };
     return { tag: isNight ? 'Clear night' : 'Mild', subTag: 'Perfect weather' };
+  };
+
+  const getDailyInsight = (code: number, temp: number) => {
+    const hour = new Date().getHours();
+    const isNight = hour < 6 || hour >= 18;
+    const roundedTemp = Math.round(temp);
+
+    if ((code >= 51 && code <= 67) || (code >= 80 && code <= 82)) {
+      return {
+        title: "Don't forget your umbrella",
+        desc: `It's rainy and ${roundedTemp}°C out there. A water-resistant jacket and sturdy boots will keep you comfortable today.`,
+      };
+    }
+    if (code >= 71 && code <= 77) {
+      return {
+        title: "Bundle up, it's snowing!",
+        desc: `With temperatures around ${roundedTemp}°C and snow falling, layer up with thermal wear, a heavy coat, and a warm scarf.`,
+      };
+    }
+    if (code >= 95) {
+      return {
+        title: "Stormy weather ahead",
+        desc: `It's stormy and ${roundedTemp}°C outside. If you must go out, prioritize safety and wear waterproof, wind-resistant layers.`,
+      };
+    }
+    
+    if (temp > 25) {
+      return {
+        title: isNight ? "Warm evening ahead" : "Stay cool and stylish",
+        desc: `With today's ${roundedTemp}°C heat, light linen or cotton fabrics are your best friend. Tap the sparkles below to ask me for summer outfit ideas!`,
+      };
+    }
+    if (temp < 15) {
+      return {
+        title: isNight ? "Chilly night out" : "Crisp and cool",
+        desc: `It's a crisp ${roundedTemp}°C outside. A stylish sweater or a light jacket will be perfect to keep you cozy.`,
+      };
+    }
+    
+    return {
+      title: isNight ? "A pleasant evening" : "Perfect mild weather",
+      desc: `It's a beautiful ${roundedTemp}°C right now. Almost any outfit works perfectly in this weather!`,
+    };
   };
 
   const currentDate = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
@@ -128,8 +174,33 @@ export default function HomeScreen() {
       }
     };
 
+    const fetchRecentLooks = async () => {
+      try {
+        const looks = await getCalendarOutfits();
+        const todayStr = new Date().toISOString().split('T')[0];
+        const pastLooks = looks.filter(l => l.date <= todayStr);
+        pastLooks.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        
+        const seen = new Set();
+        const uniqueLooks: CalendarOutfitWithOutfitResponse[] = [];
+        for (const look of pastLooks) {
+          if (!seen.has(look.outfit.id)) {
+            seen.add(look.outfit.id);
+            uniqueLooks.push(look);
+            if (uniqueLooks.length >= 5) break;
+          }
+        }
+        setRecentLooks(uniqueLooks);
+      } catch (error) {
+        console.error('Error fetching recent looks:', error);
+      } finally {
+        setLoadingLooks(false);
+      }
+    };
+
     fetchUser();
     fetchWeather();
+    fetchRecentLooks();
   }, [])
   );
 
@@ -212,39 +283,117 @@ export default function HomeScreen() {
             </View>
             <ThemedText style={styles.dailyTipLabel}>Daily Insight</ThemedText>
           </View>
-          <ThemedText style={styles.dailyTipTitle}>Stay cool and stylish</ThemedText>
-          <ThemedText style={styles.dailyTipDesc}>
-            With today&apos;s 32°C heat, light linen or cotton fabrics are your best friend. Tap the sparkles below to ask me for summer outfit ideas!
-          </ThemedText>
+          {weatherData.loading ? (
+            <View style={{ gap: 8 }}>
+              <Skeleton width={180} height={24} borderRadius={4} />
+              <Skeleton width="100%" height={16} borderRadius={4} />
+              <Skeleton width="80%" height={16} borderRadius={4} />
+            </View>
+          ) : weatherData.city === 'Weather Error' || weatherData.city === 'Location Denied' ? (
+            <>
+              <ThemedText style={styles.dailyTipTitle}>Plan your outfits</ThemedText>
+              <ThemedText style={styles.dailyTipDesc}>
+                Enable location services to get personalized outfit recommendations based on your local weather!
+              </ThemedText>
+            </>
+          ) : (() => {
+            const insight = getDailyInsight(weatherData.conditionCode, weatherData.temperature);
+            return (
+              <>
+                <ThemedText style={styles.dailyTipTitle}>{insight.title}</ThemedText>
+                <ThemedText style={styles.dailyTipDesc}>{insight.desc}</ThemedText>
+              </>
+            );
+          })()}
         </View>
 
         {/* Recent Looks */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <ThemedText style={styles.sectionTitle}>Recent Looks</ThemedText>
-            <Pressable>
+            <Pressable onPress={() => router.push('/calendar')}>
               <ThemedText style={styles.seeAllText}>See all →</ThemedText>
             </Pressable>
           </View>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.recentLooksContainer}>
-            {[
-              { id: '1', title: 'Interview Look', date: 'Jun 26', items: ['Blazer', 'Tee', 'Chinos', 'Loafers'] },
-              { id: '2', title: 'Casual Friday', date: 'Jun 25', items: ['Polo', 'Jeans', 'Boots', 'Watch'] },
-              { id: '3', title: 'Dinner Date', date: 'Jun 23', items: ['Dress', 'Heels', 'Bag', 'Earring'] },
-            ].map((look) => (
-              <Pressable key={look.id} style={styles.recentCard}>
-                <View style={styles.recentGrid}>
-                  {look.items.map((item, idx) => (
-                    <Image key={idx} source={{ uri: `https://placehold.co/80x80/FDF2F8/86003C/png?text=${item}` }} style={styles.recentGridImage} />
-                  ))}
-                </View>
-                <View style={styles.recentContent}>
-                  <ThemedText style={styles.recentTitle} numberOfLines={1}>{look.title}</ThemedText>
-                  <ThemedText style={styles.recentDate}>{look.date}</ThemedText>
-                </View>
-              </Pressable>
-            ))}
-          </ScrollView>
+          {loadingLooks ? (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.recentLooksContainer}>
+              {[1, 2, 3].map(i => (
+                <Skeleton key={i} width={130} height={175} borderRadius={16} />
+              ))}
+            </ScrollView>
+          ) : recentLooks.length > 0 ? (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.recentLooksContainer}>
+              {recentLooks.map((look) => {
+                const dateObj = new Date(look.date + 'T12:00:00Z');
+                const dateStr = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
+                const outfit = look.outfit;
+                const firstUploadedImage = outfit.images && outfit.images.length > 0 ? outfit.images[0].image_url : null;
+                const displayImage = firstUploadedImage || outfit.image_url;
+                const totalItems = (outfit.clothing_items || []).length;
+                const items = (outfit.clothing_items || []).slice(0, 4);
+
+                return (
+                  <Pressable key={look.id} style={styles.recentCard} onPress={() => router.push(`/outfit/${outfit.id}`)}>
+                    <View style={styles.recentGrid}>
+                      {displayImage ? (
+                        <Image source={{ uri: displayImage as string }} style={styles.recentGridImageFull} contentFit="cover" />
+                      ) : items.length === 0 ? (
+                         <View style={[StyleSheet.absoluteFillObject, { backgroundColor: FuchsiaColors.mist }]} />
+                      ) : items.length === 1 ? (
+                         <Image source={{ uri: (items[0].image_url || `https://placehold.co/80x80/FDF2F8/86003C/png?text=${encodeURIComponent(items[0].name)}`) as string }} style={styles.recentGridImageFull} contentFit="cover" />
+                      ) : items.length === 2 ? (
+                         <>
+                           <Image source={{ uri: (items[0].image_url || `https://placehold.co/80x80/FDF2F8/86003C/png?text=${encodeURIComponent(items[0].name)}`) as string }} style={styles.recentGridImageHalf} contentFit="cover" />
+                           <Image source={{ uri: (items[1].image_url || `https://placehold.co/80x80/FDF2F8/86003C/png?text=${encodeURIComponent(items[1].name)}`) as string }} style={styles.recentGridImageHalf} contentFit="cover" />
+                         </>
+                      ) : items.length >= 3 ? (
+                         <>
+                           <Image source={{ uri: (items[0].image_url || `https://placehold.co/80x80/FDF2F8/86003C/png?text=${encodeURIComponent(items[0].name)}`) as string }} style={items.length === 3 ? styles.recentGridImageTopRowSpan : styles.recentGridImageQuarter} contentFit="cover" />
+                           <Image source={{ uri: (items[1].image_url || `https://placehold.co/80x80/FDF2F8/86003C/png?text=${encodeURIComponent(items[1].name)}`) as string }} style={styles.recentGridImageQuarter} contentFit="cover" />
+                           <Image source={{ uri: (items[2].image_url || `https://placehold.co/80x80/FDF2F8/86003C/png?text=${encodeURIComponent(items[2].name)}`) as string }} style={styles.recentGridImageQuarter} contentFit="cover" />
+                           {items.length >= 4 && (
+                             <View style={styles.recentGridImageQuarter}>
+                               <Image source={{ uri: (items[3].image_url || `https://placehold.co/80x80/FDF2F8/86003C/png?text=${encodeURIComponent(items[3].name)}`) as string }} style={styles.recentGridImageFull} contentFit="cover" />
+                               {totalItems > 4 && (
+                                 <View style={{ ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center' }}>
+                                   <Text style={{ fontFamily: FuchsiaFonts.heading, fontSize: 16, color: '#fff', fontWeight: 'bold' }}>+{totalItems - 4}</Text>
+                                 </View>
+                               )}
+                             </View>
+                           )}
+                         </>
+                      ) : null}
+                    </View>
+                    <View style={styles.recentContent}>
+                      <ThemedText style={styles.recentTitle} numberOfLines={1}>{outfit.name}</ThemedText>
+                      <ThemedText style={styles.recentDate}>{dateStr}</ThemedText>
+                    </View>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+          ) : (
+            <View style={{
+              backgroundColor: '#fff',
+              borderRadius: 16,
+              borderWidth: 1,
+              borderColor: FuchsiaColors.mist,
+              padding: 24,
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 8,
+            }}>
+              <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: FuchsiaColors.blush, alignItems: 'center', justifyContent: 'center', marginBottom: 4 }}>
+                <History size={24} color={FuchsiaColors.vibrant} />
+              </View>
+              <ThemedText style={{ fontFamily: FuchsiaFonts.bodySemiBold, fontSize: 14, color: FuchsiaColors.ink }}>
+                No recent looks
+              </ThemedText>
+              <ThemedText style={{ fontFamily: FuchsiaFonts.body, fontSize: 12, color: FuchsiaColors.slate, textAlign: 'center', lineHeight: 18 }}>
+                Your logged outfits will appear here.{'\n'}Tap the + button to create a new look.
+              </ThemedText>
+            </View>
+          )}
         </View>
 
         {/* Style Tips */}
@@ -448,12 +597,26 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     backgroundColor: FuchsiaColors.mist,
-    gap: 1,
-    padding: 1,
+    height: 130,
   },
-  recentGridImage: {
-    width: '49%',
-    aspectRatio: 1,
+  recentGridImageFull: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#fff',
+  },
+  recentGridImageHalf: {
+    width: '50%',
+    height: '100%',
+    backgroundColor: '#fff',
+  },
+  recentGridImageTopRowSpan: {
+    width: '100%',
+    height: '50%',
+    backgroundColor: '#fff',
+  },
+  recentGridImageQuarter: {
+    width: '50%',
+    height: '50%',
     backgroundColor: '#fff',
   },
   recentContent: {
