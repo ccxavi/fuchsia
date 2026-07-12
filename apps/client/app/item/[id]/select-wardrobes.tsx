@@ -274,7 +274,7 @@ export default function SelectWardrobesScreen() {
                     <ActivityIndicator color="white" size="small" />
                   ) : (
                     <Text style={styles.cartSaveButtonText}>
-                      Pack Item in {selectedCount} {selectedCount === 1 ? 'Wardrobe' : 'Wardrobes'}
+                      Pack Item
                     </Text>
                   )}
                 </LinearGradient>
