@@ -8,7 +8,7 @@ import { jwtDecode } from 'jwt-decode';
 import { getMe, getClothingItems, getWardrobes, getOutfits } from '@/api/client';
 import { ThemedText } from '@/components/themed-text';
 import { FuchsiaColors, FuchsiaFonts } from '@/constants/theme';
-import { User, BrainCircuit, ChevronRight, LogOut } from 'lucide-react-native';
+import { User, BrainCircuit, ChevronRight, LogOut, HelpCircle } from 'lucide-react-native';
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
@@ -127,6 +127,22 @@ export default function ProfileScreen() {
               <BrainCircuit size={20} color={FuchsiaColors.slate} />
             </View>
             <ThemedText style={styles.settingsItemText}>Manage AI Memory</ThemedText>
+          </View>
+          <ChevronRight size={20} color={FuchsiaColors.slate} />
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.settingsGroup}>
+        <ThemedText style={styles.groupTitle}>Support</ThemedText>
+        <TouchableOpacity 
+          style={styles.settingsItem}
+          onPress={() => router.push('/help')}
+        >
+          <View style={styles.settingsItemLeft}>
+            <View style={styles.itemIcon}>
+              <HelpCircle size={20} color={FuchsiaColors.slate} />
+            </View>
+            <ThemedText style={styles.settingsItemText}>Help Center & FAQ</ThemedText>
           </View>
           <ChevronRight size={20} color={FuchsiaColors.slate} />
         </TouchableOpacity>
