@@ -2,7 +2,7 @@ import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator, useWi
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useState } from 'react';
 import { router, useFocusEffect } from 'expo-router';
-import { ChevronLeft, ChevronRight, Shirt, Sparkles, Calendar, X, Trash2 } from 'lucide-react-native';
+import { ChevronLeft, ChevronRight, Shirt, Sparkles, Calendar, X, Trash2, Layers, Plus } from 'lucide-react-native';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import React from 'react';
@@ -19,7 +19,9 @@ export default function CalendarScreen() {
   const { width } = useWindowDimensions();
   
   const [currentMonth, setCurrentMonth] = useState(new Date());
-  const [outfits, setOutfits] = useState<CalendarOutfitWithOutfitResponse[]>([]);
+  const [outfitsCache, setOutfitsCache] = useState<Record<string, CalendarOutfitWithOutfitResponse[]>>({});
+  const currentMonthKey = `${currentMonth.getFullYear()}-${currentMonth.getMonth()}`;
+  const outfits = outfitsCache[currentMonthKey] || [];
   const [isLoading, setIsLoading] = useState(true);
 
   const [isPickerVisible, setIsPickerVisible] = useState(false);
@@ -28,6 +30,9 @@ export default function CalendarScreen() {
   const [isDayModalVisible, setIsDayModalVisible] = useState(false);
   const [rescheduleOutfitId, setRescheduleOutfitId] = useState<string | null>(null);
   const [showReschedulePicker, setShowReschedulePicker] = useState(false);
+  const [addOutfitActionSheetVisible, setAddOutfitActionSheetVisible] = useState(false);
+
+  const fetchMonthRef = React.useRef<string>('');
 
   useFocusEffect(
     React.useCallback(() => {
@@ -36,14 +41,20 @@ export default function CalendarScreen() {
   );
 
   const fetchOutfits = async (monthDate: Date) => {
+    const fetchId = `${monthDate.getFullYear()}-${monthDate.getMonth()}`;
+    fetchMonthRef.current = fetchId;
     try {
       setIsLoading(true);
       const data = await getCalendarOutfits(monthDate.getFullYear(), monthDate.getMonth() + 1);
-      setOutfits(data);
+      if (fetchMonthRef.current === fetchId) {
+        setOutfitsCache(prev => ({ ...prev, [fetchId]: data }));
+      }
     } catch (error) {
       console.error('Failed to fetch outfits for calendar:', error);
     } finally {
-      setIsLoading(false);
+      if (fetchMonthRef.current === fetchId) {
+        setIsLoading(false);
+      }
     }
   };
 
@@ -204,7 +215,7 @@ export default function CalendarScreen() {
         </Pressable>
       </View>
 
-      {isLoading && outfits.length === 0 ? (
+      {isLoading && Object.keys(outfitsCache).length === 0 ? (
         <CalendarSkeleton calendarDays={calendarDays} />
       ) : (
         <ScrollView style={styles.scrollContainer} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
@@ -353,7 +364,7 @@ export default function CalendarScreen() {
               <ThemedText style={styles.statText}>{aiPicksThisMonth} {aiPicksThisMonth === 1 ? 'AI pick' : 'AI picks'}</ThemedText>
             </View>
           </View>
-          {isViewingCurrentMonth && !todaysOutfit && (
+          {isViewingCurrentMonth && !todaysOutfit && !isLoading && (
             <View style={styles.todayPreviewCard}>
               <ThemedText style={styles.todayPreviewTitle}>NO OUTFIT LOGGED TODAY</ThemedText>
               <ThemedText style={styles.todayPreviewSubtitle}>
@@ -363,7 +374,7 @@ export default function CalendarScreen() {
                 <Pressable style={styles.primaryAction} onPress={() => router.push('/chat')}>
                   <Text style={styles.primaryActionText}>Ask Fuchsia</Text>
                 </Pressable>
-                <Pressable style={styles.secondaryAction} onPress={() => router.push('/add-outfit')}>
+                <Pressable style={styles.secondaryAction} onPress={() => setAddOutfitActionSheetVisible(true)}>
                   <Text style={styles.secondaryActionText}>Log Manually</Text>
                 </Pressable>
               </View>
@@ -496,6 +507,61 @@ export default function CalendarScreen() {
         onClose={() => setShowReschedulePicker(false)}
         onChange={handleRescheduleDateChange}
       />
+
+      {/* Add Outfit Action Sheet */}
+      <Modal
+        visible={addOutfitActionSheetVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setAddOutfitActionSheetVisible(false)}
+      >
+        <View style={styles.actionSheetOverlay}>
+          <Pressable style={StyleSheet.absoluteFillObject} onPress={() => setAddOutfitActionSheetVisible(false)} />
+          <View style={[styles.actionSheetContent, { paddingBottom: Math.max(insets.bottom, 24) }]}>
+            <View style={styles.actionSheetHeader}>
+              <Text style={styles.actionSheetTitle}>Log Outfit</Text>
+              <Pressable 
+                style={styles.actionSheetCloseButton} 
+                onPress={() => setAddOutfitActionSheetVisible(false)}
+              >
+                <X size={20} color={FuchsiaColors.slate} />
+              </Pressable>
+            </View>
+            
+            <Pressable 
+              style={styles.actionSheetOption}
+              onPress={() => {
+                setAddOutfitActionSheetVisible(false);
+                router.push({ pathname: '/calendar/select-outfit', params: { date: new Date().toISOString() } });
+              }}
+            >
+              <View style={styles.actionSheetOptionIcon}>
+                <Layers size={24} color={FuchsiaColors.deep} />
+              </View>
+              <View style={styles.actionSheetOptionTextContainer}>
+                <Text style={styles.actionSheetOptionTitle}>Select Existing</Text>
+                <Text style={styles.actionSheetOptionSubtitle}>Choose from your closet</Text>
+              </View>
+            </Pressable>
+
+            <Pressable 
+              style={styles.actionSheetOption}
+              onPress={() => {
+                setAddOutfitActionSheetVisible(false);
+                router.push({ pathname: '/add-outfit', params: { date: new Date().toISOString() } });
+              }}
+            >
+              <View style={styles.actionSheetOptionIcon}>
+                <Plus size={24} color={FuchsiaColors.vibrant} />
+              </View>
+              <View style={styles.actionSheetOptionTextContainer}>
+                <Text style={styles.actionSheetOptionTitle}>Create New</Text>
+                <Text style={styles.actionSheetOptionSubtitle}>Build an outfit from scratch</Text>
+              </View>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -931,5 +997,78 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
     color: '#fff',
+  },
+  actionSheetOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'flex-end',
+  },
+  actionSheetContent: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 20,
+    paddingTop: 24,
+  },
+  actionSheetHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 20,
+  },
+  actionSheetTitle: {
+    fontFamily: FuchsiaFonts.heading,
+    fontSize: 20,
+    fontWeight: '600',
+    color: FuchsiaColors.ink,
+  },
+  actionSheetCloseButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: FuchsiaColors.mist,
+    backgroundColor: '#fff',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  actionSheetOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 16,
+    backgroundColor: FuchsiaColors.cloud,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  actionSheetOptionIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    backgroundColor: '#fff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  actionSheetOptionTextContainer: {
+    flex: 1,
+  },
+  actionSheetOptionTitle: {
+    fontFamily: FuchsiaFonts.heading,
+    fontSize: 16,
+    fontWeight: '600',
+    color: FuchsiaColors.ink,
+    marginBottom: 4,
+  },
+  actionSheetOptionSubtitle: {
+    fontFamily: FuchsiaFonts.body,
+    fontSize: 13,
+    color: FuchsiaColors.slate,
   },
 });

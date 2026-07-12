@@ -3,46 +3,30 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useState, useEffect } from 'react';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Image } from 'expo-image';
-import { X, Check, Search, Plus, ShoppingBag, ArrowLeft } from 'lucide-react-native';
-import Animated, { FadeInDown, FadeOutDown, Layout } from 'react-native-reanimated';
+import { X, Search, ArrowLeft, Check, ShoppingBag } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
 import { FuchsiaColors, FuchsiaFonts } from '@/constants/theme';
-import { getOutfits, getWardrobe, addWardrobeToOutfit, removeWardrobeFromOutfit, OutfitWithItemsResponse, WardrobeWithDetailsResponse } from '@/api/client';
-import { GridSkeleton } from '@/components/ui/Skeleton';
+import { getOutfits, createCalendarOutfit, OutfitWithItemsResponse } from '@/api/client';
 
-export default function SelectOutfitsScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+export default function SelectOutfitScreen() {
+  const { date } = useLocalSearchParams<{ date: string }>();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const itemWidth = (width - 48) / 2;
 
-  const [wardrobe, setWardrobe] = useState<WardrobeWithDetailsResponse | null>(null);
   const [outfits, setOutfits] = useState<OutfitWithItemsResponse[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [initialIds, setInitialIds] = useState<Set<string>>(new Set());
-  
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-
   const [searchQuery, setSearchQuery] = useState('');
   const [showCartModal, setShowCartModal] = useState(false);
 
   useEffect(() => {
     async function loadData() {
-      if (!id) return;
       try {
-        const [wardrobeData, allOutfits] = await Promise.all([
-          getWardrobe(id as string),
-          getOutfits()
-        ]);
-        
-        setWardrobe(wardrobeData);
+        const allOutfits = await getOutfits();
         setOutfits(allOutfits);
-        
-        const existingIds = new Set(wardrobeData.outfits.map(o => o.id));
-        setSelectedIds(existingIds);
-        setInitialIds(new Set(existingIds));
       } catch (err) {
         console.error('Failed to load outfits', err);
       } finally {
@@ -50,7 +34,7 @@ export default function SelectOutfitsScreen() {
       }
     }
     loadData();
-  }, [id]);
+  }, []);
 
   const toggleSelection = (outfitId: string) => {
     setSelectedIds(prev => {
@@ -65,31 +49,26 @@ export default function SelectOutfitsScreen() {
   };
 
   const handleSave = async () => {
-    if (!id || isSaving) return;
+    if (!date || isSaving || selectedIds.size === 0) return;
     setIsSaving(true);
     
     try {
-      const added = [...selectedIds].filter(outfitId => !initialIds.has(outfitId));
-      const removed = [...initialIds].filter(outfitId => !selectedIds.has(outfitId));
-      
-      const promises: Promise<any>[] = [];
-      
-      for (const outfitId of added) {
-        promises.push(addWardrobeToOutfit(outfitId, id as string));
-      }
-      
-      for (const outfitId of removed) {
-        promises.push(removeWardrobeFromOutfit(outfitId, id as string));
-      }
+      const promises = Array.from(selectedIds).map(outfitId => 
+        createCalendarOutfit({
+          outfit_id: outfitId,
+          date: date.split('T')[0],
+          notes: undefined
+        })
+      );
       
       await Promise.all(promises);
       
-      DeviceEventEmitter.emit('wardrobeUpdated', id);
-      DeviceEventEmitter.emit('showGlobalToast', 'Outfits updated successfully');
+      DeviceEventEmitter.emit('calendarUpdated');
+      DeviceEventEmitter.emit('showGlobalToast', `${selectedIds.size} outfit${selectedIds.size > 1 ? 's' : ''} logged!`);
       router.back();
     } catch (err) {
-      console.error('Failed to save selections', err);
-      alert('Failed to save your selections. Please try again.');
+      console.error('Failed to log outfits', err);
+      alert('Failed to log outfits. Please try again.');
       setIsSaving(false);
     }
   };
@@ -186,10 +165,10 @@ export default function SelectOutfitsScreen() {
     );
   };
 
-  if (isLoading || !wardrobe) {
+  if (isLoading) {
     return (
-      <View style={[styles.loadingContainer, { paddingTop: insets.top + 60 }]}>
-        <GridSkeleton />
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator color={FuchsiaColors.vibrant} size="large" />
       </View>
     );
   }
@@ -265,6 +244,7 @@ export default function SelectOutfitsScreen() {
                     key={outfit.id} 
                     style={[styles.itemCard, { width: itemWidth }]}
                     onPress={() => toggleSelection(outfit.id)}
+                    disabled={isSaving}
                   >
                     <View style={[
                       styles.itemImageContainer, 
@@ -292,8 +272,6 @@ export default function SelectOutfitsScreen() {
           )}
           <View style={{ height: (insets.bottom || 24) + 40 }} />
         </ScrollView>
-        
-        
       </View>
 
       <Modal
@@ -354,7 +332,7 @@ export default function SelectOutfitsScreen() {
                     <ActivityIndicator color="white" size="small" />
                   ) : (
                     <Text style={styles.cartSaveButtonText}>
-                      Assign Outfits
+                      Log Today
                     </Text>
                   )}
                 </LinearGradient>
@@ -532,23 +510,6 @@ const styles = StyleSheet.create({
     color: FuchsiaColors.slate,
     textAlign: 'center',
     paddingHorizontal: 40,
-  },
-  cartFabWrapper: {
-    position: 'absolute',
-    left: 24,
-  },
-  cartFab: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: FuchsiaColors.vibrant,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 8,
   },
   cartBadge: {
     position: 'absolute',
