@@ -4,6 +4,7 @@ from uuid import uuid4
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from fastapi.security import HTTPAuthorizationCredentials
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.auth import AuthenticatedUser, bearer_scheme, get_current_authenticated_user
@@ -229,5 +230,12 @@ def delete_clothing_item(
     if not item:
         raise HTTPException(status_code=404, detail="Clothing item not found")
 
-    db.delete(item)
-    db.commit()
+    try:
+        db.delete(item)
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=400, 
+            detail="Cannot delete clothing item because it is associated with an outfit or wardrobe."
+        )
