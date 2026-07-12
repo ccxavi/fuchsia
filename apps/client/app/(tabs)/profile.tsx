@@ -8,7 +8,7 @@ import { jwtDecode } from 'jwt-decode';
 import { getMe, getClothingItems, getWardrobes, getOutfits } from '@/api/client';
 import { ThemedText } from '@/components/themed-text';
 import { FuchsiaColors, FuchsiaFonts } from '@/constants/theme';
-import { User, BrainCircuit, ChevronRight, LogOut, HelpCircle } from 'lucide-react-native';
+import { User, BrainCircuit, ChevronRight, LogOut, HelpCircle, Shield } from 'lucide-react-native';
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
@@ -133,19 +133,36 @@ export default function ProfileScreen() {
       </View>
 
       <View style={styles.settingsGroup}>
-        <ThemedText style={styles.groupTitle}>Support</ThemedText>
-        <TouchableOpacity 
-          style={styles.settingsItem}
-          onPress={() => router.push('/help')}
-        >
-          <View style={styles.settingsItemLeft}>
-            <View style={styles.itemIcon}>
-              <HelpCircle size={20} color={FuchsiaColors.slate} />
+        <ThemedText style={styles.groupTitle}>Support & Legal</ThemedText>
+        <View style={styles.settingsCard}>
+          <TouchableOpacity 
+            style={styles.settingsRow}
+            onPress={() => router.push('/help')}
+          >
+            <View style={styles.settingsItemLeft}>
+              <View style={styles.itemIcon}>
+                <HelpCircle size={20} color={FuchsiaColors.slate} />
+              </View>
+              <ThemedText style={styles.settingsItemText}>Help Center & FAQ</ThemedText>
             </View>
-            <ThemedText style={styles.settingsItemText}>Help Center & FAQ</ThemedText>
-          </View>
-          <ChevronRight size={20} color={FuchsiaColors.slate} />
-        </TouchableOpacity>
+            <ChevronRight size={20} color={FuchsiaColors.slate} />
+          </TouchableOpacity>
+          
+          <View style={styles.settingsDivider} />
+          
+          <TouchableOpacity 
+            style={styles.settingsRow}
+            onPress={() => router.push('/legal')}
+          >
+            <View style={styles.settingsItemLeft}>
+              <View style={styles.itemIcon}>
+                <Shield size={20} color={FuchsiaColors.slate} />
+              </View>
+              <ThemedText style={styles.settingsItemText}>Privacy & Terms</ThemedText>
+            </View>
+            <ChevronRight size={20} color={FuchsiaColors.slate} />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <View style={styles.settingsGroup}>
@@ -245,6 +262,24 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
     color: FuchsiaColors.slate,
     marginLeft: 4,
+  },
+  settingsCard: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.05)',
+    overflow: 'hidden',
+  },
+  settingsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 16,
+  },
+  settingsDivider: {
+    height: 1,
+    backgroundColor: 'rgba(0,0,0,0.05)',
+    marginLeft: 64, // Aligns with text start
   },
   settingsItem: {
     flexDirection: 'row',

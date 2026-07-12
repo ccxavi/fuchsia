@@ -131,7 +131,9 @@ export default function HelpScreen() {
 
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.iconContainer}>
-          <HelpCircle size={48} color={FuchsiaColors.vibrant} />
+          <View style={styles.iconWrapper}>
+            <HelpCircle size={40} color={FuchsiaColors.vibrant} />
+          </View>
           <ThemedText style={styles.pageTitle}>Frequently Asked Questions</ThemedText>
           <ThemedText style={styles.pageSubtitle}>Everything you need to know about Fuchsia.</ThemedText>
         </View>
@@ -181,6 +183,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     alignItems: 'center',
     justifyContent: 'center',
+    shadowColor: FuchsiaColors.ink,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
   headerTitle: {
     fontFamily: FuchsiaFonts.heading,
@@ -200,11 +207,24 @@ const styles = StyleSheet.create({
     marginBottom: 32,
     marginTop: 16,
   },
+  iconWrapper: {
+    width: 80,
+    height: 80,
+    borderRadius: 24,
+    backgroundColor: FuchsiaColors.blush,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+    shadowColor: FuchsiaColors.vibrant,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 4,
+  },
   pageTitle: {
     fontFamily: FuchsiaFonts.heading,
-    fontSize: 22,
+    fontSize: 24,
     color: FuchsiaColors.ink,
-    marginTop: 16,
     textAlign: 'center',
   },
   pageSubtitle: {
@@ -213,6 +233,8 @@ const styles = StyleSheet.create({
     color: FuchsiaColors.slate,
     marginTop: 8,
     textAlign: 'center',
+    lineHeight: 22,
+    paddingHorizontal: 16,
   },
   faqContainer: {
     gap: 24,
@@ -229,11 +251,16 @@ const styles = StyleSheet.create({
   },
   faqCard: {
     backgroundColor: '#fff',
-    borderRadius: 16,
+    borderRadius: 24,
     borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.05)',
-    padding: 16,
+    borderColor: 'rgba(0,0,0,0.04)',
+    padding: 24,
     overflow: 'hidden',
+    shadowColor: FuchsiaColors.ink,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.04,
+    shadowRadius: 24,
+    elevation: 3,
   },
   faqCardExpanded: {
     borderColor: FuchsiaColors.mist,
