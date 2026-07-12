@@ -10,7 +10,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { FuchsiaColors, FuchsiaFonts } from '@/constants/theme';
 import { CLOTHING_CATEGORIES } from '@/constants/categories';
 import { getClothingItems, getWardrobe, addItemToWardrobe, removeItemFromWardrobe, ClothingItemResponse, WardrobeWithDetailsResponse } from '@/api/client';
-import { GridSkeleton } from '@/components/ui/Skeleton';
+import { GridSkeleton, Skeleton } from '@/components/ui/Skeleton';
 
 export default function SelectItemsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -130,14 +130,6 @@ export default function SelectItemsScreen() {
     return matchesSearch && matchesCategory;
   });
 
-  if (isLoading || !wardrobe) {
-    return (
-      <View style={[styles.loadingContainer, { paddingTop: insets.top + 60 }]}>
-        <GridSkeleton />
-      </View>
-    );
-  }
-
   const selectedCount = selectedIds.size;
   const selectedItemsData = items.filter(i => selectedIds.has(i.id));
 
@@ -150,16 +142,25 @@ export default function SelectItemsScreen() {
             <ArrowLeft size={20} color={FuchsiaColors.slate} />
           </Pressable>
           <View style={styles.headerCenter}>
-            {wardrobe?.image_url ? (
-              <Image source={{ uri: wardrobe.image_url }} style={styles.headerImage} contentFit="cover" />
+            {isLoading || !wardrobe ? (
+              <>
+                <Skeleton width={36} height={36} borderRadius={18} style={{ marginBottom: 4 }} />
+                <Skeleton width={80} height={14} />
+              </>
             ) : (
-              <View style={[styles.headerImage, { backgroundColor: FuchsiaColors.mist, alignItems: 'center', justifyContent: 'center' }]}>
-                <ShoppingBag size={14} color="#fff" />
-              </View>
+              <>
+                {wardrobe.image_url ? (
+                  <Image source={{ uri: wardrobe.image_url }} style={styles.headerImage} contentFit="cover" />
+                ) : (
+                  <View style={[styles.headerImage, { backgroundColor: FuchsiaColors.mist, alignItems: 'center', justifyContent: 'center' }]}>
+                    <ShoppingBag size={14} color="#fff" />
+                  </View>
+                )}
+                <Text style={styles.headerTitleSub} numberOfLines={1}>
+                  {wardrobe.name}
+                </Text>
+              </>
             )}
-            <Text style={styles.headerTitleSub} numberOfLines={1}>
-              {wardrobe?.name || 'Loading...'}
-            </Text>
           </View>
           <Pressable 
             style={styles.iconButton}
@@ -209,7 +210,9 @@ export default function SelectItemsScreen() {
       {/* Grid */}
       <View style={styles.flex1}>
         <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-          {filteredItems.length === 0 ? (
+          {isLoading || !wardrobe ? (
+            <GridSkeleton />
+          ) : filteredItems.length === 0 ? (
             <View style={styles.emptyState}>
               <Text style={styles.emptyTitle}>No items found</Text>
               <Text style={styles.emptySubtitle}>Try adjusting your search or filters.</Text>
