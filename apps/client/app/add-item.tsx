@@ -9,6 +9,7 @@ import { Image } from 'expo-image';
 import { ThemedText } from '@/components/themed-text';
 import { FuchsiaColors, FuchsiaFonts } from '@/constants/theme';
 import { CLOTHING_CATEGORIES } from '@/constants/categories';
+import { ItemFormSkeleton, Skeleton } from '@/components/ui/Skeleton';
 import { createClothingItem, updateClothingItem, getClothingItem, getWardrobes, WardrobeResponse } from '@/api/client';
 
 export default function AddOrEditItemScreen() {
@@ -148,8 +149,16 @@ export default function AddOrEditItemScreen() {
 
   if (isFetching) {
     return (
-      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
-        <ActivityIndicator size="large" color={FuchsiaColors.deep} />
+      <View style={styles.container}>
+        <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
+          <Skeleton width={40} height={40} borderRadius={12} />
+          <Skeleton width={120} height={20} />
+          <View style={{ width: 40 }} />
+        </View>
+        <ItemFormSkeleton />
+        <View style={[styles.footer, { paddingBottom: (insets.bottom || 24) + 16 }]}>
+          <Skeleton width="100%" height={52} borderRadius={12} />
+        </View>
       </View>
     );
   }

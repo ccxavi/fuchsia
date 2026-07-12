@@ -8,6 +8,7 @@ import { ArrowLeft, MoreHorizontal, Calendar, Plus, Trash2, Edit2, X, Layers } f
 
 import { FuchsiaColors, FuchsiaFonts } from '@/constants/theme';
 import { getWardrobe, deleteWardrobe, WardrobeWithDetailsResponse, OutfitWithItemsResponse } from '@/api/client';
+import { WardrobeDetailSkeleton } from '@/components/ui/Skeleton';
 
 export default function WardrobeDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -48,8 +49,8 @@ export default function WardrobeDetailScreen() {
 
   if (isLoading || !wardrobe) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator color={FuchsiaColors.vibrant} size="large" />
+      <View style={styles.container}>
+        <WardrobeDetailSkeleton />
       </View>
     );
   }

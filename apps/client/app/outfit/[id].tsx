@@ -11,6 +11,7 @@ import { CustomAlert } from '@/components/ui/CustomAlert';
 
 import { FuchsiaColors, FuchsiaFonts } from '@/constants/theme';
 import { getOutfit, deleteOutfit, updateOutfit, deleteOutfitImage, addItemToOutfit, removeItemFromOutfit, addWardrobeToOutfit, removeWardrobeFromOutfit, createCalendarOutfit, OutfitWithWardrobesResponse } from '@/api/client';
+import { OutfitDetailSkeleton } from '@/components/ui/Skeleton';
 
 export default function OutfitDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -148,8 +149,8 @@ export default function OutfitDetailScreen() {
 
   if (isLoading || !outfit) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={FuchsiaColors.vibrant} />
+      <View style={[styles.container, { paddingTop: insets.top }]}>
+        <OutfitDetailSkeleton />
       </View>
     );
   }

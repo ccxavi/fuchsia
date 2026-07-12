@@ -9,6 +9,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 
 import { FuchsiaColors, FuchsiaFonts } from '@/constants/theme';
 import { getOutfits, getWardrobe, addWardrobeToOutfit, removeWardrobeFromOutfit, OutfitWithItemsResponse, WardrobeWithDetailsResponse } from '@/api/client';
+import { GridSkeleton } from '@/components/ui/Skeleton';
 
 export default function SelectOutfitsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -187,8 +188,8 @@ export default function SelectOutfitsScreen() {
 
   if (isLoading || !wardrobe) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator color={FuchsiaColors.vibrant} size="large" />
+      <View style={[styles.loadingContainer, { paddingTop: insets.top + 60 }]}>
+        <GridSkeleton />
       </View>
     );
   }

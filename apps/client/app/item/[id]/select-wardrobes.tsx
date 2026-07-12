@@ -7,7 +7,8 @@ import { X, Check, Search, ArrowLeft, Folder } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
 import { FuchsiaColors, FuchsiaFonts } from '@/constants/theme';
-import { getClothingItem, getWardrobes, addItemToWardrobe, removeItemFromWardrobe, WardrobeResponse, ClothingItemWithDetailsResponse } from '@/api/client';
+import { getWardrobes, addItemToWardrobe, removeItemFromWardrobe, getClothingItem, WardrobeResponse, ClothingItemWithDetailsResponse } from '@/api/client';
+import { GridSkeleton } from '@/components/ui/Skeleton';
 
 export default function SelectWardrobesScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -95,10 +96,10 @@ export default function SelectWardrobesScreen() {
     return !searchQuery || w.name.toLowerCase().includes(searchQuery.toLowerCase());
   });
 
-  if (isLoading || !item) {
+  if (isLoading) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator color={FuchsiaColors.deep} size="large" />
+      <View style={[styles.loadingContainer, { paddingTop: insets.top + 60 }]}>
+        <GridSkeleton />
       </View>
     );
   }

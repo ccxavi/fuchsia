@@ -8,6 +8,7 @@ import { ArrowLeft, Trash2, Palette, Folder, Layers, Upload, Plus, MoreHorizonta
 import { LinearGradient } from 'expo-linear-gradient';
 import { FuchsiaColors, FuchsiaFonts } from '@/constants/theme';
 import { getClothingItem, deleteClothingItem, ClothingItemWithDetailsResponse, OutfitWithItemsResponse, WardrobeResponse, getWardrobes, addItemToWardrobe, removeItemFromWardrobe } from '@/api/client';
+import { ItemDetailSkeleton } from '@/components/ui/Skeleton';
 
 export default function ItemDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -87,8 +88,8 @@ export default function ItemDetailScreen() {
 
   if (isLoading || !item) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={FuchsiaColors.vibrant} />
+      <View style={styles.container}>
+        <ItemDetailSkeleton />
       </View>
     );
   }

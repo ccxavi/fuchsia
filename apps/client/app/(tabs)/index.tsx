@@ -12,43 +12,7 @@ import { getMe } from '@/api/client';
 
 import { ThemedText } from '@/components/themed-text';
 import { FuchsiaColors, FuchsiaFonts } from '@/constants/theme';
-
-const Skeleton = ({ width, height, borderRadius = 4, style }: any) => {
-  const pulseAnim = useState(new Animated.Value(0.3))[0];
-
-  useEffect(() => {
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulseAnim, {
-          toValue: 0.7,
-          duration: 800,
-          useNativeDriver: true,
-        }),
-        Animated.timing(pulseAnim, {
-          toValue: 0.3,
-          duration: 800,
-          useNativeDriver: true,
-        }),
-      ])
-    ).start();
-  }, [pulseAnim]);
-
-  return (
-    <Animated.View
-      style={[
-        {
-          width,
-          height,
-          borderRadius,
-          backgroundColor: FuchsiaColors.mist,
-          opacity: pulseAnim,
-        },
-        style,
-      ]}
-    />
-  );
-};
-
+import { Skeleton } from '@/components/ui/Skeleton';
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();

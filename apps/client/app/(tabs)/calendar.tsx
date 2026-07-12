@@ -6,6 +6,7 @@ import { ChevronLeft, ChevronRight, Shirt, Sparkles, Calendar, X, Trash2 } from 
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import React from 'react';
+import { CalendarSkeleton } from '@/components/ui/Skeleton';
 
 import { ThemedText } from '@/components/themed-text';
 import { FuchsiaColors, FuchsiaFonts } from '@/constants/theme';
@@ -204,9 +205,7 @@ export default function CalendarScreen() {
       </View>
 
       {isLoading && outfits.length === 0 ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator color={FuchsiaColors.vibrant} />
-        </View>
+        <CalendarSkeleton calendarDays={calendarDays} />
       ) : (
         <ScrollView style={styles.scrollContainer} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
           <View style={styles.gridContainer}>
