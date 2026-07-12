@@ -8,6 +8,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 
 import { FuchsiaColors, FuchsiaFonts } from '@/constants/theme';
 import { getOutfits, createCalendarOutfit, OutfitWithItemsResponse } from '@/api/client';
+import { GridSkeleton } from '@/components/ui/Skeleton';
 
 export default function SelectOutfitScreen() {
   const { date } = useLocalSearchParams<{ date: string }>();
@@ -165,14 +166,6 @@ export default function SelectOutfitScreen() {
     );
   };
 
-  if (isLoading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator color={FuchsiaColors.vibrant} size="large" />
-      </View>
-    );
-  }
-
   const selectedCount = selectedIds.size;
   const selectedOutfitsData = outfits.filter(o => selectedIds.has(o.id));
 
@@ -229,7 +222,9 @@ export default function SelectOutfitScreen() {
 
       <View style={styles.flex1}>
         <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-          {filteredOutfits.length === 0 ? (
+          {isLoading ? (
+            <GridSkeleton />
+          ) : filteredOutfits.length === 0 ? (
             <View style={styles.emptyState}>
               <Text style={styles.emptyTitle}>No outfits found</Text>
               <Text style={styles.emptySubtitle}>Try adjusting your search or create a new outfit.</Text>
