@@ -66,6 +66,13 @@ export default function ClosetScreen() {
     fetchData();
   };
 
+  const getItemTimesWorn = useCallback((itemId: string) => {
+    return outfits.reduce((total, outfit) => {
+      const hasItem = outfit.clothing_items?.some(i => i.id === itemId) ?? false;
+      return total + (hasItem ? (outfit.times_worn || 0) : 0);
+    }, 0);
+  }, [outfits]);
+
   const filteredOutfits = outfits.filter(o => o.name.toLowerCase().includes(searchQuery.toLowerCase()));
   const filteredWardrobes = wardrobes.filter(w => w.name.toLowerCase().includes(searchQuery.toLowerCase()));
   const filteredItems = clothingItems.filter(i => {
@@ -394,7 +401,7 @@ export default function ClosetScreen() {
             </View>
             <View style={styles.itemInfo}>
               <Text style={styles.itemTitle} numberOfLines={1}>{item.name}</Text>
-              <Text style={styles.itemSubtitle}>Worn 0 times</Text>
+              <Text style={styles.itemSubtitle}>Worn {getItemTimesWorn(item.id)} times</Text>
             </View>
           </Pressable>
         )}
