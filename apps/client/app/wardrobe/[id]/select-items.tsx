@@ -336,7 +336,7 @@ export default function SelectItemsScreen() {
                     <ActivityIndicator color="white" size="small" />
                   ) : (
                     <Text style={styles.cartSaveButtonText}>
-                      Pack {selectedCount} {selectedCount === 1 ? 'Item' : 'Items'}
+                      Pack Items
                     </Text>
                   )}
                 </LinearGradient>

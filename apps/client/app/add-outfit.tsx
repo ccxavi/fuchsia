@@ -26,7 +26,7 @@ import {
 } from '@/api/client';
 
 export default function AddOrEditOutfitScreen() {
-  const { id, wardrobeId, itemId } = useLocalSearchParams<{ id?: string; wardrobeId?: string; itemId?: string }>();
+  const { id, wardrobeId, itemId, date } = useLocalSearchParams<{ id?: string; wardrobeId?: string; itemId?: string; date?: string }>();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
 
@@ -42,7 +42,7 @@ export default function AddOrEditOutfitScreen() {
   const [showItemPicker, setShowItemPicker] = useState(false);
   const [showCartModal, setShowCartModal] = useState(false);
   const [pickerSelectedIds, setPickerSelectedIds] = useState<Set<string>>(new Set());
-  const [scheduledDate, setScheduledDate] = useState<Date | null>(null);
+  const [scheduledDate, setScheduledDate] = useState<Date | null>(date ? new Date(date) : null);
   const [showDatePicker, setShowDatePicker] = useState(false);
 
   // Item Picker state
@@ -332,16 +332,20 @@ export default function AddOrEditOutfitScreen() {
             />
           </View>
           <View style={styles.formGroup}>
-            <ThemedText style={styles.label}>Schedule Outfit (Optional)</ThemedText>
+            <ThemedText style={styles.label}>
+              {date ? 'Scheduled Date' : 'Schedule Outfit (Optional)'}
+            </ThemedText>
             <Pressable 
-              style={styles.scheduleButton}
-              onPress={() => setShowDatePicker(true)}
+              style={[styles.scheduleButton, !!date && { backgroundColor: FuchsiaColors.cloud }]}
+              onPress={() => {
+                if (!date) setShowDatePicker(true);
+              }}
             >
               <Calendar size={18} color={FuchsiaColors.slate} />
               <ThemedText style={scheduledDate ? styles.scheduledDateText : styles.schedulePlaceholderText}>
                 {scheduledDate ? scheduledDate.toLocaleDateString() : 'Select a date...'}
               </ThemedText>
-              {scheduledDate && (
+              {scheduledDate && !date && (
                 <Pressable onPress={() => setScheduledDate(null)} style={{ marginLeft: 'auto' }}>
                   <X size={16} color={FuchsiaColors.slate} />
                 </Pressable>
