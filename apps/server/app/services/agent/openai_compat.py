@@ -76,12 +76,17 @@ def build_body(
     temperature: float | None,
     max_tokens: int | None,
     tools: list[dict[str, Any]] | None = None,
+    response_format: dict[str, Any] | None = None,
+    reasoning_effort: str | None = None,
 ) -> dict[str, Any]:
     """Build an OpenAI-compatible chat completion request body.
 
     ``message_dicts`` must already be serialized (see :func:`serialize_messages`),
     which lets the agentic loop append raw ``assistant``/``tool`` messages between
-    rounds.
+    rounds. ``response_format`` (e.g. ``{"type": "json_object"}``) is forwarded
+    when provided so callers can request structured output. ``reasoning_effort``
+    (e.g. ``"none"``) controls a thinking model's internal reasoning budget;
+    ``"none"`` disables it for fast, deterministic single-shot responses.
     """
     payload: dict[str, Any] = {
         "model": model,
@@ -94,6 +99,10 @@ def build_body(
         payload["max_tokens"] = max_tokens
     if tools:
         payload["tools"] = tools
+    if response_format is not None:
+        payload["response_format"] = response_format
+    if reasoning_effort is not None:
+        payload["reasoning_effort"] = reasoning_effort
 
     return payload
 

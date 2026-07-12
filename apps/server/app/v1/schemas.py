@@ -273,6 +273,19 @@ class ClothingItemResponse(BaseModel):
     updated_at: datetime.datetime
 
 
+class ClothingItemAnalysis(BaseModel):
+    """AI-derived clothing attributes from an uploaded image.
+
+    All fields are optional: the model returns ``null`` for anything it cannot
+    determine confidently (e.g. a brand with no visible logo).
+    """
+
+    name: str | None = None
+    category: str | None = None
+    color: str | None = None
+    brand: str | None = None
+
+
 class WardrobeCreateRequest(BaseModel):
     name: str = Field(..., min_length=1, max_length=255)
 
