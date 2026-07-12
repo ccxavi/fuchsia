@@ -18,7 +18,9 @@ export default function CalendarScreen() {
   const { width } = useWindowDimensions();
   
   const [currentMonth, setCurrentMonth] = useState(new Date());
-  const [outfits, setOutfits] = useState<CalendarOutfitWithOutfitResponse[]>([]);
+  const [outfitsCache, setOutfitsCache] = useState<Record<string, CalendarOutfitWithOutfitResponse[]>>({});
+  const currentMonthKey = `${currentMonth.getFullYear()}-${currentMonth.getMonth()}`;
+  const outfits = outfitsCache[currentMonthKey] || [];
   const [isLoading, setIsLoading] = useState(true);
 
   const [isPickerVisible, setIsPickerVisible] = useState(false);
@@ -28,6 +30,8 @@ export default function CalendarScreen() {
   const [rescheduleOutfitId, setRescheduleOutfitId] = useState<string | null>(null);
   const [showReschedulePicker, setShowReschedulePicker] = useState(false);
 
+  const fetchMonthRef = React.useRef<string>('');
+
   useFocusEffect(
     React.useCallback(() => {
       fetchOutfits(currentMonth);
@@ -35,14 +39,20 @@ export default function CalendarScreen() {
   );
 
   const fetchOutfits = async (monthDate: Date) => {
+    const fetchId = `${monthDate.getFullYear()}-${monthDate.getMonth()}`;
+    fetchMonthRef.current = fetchId;
     try {
       setIsLoading(true);
       const data = await getCalendarOutfits(monthDate.getFullYear(), monthDate.getMonth() + 1);
-      setOutfits(data);
+      if (fetchMonthRef.current === fetchId) {
+        setOutfitsCache(prev => ({ ...prev, [fetchId]: data }));
+      }
     } catch (error) {
       console.error('Failed to fetch outfits for calendar:', error);
     } finally {
-      setIsLoading(false);
+      if (fetchMonthRef.current === fetchId) {
+        setIsLoading(false);
+      }
     }
   };
 
@@ -203,7 +213,7 @@ export default function CalendarScreen() {
         </Pressable>
       </View>
 
-      {isLoading && outfits.length === 0 ? (
+      {isLoading && Object.keys(outfitsCache).length === 0 ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator color={FuchsiaColors.vibrant} />
         </View>
@@ -354,7 +364,7 @@ export default function CalendarScreen() {
               <ThemedText style={styles.statText}>{aiPicksThisMonth} {aiPicksThisMonth === 1 ? 'AI pick' : 'AI picks'}</ThemedText>
             </View>
           </View>
-          {isViewingCurrentMonth && !todaysOutfit && (
+          {isViewingCurrentMonth && !todaysOutfit && !isLoading && (
             <View style={styles.todayPreviewCard}>
               <ThemedText style={styles.todayPreviewTitle}>NO OUTFIT LOGGED TODAY</ThemedText>
               <ThemedText style={styles.todayPreviewSubtitle}>
