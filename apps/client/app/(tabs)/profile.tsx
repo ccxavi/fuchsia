@@ -1,7 +1,11 @@
 import { View, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
+import { Image } from 'expo-image';
 import * as SecureStore from 'expo-secure-store';
+import { useState, useCallback } from 'react';
+import { jwtDecode } from 'jwt-decode';
+import { getMe } from '@/api/client';
 import { ThemedText } from '@/components/themed-text';
 import { FuchsiaColors, FuchsiaFonts } from '@/constants/theme';
 import { User, BrainCircuit, ChevronRight, LogOut } from 'lucide-react-native';
@@ -9,6 +13,47 @@ import { User, BrainCircuit, ChevronRight, LogOut } from 'lucide-react-native';
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+
+  const [userName, setUserName] = useState<string>('');
+  const [userEmail, setUserEmail] = useState<string>('');
+  const [userPhoto, setUserPhoto] = useState<string | null>(null);
+
+  useFocusEffect(
+    useCallback(() => {
+      const fetchUser = async () => {
+        try {
+          const data = await getMe();
+          let nameToSet = data?.user?.display_name;
+          let emailToSet = data?.user?.email;
+          let photoToSet = null;
+
+          const token = await SecureStore.getItemAsync('access_token');
+          if (token) {
+            try {
+              const decoded: any = jwtDecode(token);
+              if (!nameToSet) {
+                nameToSet = decoded?.user_metadata?.full_name || decoded?.user_metadata?.name || decoded?.email?.split('@')[0] || '';
+              }
+              if (!emailToSet) {
+                emailToSet = decoded?.email || '';
+              }
+              photoToSet = decoded?.user_metadata?.avatar_url || decoded?.user_metadata?.picture || null;
+            } catch (e) {
+              console.error('Failed to decode token:', e);
+            }
+          }
+          
+          setUserName(nameToSet || '');
+          setUserEmail(emailToSet || '');
+          setUserPhoto(photoToSet);
+        } catch (error) {
+          console.error('Error fetching user from API:', error);
+        }
+      };
+
+      fetchUser();
+    }, [])
+  );
 
   const handleLogout = async () => {
     await SecureStore.deleteItemAsync('access_token');
@@ -22,12 +67,16 @@ export default function ProfileScreen() {
       contentContainerStyle={styles.content}
     >
       <View style={styles.header}>
-        <View style={styles.iconContainer}>
-          <User size={32} color={FuchsiaColors.vibrant} />
-        </View>
-        <ThemedText style={styles.title}>My Profile</ThemedText>
+        {userPhoto ? (
+          <Image source={{ uri: userPhoto }} style={styles.iconContainer} contentFit="cover" />
+        ) : (
+          <View style={styles.iconContainer}>
+            <User size={32} color={FuchsiaColors.vibrant} />
+          </View>
+        )}
+        <ThemedText style={styles.title}>{userName || 'My Profile'}</ThemedText>
         <ThemedText style={styles.subtitle}>
-          Manage your account and preferences.
+          {userEmail || 'Manage your account and preferences.'}
         </ThemedText>
       </View>
 
