@@ -1,10 +1,13 @@
 import { View, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
-import { ArrowLeft, HelpCircle } from 'lucide-react-native';
+import { ArrowLeft, HelpCircle, ChevronDown } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ThemedText } from '@/components/themed-text';
 import { FuchsiaColors, FuchsiaFonts } from '@/constants/theme';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import Animated, { Layout, FadeIn, FadeOut, useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
+
+const AnimatedTouchableOpacity = Animated.createAnimatedComponent(TouchableOpacity);
 
 const FAQ_CATEGORIES = [
   {
@@ -72,6 +75,45 @@ const FAQ_CATEGORIES = [
   }
 ];
 
+function FaqItem({ faq, isExpanded, onPress }: { faq: any, isExpanded: boolean, onPress: () => void }) {
+  const rotation = useSharedValue(isExpanded ? 180 : 0);
+  
+  useEffect(() => {
+    rotation.value = withTiming(isExpanded ? 180 : 0, { duration: 250 });
+  }, [isExpanded]);
+
+  const chevronStyle = useAnimatedStyle(() => {
+    return {
+      transform: [{ rotate: `${rotation.value}deg` }]
+    };
+  });
+
+  return (
+    <AnimatedTouchableOpacity
+      layout={Layout.duration(250)}
+      style={[styles.faqCard, isExpanded && styles.faqCardExpanded]}
+      onPress={onPress}
+      activeOpacity={0.7}
+    >
+      <View style={styles.questionRow}>
+        <ThemedText style={styles.questionText}>{faq.question}</ThemedText>
+        <Animated.View style={chevronStyle}>
+          <ChevronDown size={20} color={FuchsiaColors.slate} />
+        </Animated.View>
+      </View>
+      {isExpanded && (
+        <Animated.View 
+          entering={FadeIn.duration(300).delay(50)} 
+          exiting={FadeOut.duration(150)}
+          style={styles.answerContainer}
+        >
+          <ThemedText style={styles.answerText}>{faq.answer}</ThemedText>
+        </Animated.View>
+      )}
+    </AnimatedTouchableOpacity>
+  );
+}
+
 export default function HelpScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -102,21 +144,12 @@ export default function HelpScreen() {
                 const uniqueIndex = `${catIndex}-${faqIndex}`;
                 const isExpanded = expandedIndex === uniqueIndex;
                 return (
-                  <TouchableOpacity
+                  <FaqItem
                     key={faqIndex}
-                    style={[styles.faqCard, isExpanded && styles.faqCardExpanded]}
+                    faq={faq}
+                    isExpanded={isExpanded}
                     onPress={() => setExpandedIndex(isExpanded ? null : uniqueIndex)}
-                    activeOpacity={0.7}
-                  >
-                    <View style={styles.questionRow}>
-                      <ThemedText style={styles.questionText}>{faq.question}</ThemedText>
-                    </View>
-                    {isExpanded && (
-                      <View style={styles.answerContainer}>
-                        <ThemedText style={styles.answerText}>{faq.answer}</ThemedText>
-                      </View>
-                    )}
-                  </TouchableOpacity>
+                  />
                 );
               })}
             </View>
@@ -217,6 +250,7 @@ const styles = StyleSheet.create({
     color: FuchsiaColors.ink,
     flex: 1,
     lineHeight: 22,
+    paddingRight: 16,
   },
   answerContainer: {
     marginTop: 12,
