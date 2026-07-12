@@ -14,7 +14,7 @@ router.include_router(
 )
 router.include_router(
     chat.router,
-    tags=["chat"],
+    tags=["AI"],
 )
 router.include_router(
     clothing_items.router,

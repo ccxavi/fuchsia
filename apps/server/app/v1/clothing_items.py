@@ -28,7 +28,12 @@ router = APIRouter()
 MAX_ANALYZE_IMAGE_BYTES = 10 * 1024 * 1024
 
 
-@router.post("/analyze", response_model=ClothingItemAnalysis)
+@router.post(
+    "/analyze",
+    response_model=ClothingItemAnalysis,
+    tags=["AI"],
+    summary="Derive clothing attributes from an image (Gemini vision)",
+)
 async def analyze_clothing_item_image(
     image: Annotated[UploadFile, File(...)],
     user: AuthenticatedUser = Depends(get_current_authenticated_user),
