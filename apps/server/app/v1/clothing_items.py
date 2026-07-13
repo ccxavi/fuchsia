@@ -6,17 +6,59 @@ from fastapi.security import HTTPAuthorizationCredentials
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
+from starlette.concurrency import run_in_threadpool
 
 from app.core.auth import AuthenticatedUser, bearer_scheme, get_current_authenticated_user
 from app.db.session import get_db_session
 from app.models.clothing_item import ClothingItem
 from app.models.wardrobe import Wardrobe
+from app.services.agent import analyze_clothing_image
 from app.services.supabase_storage import upload_file_to_supabase
 from app.models.outfit import Outfit
-from app.v1.schemas import ClothingItemResponse, ClothingItemWithDetailsResponse
+from app.v1.schemas import (
+    ClothingItemAnalysis,
+    ClothingItemResponse,
+    ClothingItemWithDetailsResponse,
+)
 from sqlalchemy.orm import selectinload
 
 router = APIRouter()
+
+# Cap analyzed images: the bytes are inlined into the LLM request, so keep the
+# payload sane. ~10 MB comfortably covers phone photos.
+MAX_ANALYZE_IMAGE_BYTES = 10 * 1024 * 1024
+
+
+@router.post(
+    "/analyze",
+    response_model=ClothingItemAnalysis,
+    tags=["AI"],
+    summary="Derive clothing attributes from an image (Gemini vision)",
+)
+async def analyze_clothing_item_image(
+    image: Annotated[UploadFile, File(...)],
+    user: AuthenticatedUser = Depends(get_current_authenticated_user),
+) -> ClothingItemAnalysis:
+    """Derive clothing attributes from an image without saving anything.
+
+    Returns AI-inferred ``name``/``category``/``color``/``brand`` so the client
+    can pre-fill the add-item form. The image is uploaded later by the regular
+    create endpoint when the user saves.
+    """
+    if not image.content_type or not image.content_type.startswith("image/"):
+        raise HTTPException(status_code=400, detail="File must be an image")
+
+    image_bytes = await image.read()
+    if not image_bytes:
+        raise HTTPException(status_code=400, detail="Image file is empty")
+    if len(image_bytes) > MAX_ANALYZE_IMAGE_BYTES:
+        raise HTTPException(status_code=413, detail="Image is too large")
+
+    # analyze_clothing_image makes a blocking (sync httpx) call to Gemini; run it
+    # in a threadpool so it never stalls the event loop for other requests.
+    return await run_in_threadpool(
+        analyze_clothing_image, image_bytes, image.content_type
+    )
 
 @router.post("/", status_code=status.HTTP_201_CREATED, response_model=ClothingItemResponse)
 async def create_clothing_item(
