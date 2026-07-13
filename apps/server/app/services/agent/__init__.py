@@ -5,6 +5,7 @@ from __future__ import annotations
 from app.services.agent.loop import run_stylist_chat
 from app.services.agent.prompt import STYLIST_SYSTEM_PROMPT, build_stylist_messages
 from app.services.agent.providers import deepseek_provider, gemini_provider
+from app.services.agent.style_tips import generate_style_tips, wardrobe_fingerprint
 from app.services.agent.vision import analyze_clothing_image
 
 __all__ = [
@@ -13,5 +14,7 @@ __all__ = [
     "build_stylist_messages",
     "deepseek_provider",
     "gemini_provider",
+    "generate_style_tips",
     "run_stylist_chat",
+    "wardrobe_fingerprint",
 ]

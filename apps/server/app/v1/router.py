@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from app.v1 import auth, chat, clothing_items, health, wardrobes, outfits, calendar, weather, memories
+from app.v1 import auth, chat, clothing_items, health, wardrobes, outfits, calendar, weather, memories, style_tips
 
 router = APIRouter()
 
@@ -45,4 +45,9 @@ router.include_router(
     memories.router,
     prefix="/memories",
     tags=["memories"],
+)
+router.include_router(
+    style_tips.router,
+    prefix="/style-tips",
+    tags=["AI"],
 )
