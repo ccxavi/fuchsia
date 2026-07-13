@@ -15,6 +15,8 @@ class AuthenticatedUserResponse(BaseModel):
     supabase_user_id: str
     email: str | None
     display_name: str | None = None
+    push_token: str | None = None
+    daily_reminders: bool
     created_at: datetime.datetime
     updated_at: datetime.datetime
 
@@ -25,6 +27,8 @@ class AuthMeResponse(BaseModel):
 
 class UserPreferencesUpdateRequest(BaseModel):
     display_name: str | None = None
+    push_token: str | None = None
+    daily_reminders: bool | None = None
 
     @field_validator("display_name")
     @classmethod

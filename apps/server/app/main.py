@@ -1,10 +1,19 @@
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from app.core.logging import setup_logging
 from app.v1.router import router as v1_router
 
-setup_logging()
+from app.services.notifications import start_scheduler, shutdown_scheduler
 
+setup_logging()
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    start_scheduler()
+    yield
+    # Shutdown
+    shutdown_scheduler()
 # Tag order + descriptions drive the grouping and copy shown in Swagger UI.
 # "AI" is surfaced first so the AI-backed endpoints are easy to find.
 tags_metadata = [
@@ -25,7 +34,6 @@ tags_metadata = [
     {"name": "memories", "description": "User style preferences remembered across chats."},
     {"name": "health", "description": "Service liveness checks."},
 ]
-
-app = FastAPI(title="Fuchsia API", openapi_tags=tags_metadata)
-
+# Combine both the lifespan AND the openapi_tags!
+app = FastAPI(title="Fuchsia API", lifespan=lifespan, openapi_tags=tags_metadata)
 app.include_router(v1_router, prefix="/api/v1")
