@@ -16,6 +16,8 @@ dependencies = [
     "SQLAlchemy==2.0.49",
     "uvicorn==0.40.0",
     "python-multipart==0.0.9",
+    "apscheduler==3.11.0",
+    "exponent-server-sdk==2.0.0",
 ]
 
 [dependency-groups]
