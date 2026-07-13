@@ -273,6 +273,41 @@ class ClothingItemResponse(BaseModel):
     updated_at: datetime.datetime
 
 
+class ClothingItemAnalysis(BaseModel):
+    """AI-derived clothing attributes from an uploaded image.
+
+    All fields are optional: the model returns ``null`` for anything it cannot
+    determine confidently (e.g. a brand with no visible logo).
+    """
+
+    name: str | None = None
+    category: str | None = None
+    color: str | None = None
+    brand: str | None = None
+
+
+StyleTipKind = Literal["pairing", "color", "occasion", "care", "versatility"]
+
+
+class StyleTip(BaseModel):
+    """A single AI-generated wardrobe style tip.
+
+    ``kind`` maps to a client-side icon; it is ``None`` when the model returns a
+    value outside the known set.
+    """
+
+    title: str = Field(..., min_length=1, max_length=80)
+    description: str = Field(..., min_length=1, max_length=200)
+    kind: StyleTipKind | None = None
+
+
+class StyleTipsResponse(BaseModel):
+    tips: list[StyleTip] = []
+    updated_at: datetime.datetime | None = None
+    # True when served from the wardrobe-fingerprint cache (no LLM call made).
+    cached: bool = False
+
+
 class WardrobeCreateRequest(BaseModel):
     name: str = Field(..., min_length=1, max_length=255)
 

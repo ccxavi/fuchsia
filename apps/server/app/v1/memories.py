@@ -26,6 +26,7 @@ def _get_owned_memory(db: Session, memory_id: str, user_id: str) -> Memory | Non
     "",
     status_code=status.HTTP_201_CREATED,
     response_model=list[MemoryResponse],
+    tags=["AI"],
     summary="Persist approved memory suggestions for the current user",
 )
 def ingest_memories(
