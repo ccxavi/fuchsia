@@ -5,6 +5,13 @@ Revises: c3d4e5f6a7b8
 Create Date: 2026-07-13 00:23:05.883036
 """
 
+"""add push notification fields
+
+Revision ID: 96f5a077648e
+Revises: c3d4e5f6a7b8
+Create Date: 2026-07-13 00:23:05.883036
+"""
+
 from __future__ import annotations
 
 from alembic import op
@@ -13,7 +20,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision = '96f5a077648e'
-down_revision = 'c3d4e5f6a7b8'
+down_revision = 'd5e6f7a8b9c0'
 branch_labels = None
 depends_on = None
 
