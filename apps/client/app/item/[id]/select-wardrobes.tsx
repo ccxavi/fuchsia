@@ -8,7 +8,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 
 import { FuchsiaColors, FuchsiaFonts } from '@/constants/theme';
 import { getWardrobes, addItemToWardrobe, removeItemFromWardrobe, getClothingItem, WardrobeResponse, ClothingItemWithDetailsResponse } from '@/api/client';
-import { GridSkeleton } from '@/components/ui/Skeleton';
+import { GridSkeleton, Skeleton } from '@/components/ui/Skeleton';
 
 export default function SelectWardrobesScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -96,13 +96,7 @@ export default function SelectWardrobesScreen() {
     return !searchQuery || w.name.toLowerCase().includes(searchQuery.toLowerCase());
   });
 
-  if (isLoading) {
-    return (
-      <View style={[styles.loadingContainer, { paddingTop: insets.top + 60 }]}>
-        <GridSkeleton />
-      </View>
-    );
-  }
+
 
   const selectedCount = selectedIds.size;
   const selectedWardrobesData = wardrobes.filter(w => selectedIds.has(w.id));
@@ -116,14 +110,23 @@ export default function SelectWardrobesScreen() {
             <ArrowLeft size={20} color={FuchsiaColors.slate} />
           </Pressable>
           <View style={styles.headerCenter}>
-            {item?.image_url ? (
-              <Image source={{ uri: item.image_url }} style={styles.headerImage} contentFit="cover" />
+            {isLoading || !item ? (
+              <>
+                <Skeleton width={36} height={36} borderRadius={18} style={{ marginBottom: 4 }} />
+                <Skeleton width={80} height={14} />
+              </>
             ) : (
-              <View style={[styles.headerImage, { backgroundColor: FuchsiaColors.mist, alignItems: 'center', justifyContent: 'center' }]} />
+              <>
+                {item.image_url ? (
+                  <Image source={{ uri: item.image_url }} style={styles.headerImage} contentFit="cover" />
+                ) : (
+                  <View style={[styles.headerImage, { backgroundColor: FuchsiaColors.mist, alignItems: 'center', justifyContent: 'center' }]} />
+                )}
+                <Text style={styles.headerTitleSub} numberOfLines={1}>
+                  {item.name}
+                </Text>
+              </>
             )}
-            <Text style={styles.headerTitleSub} numberOfLines={1}>
-              {item?.name || 'Loading...'}
-            </Text>
           </View>
           <Pressable 
             style={styles.iconButton}
@@ -168,7 +171,9 @@ export default function SelectWardrobesScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {filteredWardrobes.length === 0 ? (
+        {isLoading || !item ? (
+          <GridSkeleton />
+        ) : filteredWardrobes.length === 0 ? (
           <Text style={styles.emptyMessage}>No wardrobes found.</Text>
         ) : (
           <View style={styles.gridContainer}>
@@ -313,21 +318,20 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   headerCenter: {
-    flexDirection: 'row',
-    alignItems: 'center',
     flex: 1,
+    alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 16,
   },
   headerImage: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    marginRight: 8,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    marginBottom: 4,
   },
   headerTitleSub: {
     fontFamily: FuchsiaFonts.heading,
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
     color: FuchsiaColors.ink,
   },
