@@ -2,13 +2,13 @@ import { StyleSheet, View, ScrollView, Pressable, Animated, Text } from 'react-n
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Sparkles, Lightbulb, Palette, History } from 'lucide-react-native';
+import { Sparkles, Lightbulb, Palette, History, RefreshCw, Briefcase, Droplet, Layers } from 'lucide-react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import { useState, useEffect, useCallback } from 'react';
 import * as Location from 'expo-location';
 import { jwtDecode } from 'jwt-decode';
-import { getMe, getCalendarOutfits, CalendarOutfitWithOutfitResponse } from '@/api/client';
+import { getMe, getCalendarOutfits, CalendarOutfitWithOutfitResponse, getStyleTips, StyleTip } from '@/api/client';
 
 import { ThemedText } from '@/components/themed-text';
 import { FuchsiaColors, FuchsiaFonts } from '@/constants/theme';
@@ -22,6 +22,9 @@ export default function HomeScreen() {
 
   const [recentLooks, setRecentLooks] = useState<CalendarOutfitWithOutfitResponse[]>([]);
   const [loadingLooks, setLoadingLooks] = useState(true);
+
+  const [styleTips, setStyleTips] = useState<StyleTip[]>([]);
+  const [loadingTips, setLoadingTips] = useState(true);
 
   const [weatherData, setWeatherData] = useState<{
     temperature: number;
@@ -198,9 +201,21 @@ export default function HomeScreen() {
       }
     };
 
+    const fetchStyleTips = async () => {
+      try {
+        const res = await getStyleTips();
+        setStyleTips(res.tips || []);
+      } catch (error) {
+        console.error('Error fetching style tips:', error);
+      } finally {
+        setLoadingTips(false);
+      }
+    };
+
     fetchUser();
     fetchWeather();
     fetchRecentLooks();
+    fetchStyleTips();
   }, [])
   );
 
@@ -391,24 +406,53 @@ export default function HomeScreen() {
         <View style={styles.section}>
           <ThemedText style={styles.sectionTitle}>Style Tips</ThemedText>
           <View style={styles.tipsContainer}>
-            <View style={styles.tipCard}>
-              <View style={styles.tipIcon}>
-                <Sparkles size={16} color={FuchsiaColors.deep} />
+            {loadingTips ? (
+              <>
+                <View style={styles.tipCard}>
+                  <Skeleton width={36} height={36} borderRadius={12} />
+                  <View style={{ flex: 1, gap: 4 }}>
+                    <Skeleton width="80%" height={16} />
+                    <Skeleton width="100%" height={14} />
+                    <Skeleton width="60%" height={14} />
+                  </View>
+                </View>
+                <View style={styles.tipCard}>
+                  <Skeleton width={36} height={36} borderRadius={12} />
+                  <View style={{ flex: 1, gap: 4 }}>
+                    <Skeleton width="70%" height={16} />
+                    <Skeleton width="90%" height={14} />
+                  </View>
+                </View>
+              </>
+            ) : styleTips.length > 0 ? (
+              styleTips.map((tip, index) => {
+                let Icon = Sparkles;
+                if (tip.kind === 'color') Icon = Palette;
+                else if (tip.kind === 'pairing') Icon = Layers;
+                else if (tip.kind === 'occasion') Icon = Briefcase;
+                else if (tip.kind === 'care') Icon = Droplet;
+                else if (tip.kind === 'versatility') Icon = RefreshCw;
+                
+                return (
+                  <View key={index} style={styles.tipCard}>
+                    <View style={styles.tipIcon}>
+                      <Icon size={16} color={FuchsiaColors.deep} />
+                    </View>
+                    <View style={styles.tipContent}>
+                      <ThemedText style={styles.tipTitle}>{tip.title}</ThemedText>
+                      <ThemedText style={styles.tipDesc}>{tip.description}</ThemedText>
+                    </View>
+                  </View>
+                );
+              })
+            ) : (
+              <View style={[styles.tipCard, { alignItems: 'center', justifyContent: 'center', paddingVertical: 24, flexDirection: 'column', gap: 8 }]}>
+                <Sparkles size={24} color={FuchsiaColors.slate} />
+                <ThemedText style={[styles.tipDesc, { textAlign: 'center' }]}>
+                  Add more clothing items to get personalized AI style tips!
+                </ThemedText>
               </View>
-              <View style={styles.tipContent}>
-                <ThemedText style={styles.tipTitle}>Try your navy blazer with shorts</ThemedText>
-                <ThemedText style={styles.tipDesc}>A blazer + shorts combo is a great smart-casual look for warm weather events.</ThemedText>
-              </View>
-            </View>
-            <View style={styles.tipCard}>
-              <View style={styles.tipIcon}>
-                <Palette size={16} color={FuchsiaColors.deep} />
-              </View>
-              <View style={styles.tipContent}>
-                <ThemedText style={styles.tipTitle}>Your floral dress needs love</ThemedText>
-                <ThemedText style={styles.tipDesc}>Worn only once! Perfect for today&apos;s weather — pair it with sandals.</ThemedText>
-              </View>
-            </View>
+            )}
           </View>
         </View>
       </ScrollView>
@@ -427,7 +471,7 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingHorizontal: 20,
     paddingTop: 8,
-    paddingBottom: 100,
+    paddingBottom: 120,
     gap: 20,
   },
 
