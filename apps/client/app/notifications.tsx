@@ -7,6 +7,7 @@ import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
 import { ThemedText } from '@/components/themed-text';
 import { FuchsiaColors, FuchsiaFonts } from '@/constants/theme';
+import { getMe, updateProfile } from '@/api/client';
 
 export default function NotificationsScreen() {
   const router = useRouter();
@@ -20,6 +21,23 @@ export default function NotificationsScreen() {
     newFeatures: true,
   });
 
+  useEffect(() => {
+    const fetchPreferences = async () => {
+      try {
+        const data = await getMe();
+        if (data?.user) {
+          setToggles(prev => ({
+            ...prev,
+            dailyReminders: data.user.daily_reminders ?? true,
+          }));
+        }
+      } catch (error) {
+        console.error('Failed to fetch user preferences:', error);
+      }
+    };
+    fetchPreferences();
+  }, []);
+
   const toggleSwitch = async (key: keyof typeof toggles) => {
     const newValue = !toggles[key];
     
@@ -28,14 +46,32 @@ export default function NotificationsScreen() {
       const token = await registerForPushNotificationsAsync();
       if (token) {
         setExpoPushToken(token);
-        console.log("Expo Push Token:", token); // Can be sent to backend here
         setToggles(prev => ({ ...prev, [key]: newValue }));
+        
+        // Sync with backend
+        try {
+          await updateProfile({
+            push_token: token,
+            ...(key === 'dailyReminders' && { daily_reminders: newValue })
+          });
+        } catch (e) {
+          console.error("Failed to sync push token with backend", e);
+        }
       } else {
         // If permission was denied or failed
         setToggles(prev => ({ ...prev, [key]: false }));
       }
     } else {
       setToggles(prev => ({ ...prev, [key]: newValue }));
+      
+      // Sync with backend
+      if (key === 'dailyReminders') {
+        try {
+          await updateProfile({ daily_reminders: newValue });
+        } catch (e) {
+          console.error("Failed to sync daily reminders off", e);
+        }
+      }
     }
   };
 
