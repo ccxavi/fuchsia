@@ -8,11 +8,13 @@ import * as Notifications from 'expo-notifications';
 import { ThemedText } from '@/components/themed-text';
 import { FuchsiaColors, FuchsiaFonts } from '@/constants/theme';
 import { getMe, updateProfile } from '@/api/client';
+import { Skeleton } from '@/components/ui/Skeleton';
 
 export default function NotificationsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [expoPushToken, setExpoPushToken] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
 
   const [toggles, setToggles] = useState({
     dailyReminders: true,
@@ -33,6 +35,8 @@ export default function NotificationsScreen() {
         }
       } catch (error) {
         console.error('Failed to fetch user preferences:', error);
+      } finally {
+        setIsLoading(false);
       }
     };
     fetchPreferences();
@@ -41,12 +45,14 @@ export default function NotificationsScreen() {
   const toggleSwitch = async (key: keyof typeof toggles) => {
     const newValue = !toggles[key];
     
+    // Optimistically update the UI instantly so the switch doesn't bounce
+    setToggles(prev => ({ ...prev, [key]: newValue }));
+    
     // If turning on a notification, we must ensure we have push permissions
     if (newValue) {
       const token = await registerForPushNotificationsAsync();
       if (token) {
         setExpoPushToken(token);
-        setToggles(prev => ({ ...prev, [key]: newValue }));
         
         // Sync with backend
         try {
@@ -62,8 +68,6 @@ export default function NotificationsScreen() {
         setToggles(prev => ({ ...prev, [key]: false }));
       }
     } else {
-      setToggles(prev => ({ ...prev, [key]: newValue }));
-      
       // Sync with backend
       if (key === 'dailyReminders') {
         try {
@@ -148,13 +152,17 @@ export default function NotificationsScreen() {
                 <ThemedText style={styles.settingDescription}>A morning nudge to log or pick today's outfit.</ThemedText>
               </View>
             </View>
-            <Switch
-              trackColor={{ false: FuchsiaColors.mist, true: FuchsiaColors.vibrant }}
-              thumbColor={'#fff'}
-              ios_backgroundColor={FuchsiaColors.mist}
-              onValueChange={() => toggleSwitch('dailyReminders')}
-              value={toggles.dailyReminders}
-            />
+            {isLoading ? (
+              <Skeleton width={51} height={31} borderRadius={16} />
+            ) : (
+              <Switch
+                trackColor={{ false: FuchsiaColors.mist, true: FuchsiaColors.vibrant }}
+                thumbColor={'#fff'}
+                ios_backgroundColor={FuchsiaColors.mist}
+                onValueChange={() => toggleSwitch('dailyReminders')}
+                value={toggles.dailyReminders}
+              />
+            )}
           </View>
           
           <View style={styles.divider} />
@@ -169,13 +177,17 @@ export default function NotificationsScreen() {
                 <ThemedText style={styles.settingDescription}>Suggestions based on sudden weather changes.</ThemedText>
               </View>
             </View>
-            <Switch
-              trackColor={{ false: FuchsiaColors.mist, true: FuchsiaColors.vibrant }}
-              thumbColor={'#fff'}
-              ios_backgroundColor={FuchsiaColors.mist}
-              onValueChange={() => toggleSwitch('weatherAlerts')}
-              value={toggles.weatherAlerts}
-            />
+            {isLoading ? (
+              <Skeleton width={51} height={31} borderRadius={16} />
+            ) : (
+              <Switch
+                trackColor={{ false: FuchsiaColors.mist, true: FuchsiaColors.vibrant }}
+                thumbColor={'#fff'}
+                ios_backgroundColor={FuchsiaColors.mist}
+                onValueChange={() => toggleSwitch('weatherAlerts')}
+                value={toggles.weatherAlerts}
+              />
+            )}
           </View>
           
           <View style={styles.divider} />
@@ -190,13 +202,17 @@ export default function NotificationsScreen() {
                 <ThemedText style={styles.settingDescription}>Proactive styling tips and fresh outfit ideas.</ThemedText>
               </View>
             </View>
-            <Switch
-              trackColor={{ false: FuchsiaColors.mist, true: FuchsiaColors.vibrant }}
-              thumbColor={'#fff'}
-              ios_backgroundColor={FuchsiaColors.mist}
-              onValueChange={() => toggleSwitch('aiSuggestions')}
-              value={toggles.aiSuggestions}
-            />
+            {isLoading ? (
+              <Skeleton width={51} height={31} borderRadius={16} />
+            ) : (
+              <Switch
+                trackColor={{ false: FuchsiaColors.mist, true: FuchsiaColors.vibrant }}
+                thumbColor={'#fff'}
+                ios_backgroundColor={FuchsiaColors.mist}
+                onValueChange={() => toggleSwitch('aiSuggestions')}
+                value={toggles.aiSuggestions}
+              />
+            )}
           </View>
 
           <View style={styles.divider} />
@@ -211,13 +227,17 @@ export default function NotificationsScreen() {
                 <ThemedText style={styles.settingDescription}>Occasional news about major app updates.</ThemedText>
               </View>
             </View>
-            <Switch
-              trackColor={{ false: FuchsiaColors.mist, true: FuchsiaColors.vibrant }}
-              thumbColor={'#fff'}
-              ios_backgroundColor={FuchsiaColors.mist}
-              onValueChange={() => toggleSwitch('newFeatures')}
-              value={toggles.newFeatures}
-            />
+            {isLoading ? (
+              <Skeleton width={51} height={31} borderRadius={16} />
+            ) : (
+              <Switch
+                trackColor={{ false: FuchsiaColors.mist, true: FuchsiaColors.vibrant }}
+                thumbColor={'#fff'}
+                ios_backgroundColor={FuchsiaColors.mist}
+                onValueChange={() => toggleSwitch('newFeatures')}
+                value={toggles.newFeatures}
+              />
+            )}
           </View>
         </View>
       </ScrollView>
