@@ -114,6 +114,7 @@ export type AuthenticatedUserResponse = {
   display_name: string | null;
   created_at: string;
   updated_at: string;
+  daily_reminders?: boolean;
 };
 
 export type AuthMeResponse = {
@@ -126,6 +127,8 @@ export async function getMe(): Promise<AuthMeResponse> {
 
 export type UserPreferencesUpdateRequest = {
   display_name?: string | null;
+  push_token?: string | null;
+  daily_reminders?: boolean | null;
 };
 
 export async function updateProfile(payload: UserPreferencesUpdateRequest): Promise<AuthMeResponse> {

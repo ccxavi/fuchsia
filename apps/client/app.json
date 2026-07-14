@@ -19,7 +19,8 @@
       "edgeToEdgeEnabled": true,
       "softwareKeyboardLayoutMode": "resize",
       "predictiveBackGestureEnabled": false,
-      "package": "com.CS3105N_fuchsia"
+      "package": "com.CS3105N_fuchsia",
+      "googleServicesFile": "./google-services.json"
     },
     "web": {
       "output": "static",
