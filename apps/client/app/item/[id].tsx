@@ -307,48 +307,73 @@ export default function ItemDetailScreen() {
             <View style={styles.styledInHeader}>
               <Text style={styles.styledInTitle}>Styled In</Text>
             </View>
-            <ScrollView 
-              horizontal 
-              showsHorizontalScrollIndicator={false} 
-              contentContainerStyle={styles.styledInScroll}
-              snapToInterval={160 + 16}
-              decelerationRate="fast"
-            >
-              {item.outfits?.map(outfit => (
+            {!item.outfits || item.outfits.length === 0 ? (
+              <View style={[styles.emptyState, { marginBottom: 0 }]}>
+                <Text style={styles.emptyTitle}>Not styled yet</Text>
+                <Text style={styles.emptySubtitle}>Mix and match this item with others to create beautiful outfits.</Text>
                 <Pressable 
-                  key={outfit.id} 
-                  style={styles.outfitCard}
-                  onPress={() => router.push(`/outfit/${outfit.id}`)}
-                >
-                  <View style={styles.outfitImageContainer}>
-                    {renderOutfitImage(outfit)}
-                  </View>
-                  <View style={styles.outfitInfo}>
-                    <Text style={styles.outfitTitle} numberOfLines={1}>{outfit.name}</Text>
-                    <Text style={styles.outfitSubtitle}>{outfit.clothing_items_count} Items</Text>
-                  </View>
-                </Pressable>
-              ))}
-
-              {/* Style It Button */}
-              <View style={styles.outfitCard}>
-                <Pressable 
-                  style={styles.addOutfitInner}
+                  style={styles.dashedCircleButton}
                   onPress={() => router.push({ pathname: '/add-outfit', params: { itemId: id } })}
                 >
                   <Plus size={24} color={FuchsiaColors.slate} />
-                  <Text style={styles.addOutfitText}>STYLE IT</Text>
                 </Pressable>
               </View>
-            </ScrollView>
+            ) : (
+              <ScrollView 
+                horizontal 
+                showsHorizontalScrollIndicator={false} 
+                contentContainerStyle={styles.styledInScroll}
+                snapToInterval={160 + 16}
+                decelerationRate="fast"
+              >
+                {item.outfits.map(outfit => (
+                  <Pressable 
+                    key={outfit.id} 
+                    style={styles.outfitCard}
+                    onPress={() => router.push(`/outfit/${outfit.id}`)}
+                  >
+                    <View style={styles.outfitImageContainer}>
+                      {renderOutfitImage(outfit)}
+                    </View>
+                    <View style={styles.outfitInfo}>
+                      <Text style={styles.outfitTitle} numberOfLines={1}>{outfit.name}</Text>
+                      <Text style={styles.outfitSubtitle}>{outfit.clothing_items_count} Items</Text>
+                    </View>
+                  </Pressable>
+                ))}
+
+                {/* Style It Button */}
+                <View style={styles.outfitCard}>
+                  <Pressable 
+                    style={styles.addOutfitInner}
+                    onPress={() => router.push({ pathname: '/add-outfit', params: { itemId: id } })}
+                  >
+                    <Plus size={24} color={FuchsiaColors.slate} />
+                    <Text style={styles.addOutfitText}>STYLE IT</Text>
+                  </Pressable>
+                </View>
+              </ScrollView>
+            )}
           </View>
 
           {/* Packed In / Wardrobes Section */}
-          {item.wardrobes?.length > 0 && (
-            <View style={styles.styledInSection}>
-              <View style={styles.styledInHeader}>
-                <Text style={styles.styledInTitle}>Packed In</Text>
+          {/* Packed In / Wardrobes Section */}
+          <View style={styles.styledInSection}>
+            <View style={styles.styledInHeader}>
+              <Text style={styles.styledInTitle}>Packed In</Text>
+            </View>
+            {!item.wardrobes || item.wardrobes.length === 0 ? (
+              <View style={[styles.emptyState, { marginBottom: 24 }]}>
+                <Text style={styles.emptyTitle}>Not packed in any wardrobe</Text>
+                <Text style={styles.emptySubtitle}>Pack this item into a wardrobe for your next trip.</Text>
+                <Pressable 
+                  style={styles.dashedCircleButton}
+                  onPress={() => router.push(`/item/${id}/select-wardrobes`)}
+                >
+                  <Plus size={24} color={FuchsiaColors.slate} />
+                </Pressable>
               </View>
+            ) : (
               <ScrollView 
                 horizontal 
                 showsHorizontalScrollIndicator={false} 
@@ -405,8 +430,8 @@ export default function ItemDetailScreen() {
                   </View>
                 </Pressable>
               </ScrollView>
-            </View>
-          )}
+            )}
+          </View>
 
         </View>
       </ScrollView>
@@ -418,13 +443,13 @@ export default function ItemDetailScreen() {
 const styles = StyleSheet.create({
   loadingContainer: {
     flex: 1,
-    backgroundColor: FuchsiaColors.cloud,
+    backgroundColor: '#fff',
     alignItems: 'center',
     justifyContent: 'center',
   },
   container: {
     flex: 1,
-    backgroundColor: FuchsiaColors.cloud,
+    backgroundColor: '#fff',
   },
   heroContainer: {
     width: '100%',
@@ -650,7 +675,7 @@ const styles = StyleSheet.create({
   styledInTitle: {
     fontFamily: FuchsiaFonts.heading,
     fontWeight: '600',
-    fontSize: 18,
+    fontSize: 20,
     color: FuchsiaColors.ink,
   },
   seeAllText: {
@@ -853,5 +878,37 @@ const styles = StyleSheet.create({
     color: FuchsiaColors.slate,
     textAlign: 'center',
     marginTop: 24,
+  },
+  emptyState: {
+    paddingVertical: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: FuchsiaColors.cloud,
+    borderRadius: 16,
+  },
+  emptyTitle: {
+    fontFamily: FuchsiaFonts.heading,
+    fontSize: 16,
+    fontWeight: '600',
+    color: FuchsiaColors.ink,
+    marginBottom: 4,
+  },
+  emptySubtitle: {
+    fontFamily: FuchsiaFonts.body,
+    fontSize: 14,
+    color: FuchsiaColors.slate,
+    textAlign: 'center',
+    paddingHorizontal: 24,
+  },
+  dashedCircleButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    borderWidth: 2,
+    borderColor: FuchsiaColors.mist,
+    borderStyle: 'dashed',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 16,
   }
 });
