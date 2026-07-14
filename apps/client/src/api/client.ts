@@ -701,3 +701,26 @@ export async function ingestMemories(data: MemoryIngestRequest): Promise<MemoryR
     body: JSON.stringify(data),
   });
 }
+
+// ── Style Tips ──────────────────────────────────────────────────────
+
+export type StyleTipKind = 'pairing' | 'color' | 'occasion' | 'care' | 'versatility';
+
+export type StyleTip = {
+  title: string;
+  description: string;
+  kind?: StyleTipKind | null;
+};
+
+export type StyleTipsResponse = {
+  tips: StyleTip[];
+  updated_at?: string | null;
+  cached: boolean;
+};
+
+export async function getStyleTips(refresh: boolean = false): Promise<StyleTipsResponse> {
+  const queryParams = new URLSearchParams();
+  if (refresh) queryParams.append('refresh', 'true');
+  const queryString = queryParams.toString() ? `?${queryParams.toString()}` : '';
+  return apiFetch<StyleTipsResponse>(`/style-tips${queryString}`);
+}
