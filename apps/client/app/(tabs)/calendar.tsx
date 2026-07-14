@@ -236,7 +236,7 @@ export default function CalendarScreen() {
 
             <View style={styles.daysGrid}>
               {calendarDays.map((dayNum, index) => {
-                const cellStyle = { width: cellWidth, height: cellWidth };
+                const cellStyle = { width: cellWidth, height: cellWidth * 1.35 };
                 
                 if (dayNum === null) {
                   return <View key={`empty-${index}`} style={[cellStyle, { marginBottom: 4 }]} />;
