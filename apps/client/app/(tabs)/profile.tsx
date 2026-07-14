@@ -8,7 +8,7 @@ import { jwtDecode } from 'jwt-decode';
 import { getMe, getClothingItems, getWardrobes, getOutfits } from '@/api/client';
 import { ThemedText } from '@/components/themed-text';
 import { FuchsiaColors, FuchsiaFonts } from '@/constants/theme';
-import { User, BrainCircuit, ChevronRight, LogOut, HelpCircle, Shield } from 'lucide-react-native';
+import { User, BrainCircuit, ChevronRight, LogOut, HelpCircle, Shield, Bell } from 'lucide-react-native';
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
@@ -81,106 +81,124 @@ export default function ProfileScreen() {
   };
 
   return (
-    <ScrollView 
-      style={[styles.container, { paddingTop: insets.top }]}
-      contentContainerStyle={styles.content}
-    >
-      <View style={styles.header}>
-        {userPhoto ? (
-          <Image source={{ uri: userPhoto }} style={styles.iconContainer} contentFit="cover" />
-        ) : (
-          <View style={styles.iconContainer}>
-            <User size={32} color={FuchsiaColors.vibrant} />
-          </View>
-        )}
-        <ThemedText style={styles.title}>{userName || 'My Profile'}</ThemedText>
-        <ThemedText style={styles.subtitle}>
-          {userEmail || 'Manage your account and preferences.'}
-        </ThemedText>
-      </View>
-
-      <View style={styles.statsContainer}>
-        <View style={styles.statBox}>
-          <ThemedText style={styles.statValue}>{stats.outfits}</ThemedText>
-          <ThemedText style={styles.statLabel}>Outfits</ThemedText>
-        </View>
-        <View style={styles.statDivider} />
-        <View style={styles.statBox}>
-          <ThemedText style={styles.statValue}>{stats.wardrobes}</ThemedText>
-          <ThemedText style={styles.statLabel}>Wardrobes</ThemedText>
-        </View>
-        <View style={styles.statDivider} />
-        <View style={styles.statBox}>
-          <ThemedText style={styles.statValue}>{stats.items}</ThemedText>
-          <ThemedText style={styles.statLabel}>Items</ThemedText>
-        </View>
-      </View>
-
-      <View style={styles.settingsGroup}>
-        <ThemedText style={styles.groupTitle}>AI Stylist</ThemedText>
-        <TouchableOpacity 
-          style={styles.settingsItem}
-          onPress={() => router.push('/memory')}
-        >
-          <View style={styles.settingsItemLeft}>
-            <View style={styles.itemIcon}>
-              <BrainCircuit size={20} color={FuchsiaColors.slate} />
+    <View style={[styles.container, { paddingTop: insets.top }]}>
+      <ScrollView 
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.header}>
+          {userPhoto ? (
+            <Image source={{ uri: userPhoto }} style={styles.iconContainer} contentFit="cover" />
+          ) : (
+            <View style={styles.iconContainer}>
+              <User size={32} color={FuchsiaColors.vibrant} />
             </View>
-            <ThemedText style={styles.settingsItemText}>Manage AI Memory</ThemedText>
-          </View>
-          <ChevronRight size={20} color={FuchsiaColors.slate} />
-        </TouchableOpacity>
-      </View>
+          )}
+          <ThemedText style={styles.title}>{userName || 'My Profile'}</ThemedText>
+          <ThemedText style={styles.subtitle}>
+            {userEmail || 'Manage your account and preferences.'}
+          </ThemedText>
+        </View>
 
-      <View style={styles.settingsGroup}>
-        <ThemedText style={styles.groupTitle}>Support & Legal</ThemedText>
-        <View style={styles.settingsCard}>
+        <View style={styles.statsContainer}>
+          <View style={styles.statBox}>
+            <ThemedText style={styles.statValue}>{stats.outfits}</ThemedText>
+            <ThemedText style={styles.statLabel}>Outfits</ThemedText>
+          </View>
+          <View style={styles.statDivider} />
+          <View style={styles.statBox}>
+            <ThemedText style={styles.statValue}>{stats.wardrobes}</ThemedText>
+            <ThemedText style={styles.statLabel}>Wardrobes</ThemedText>
+          </View>
+          <View style={styles.statDivider} />
+          <View style={styles.statBox}>
+            <ThemedText style={styles.statValue}>{stats.items}</ThemedText>
+            <ThemedText style={styles.statLabel}>Items</ThemedText>
+          </View>
+        </View>
+
+        <View style={styles.settingsGroup}>
+          <ThemedText style={styles.groupTitle}>AI Stylist</ThemedText>
           <TouchableOpacity 
-            style={styles.settingsRow}
-            onPress={() => router.push('/help')}
+            style={styles.settingsItem}
+            onPress={() => router.push('/memory')}
           >
             <View style={styles.settingsItemLeft}>
               <View style={styles.itemIcon}>
-                <HelpCircle size={20} color={FuchsiaColors.slate} />
+                <BrainCircuit size={20} color={FuchsiaColors.slate} />
               </View>
-              <ThemedText style={styles.settingsItemText}>Help Center & FAQ</ThemedText>
-            </View>
-            <ChevronRight size={20} color={FuchsiaColors.slate} />
-          </TouchableOpacity>
-          
-          <View style={styles.settingsDivider} />
-          
-          <TouchableOpacity 
-            style={styles.settingsRow}
-            onPress={() => router.push('/legal')}
-          >
-            <View style={styles.settingsItemLeft}>
-              <View style={styles.itemIcon}>
-                <Shield size={20} color={FuchsiaColors.slate} />
-              </View>
-              <ThemedText style={styles.settingsItemText}>Privacy & Terms</ThemedText>
+              <ThemedText style={styles.settingsItemText}>Manage AI Memory</ThemedText>
             </View>
             <ChevronRight size={20} color={FuchsiaColors.slate} />
           </TouchableOpacity>
         </View>
-      </View>
 
-      <View style={styles.settingsGroup}>
-        <ThemedText style={styles.groupTitle}>Account</ThemedText>
-        <TouchableOpacity 
-          style={styles.settingsItem}
-          onPress={handleLogout}
-        >
-          <View style={styles.settingsItemLeft}>
-            <View style={styles.itemIcon}>
-              <LogOut size={20} color={FuchsiaColors.slate} />
+        <View style={styles.settingsGroup}>
+          <ThemedText style={styles.groupTitle}>Preferences</ThemedText>
+          <TouchableOpacity 
+            style={styles.settingsItem}
+            onPress={() => router.push('/notifications' as any)}
+          >
+            <View style={styles.settingsItemLeft}>
+              <View style={styles.itemIcon}>
+                <Bell size={20} color={FuchsiaColors.slate} />
+              </View>
+              <ThemedText style={styles.settingsItemText}>Notifications</ThemedText>
             </View>
-            <ThemedText style={styles.settingsItemText}>Log Out</ThemedText>
+            <ChevronRight size={20} color={FuchsiaColors.slate} />
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.settingsGroup}>
+          <ThemedText style={styles.groupTitle}>Support & Legal</ThemedText>
+          <View style={styles.settingsCard}>
+            <TouchableOpacity 
+              style={styles.settingsRow}
+              onPress={() => router.push('/help')}
+            >
+              <View style={styles.settingsItemLeft}>
+                <View style={styles.itemIcon}>
+                  <HelpCircle size={20} color={FuchsiaColors.slate} />
+                </View>
+                <ThemedText style={styles.settingsItemText}>Help Center & FAQ</ThemedText>
+              </View>
+              <ChevronRight size={20} color={FuchsiaColors.slate} />
+            </TouchableOpacity>
+            
+            <View style={styles.settingsDivider} />
+            
+            <TouchableOpacity 
+              style={styles.settingsRow}
+              onPress={() => router.push('/legal')}
+            >
+              <View style={styles.settingsItemLeft}>
+                <View style={styles.itemIcon}>
+                  <Shield size={20} color={FuchsiaColors.slate} />
+                </View>
+                <ThemedText style={styles.settingsItemText}>Privacy & Terms</ThemedText>
+              </View>
+              <ChevronRight size={20} color={FuchsiaColors.slate} />
+            </TouchableOpacity>
           </View>
-          <ChevronRight size={20} color={FuchsiaColors.slate} />
-        </TouchableOpacity>
-      </View>
-    </ScrollView>
+        </View>
+
+        <View style={styles.settingsGroup}>
+          <ThemedText style={styles.groupTitle}>Account</ThemedText>
+          <TouchableOpacity 
+            style={styles.settingsItem}
+            onPress={handleLogout}
+          >
+            <View style={styles.settingsItemLeft}>
+              <View style={styles.itemIcon}>
+                <LogOut size={20} color={FuchsiaColors.slate} />
+              </View>
+              <ThemedText style={styles.settingsItemText}>Log Out</ThemedText>
+            </View>
+            <ChevronRight size={20} color={FuchsiaColors.slate} />
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+    </View>
   );
 }
 
