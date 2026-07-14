@@ -91,6 +91,7 @@ export default function RootLayout() {
         <Stack.Screen name="add-wardrobe" options={{ headerShown: false, presentation: 'modal' }} />
         <Stack.Screen name="help" options={{ headerShown: false, presentation: 'modal' }} />
         <Stack.Screen name="legal" options={{ headerShown: false, presentation: 'modal' }} />
+        <Stack.Screen name="notifications" options={{ headerShown: false, presentation: 'modal' }} />
         <Stack.Screen name="item/[id]" options={{ headerShown: false }} />
         <Stack.Screen name="outfit/[id]" options={{ headerShown: false }} />
         <Stack.Screen name="wardrobe/[id]" options={{ headerShown: false }} />
