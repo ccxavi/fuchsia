@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "837801933801",
+    "project_id": "fuchsia-c6295",
+    "storage_bucket": "fuchsia-c6295.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:837801933801:android:0558efb74e15e98824e978",
+        "android_client_info": {
+          "package_name": "com.CS3105N_fuchsia"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCcFKqEQO82eF-LpWh13yVUCOf4FJyzIps"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
