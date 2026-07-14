@@ -1,6 +1,6 @@
 import { View, StyleSheet, ScrollView, TouchableOpacity, Switch, Platform, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
-import { ArrowLeft, Bell, Sun, Sparkles, Megaphone, CalendarClock } from 'lucide-react-native';
+import { ArrowLeft, Bell, Sun, Megaphone, CalendarClock } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useState, useEffect } from 'react';
 import * as Device from 'expo-device';
@@ -13,13 +13,11 @@ import { Skeleton } from '@/components/ui/Skeleton';
 export default function NotificationsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const [expoPushToken, setExpoPushToken] = useState('');
   const [isLoading, setIsLoading] = useState(true);
 
   const [toggles, setToggles] = useState({
     dailyReminders: true,
     weatherAlerts: true,
-    aiSuggestions: false,
     newFeatures: true,
   });
 
@@ -52,7 +50,6 @@ export default function NotificationsScreen() {
     if (newValue) {
       const token = await registerForPushNotificationsAsync();
       if (token) {
-        setExpoPushToken(token);
         
         // Sync with backend
         try {
@@ -149,7 +146,7 @@ export default function NotificationsScreen() {
               </View>
               <View style={styles.settingTextContainer}>
                 <ThemedText style={styles.settingTitle}>Daily Outfit Reminders</ThemedText>
-                <ThemedText style={styles.settingDescription}>A morning nudge to log or pick today's outfit.</ThemedText>
+                <ThemedText style={styles.settingDescription}>A morning nudge to log or pick today&apos;s outfit.</ThemedText>
               </View>
             </View>
             {isLoading ? (
@@ -190,31 +187,6 @@ export default function NotificationsScreen() {
             )}
           </View>
           
-          <View style={styles.divider} />
-          
-          <View style={styles.settingRow}>
-            <View style={styles.settingInfo}>
-              <View style={styles.settingIcon}>
-                <Sparkles size={20} color={FuchsiaColors.ink} />
-              </View>
-              <View style={styles.settingTextContainer}>
-                <ThemedText style={styles.settingTitle}>AI Stylist Suggestions</ThemedText>
-                <ThemedText style={styles.settingDescription}>Proactive styling tips and fresh outfit ideas.</ThemedText>
-              </View>
-            </View>
-            {isLoading ? (
-              <Skeleton width={51} height={31} borderRadius={16} />
-            ) : (
-              <Switch
-                trackColor={{ false: FuchsiaColors.mist, true: FuchsiaColors.vibrant }}
-                thumbColor={'#fff'}
-                ios_backgroundColor={FuchsiaColors.mist}
-                onValueChange={() => toggleSwitch('aiSuggestions')}
-                value={toggles.aiSuggestions}
-              />
-            )}
-          </View>
-
           <View style={styles.divider} />
           
           <View style={styles.settingRow}>
