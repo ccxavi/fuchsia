@@ -224,20 +224,26 @@ export default function WardrobeDetailScreen() {
         {/* Hero Header */}
         <View style={styles.heroSection}>
           {wardrobe.image_url ? (
-            <Image source={{ uri: wardrobe.image_url }} style={StyleSheet.absoluteFillObject} contentFit="cover" />
+            <>
+              <Image source={{ uri: wardrobe.image_url }} style={StyleSheet.absoluteFillObject} contentFit="cover" />
+              <LinearGradient
+                colors={['transparent', 'rgba(0,0,0,0.8)']}
+                style={StyleSheet.absoluteFillObject}
+              />
+            </>
           ) : (
             <LinearGradient
               colors={['#D4145A', '#86003C']}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={StyleSheet.absoluteFillObject}
-            />
+            >
+              <LinearGradient
+                colors={['transparent', 'rgba(0,0,0,0.4)']}
+                style={StyleSheet.absoluteFillObject}
+              />
+            </LinearGradient>
           )}
-          
-          <LinearGradient
-            colors={['rgba(26,26,46,0.9)', 'rgba(26,26,46,0.3)', 'rgba(26,26,46,0.4)']}
-            style={StyleSheet.absoluteFillObject}
-          />
 
           <View style={styles.heroContent}>
             <Text style={styles.heroTitle}>{wardrobe.name}</Text>
