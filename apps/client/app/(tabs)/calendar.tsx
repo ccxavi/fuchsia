@@ -236,7 +236,7 @@ export default function CalendarScreen() {
 
             <View style={styles.daysGrid}>
               {calendarDays.map((dayNum, index) => {
-                const cellStyle = { width: cellWidth, height: cellWidth };
+                const cellStyle = { width: cellWidth, height: cellWidth * 1.35 };
                 
                 if (dayNum === null) {
                   return <View key={`empty-${index}`} style={[cellStyle, { marginBottom: 4 }]} />;
@@ -266,7 +266,7 @@ export default function CalendarScreen() {
                     
                     // Mini grid
                     return (
-                      <View key={`grid-${index}`} style={[style, styles.collageGrid]}>
+                      <View key={`grid-${index}`} style={[style, { flexDirection: 'row', flexWrap: 'wrap', backgroundColor: FuchsiaColors.mist, overflow: 'hidden' }]}>
                         {images.length === 2 && (
                           <>
                             <Image source={{ uri: images[0] }} style={styles.collageHalf} contentFit="cover" />
@@ -437,7 +437,7 @@ export default function CalendarScreen() {
             <ScrollView style={styles.dayModalList}>
               {(selectedDayStr ? outfitsByDate[selectedDayStr] || [] : []).map(calendarOutfit => {
                 const outfit = calendarOutfit.outfit;
-                const items = (outfit.clothing_items || []).filter(item => item.image_url);
+                const items = outfit.clothing_items || [];
                 const firstUploadedImage = outfit.images && outfit.images.length > 0 ? outfit.images[0].image_url : null;
                 const displayImage = firstUploadedImage || outfit.image_url;
                 const isPast = selectedDayStr ? selectedDayStr < todayStr : false;
@@ -454,25 +454,61 @@ export default function CalendarScreen() {
                       {displayImage ? (
                         <Image source={{ uri: displayImage }} style={StyleSheet.absoluteFillObject} contentFit="cover" />
                       ) : items.length > 0 ? (
-                        <View style={styles.collageGrid}>
+                        <View style={{ flex: 1, width: '100%', height: '100%' }}>
                           {items.length === 1 && (
-                            <Image source={{ uri: items[0].image_url as string }} style={styles.collageFull} contentFit="cover" />
+                            <View style={[{ flex: 1, backgroundColor: FuchsiaColors.mist }]}>
+                              <Image source={{ uri: items[0].image_url || '' }} style={StyleSheet.absoluteFill} contentFit="cover" />
+                            </View>
                           )}
                           {items.length === 2 && (
-                            <>
-                              <Image source={{ uri: items[0].image_url as string }} style={styles.collageHalf} contentFit="cover" />
-                              <Image source={{ uri: items[1].image_url as string }} style={styles.collageHalf} contentFit="cover" />
-                            </>
+                            <View style={{ flex: 1, flexDirection: 'row' }}>
+                              <View style={{ flex: 1, borderRightWidth: 1, borderColor: '#fff', backgroundColor: FuchsiaColors.mist }}>
+                                <Image source={{ uri: items[0].image_url || '' }} style={{ flex: 1 }} contentFit="cover" />
+                              </View>
+                              <View style={{ flex: 1, borderLeftWidth: 1, borderColor: '#fff', backgroundColor: FuchsiaColors.mist }}>
+                                <Image source={{ uri: items[1].image_url || '' }} style={{ flex: 1 }} contentFit="cover" />
+                              </View>
+                            </View>
                           )}
-                          {items.length >= 3 && (
-                            <>
-                              <Image source={{ uri: items[0].image_url as string }} style={items.length === 3 ? styles.collageTopRowSpan : styles.collageQuarter} contentFit="cover" />
-                              <Image source={{ uri: items[1].image_url as string }} style={styles.collageQuarter} contentFit="cover" />
-                              <Image source={{ uri: items[2].image_url as string }} style={styles.collageQuarter} contentFit="cover" />
-                              {items.length >= 4 && (
-                                <Image source={{ uri: items[3].image_url as string }} style={styles.collageQuarter} contentFit="cover" />
-                              )}
-                            </>
+                          {items.length === 3 && (
+                            <View style={{ flex: 1 }}>
+                              <View style={{ flex: 1, borderBottomWidth: 1, borderColor: '#fff', backgroundColor: FuchsiaColors.mist }}>
+                                <Image source={{ uri: items[0].image_url || '' }} style={{ flex: 1 }} contentFit="cover" />
+                              </View>
+                              <View style={{ flex: 1, flexDirection: 'row', borderTopWidth: 1, borderColor: '#fff' }}>
+                                <View style={{ flex: 1, borderRightWidth: 1, borderColor: '#fff', backgroundColor: FuchsiaColors.mist }}>
+                                  <Image source={{ uri: items[1].image_url || '' }} style={{ flex: 1 }} contentFit="cover" />
+                                </View>
+                                <View style={{ flex: 1, borderLeftWidth: 1, borderColor: '#fff', backgroundColor: FuchsiaColors.mist }}>
+                                  <Image source={{ uri: items[2].image_url || '' }} style={{ flex: 1 }} contentFit="cover" />
+                                </View>
+                              </View>
+                            </View>
+                          )}
+                          {items.length >= 4 && (
+                            <View style={{ flex: 1 }}>
+                              <View style={{ flex: 1, flexDirection: 'row', borderBottomWidth: 1, borderColor: '#fff' }}>
+                                <View style={{ flex: 1, borderRightWidth: 1, borderColor: '#fff', backgroundColor: FuchsiaColors.mist }}>
+                                  <Image source={{ uri: items[0].image_url || '' }} style={{ flex: 1 }} contentFit="cover" />
+                                </View>
+                                <View style={{ flex: 1, borderLeftWidth: 1, borderColor: '#fff', backgroundColor: FuchsiaColors.mist }}>
+                                  <Image source={{ uri: items[1].image_url || '' }} style={{ flex: 1 }} contentFit="cover" />
+                                </View>
+                              </View>
+                              <View style={{ flex: 1, flexDirection: 'row', borderTopWidth: 1, borderColor: '#fff' }}>
+                                <View style={{ flex: 1, borderRightWidth: 1, borderColor: '#fff', backgroundColor: FuchsiaColors.mist }}>
+                                  <Image source={{ uri: items[2].image_url || '' }} style={{ flex: 1 }} contentFit="cover" />
+                                </View>
+                                <View style={{ flex: 1, borderLeftWidth: 1, borderColor: '#fff', backgroundColor: FuchsiaColors.mist }}>
+                                  <Image source={{ uri: items[3].image_url || '' }} style={{ flex: 1 }} contentFit="cover" />
+                                  {items.length > 4 && (
+                                    <View style={{ ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center' }}>
+                                      <Text style={{ fontFamily: FuchsiaFonts.heading, fontSize: 16, color: '#fff', fontWeight: 'bold' }}>+{items.length - 4}</Text>
+                                    </View>
+                                  )}
+                                </View>
+                              </View>
+                            </View>
                           )}
                         </View>
                       ) : (
