@@ -71,7 +71,6 @@ async def get_current_weather(lat: float, lon: float) -> dict:
             "temperature": data["current"]["temperature_2m"],
             "description": description,
             "icon_url": f"https://openweathermap.org/img/wn/{icon_id}@2x.png",
-            "city": "Unknown Location" # Open-Meteo doesn't return city names by default without geocoding API
         }
         
         WEATHER_CACHE[cache_key] = (result, now)

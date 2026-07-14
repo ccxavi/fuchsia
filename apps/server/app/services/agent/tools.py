@@ -440,7 +440,6 @@ def _weather_payload(latitude: float | None, longitude: float | None) -> dict[st
     return {
         "temperature_c": weather.get("temperature"),
         "description": weather.get("description"),
-        "city": weather.get("city"),
     }
 
 

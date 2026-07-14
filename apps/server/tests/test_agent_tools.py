@@ -277,7 +277,6 @@ class StylistToolsTestCase(unittest.TestCase):
                 "temperature": 21.5,
                 "description": "Light Rain",
                 "icon_url": "https://example.test/icon.png",
-                "city": "Manila",
             }
         )
         with patch("app.services.agent.tools.get_current_weather", new=fake):
@@ -294,7 +293,6 @@ class StylistToolsTestCase(unittest.TestCase):
         parsed = json.loads(result)
         self.assertEqual(parsed["temperature_c"], 21.5)
         self.assertEqual(parsed["description"], "Light Rain")
-        self.assertEqual(parsed["city"], "Manila")
 
     def test_get_weather_without_coords_returns_error(self) -> None:
         result = execute_tool(

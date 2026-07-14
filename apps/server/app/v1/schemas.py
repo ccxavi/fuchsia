@@ -413,4 +413,3 @@ class WeatherResponse(BaseModel):
     temperature: float
     description: str
     icon_url: str
-    city: str

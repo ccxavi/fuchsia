@@ -284,7 +284,6 @@ class RunStylistChatTestCase(unittest.TestCase):
                 "temperature": 12.0,
                 "description": "Cloudy",
                 "icon_url": "https://example.test/i.png",
-                "city": "Baguio",
             }
         )
         with patch(
