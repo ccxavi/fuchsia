@@ -10,7 +10,7 @@ import { ThemedText } from '@/components/themed-text';
 import { FuchsiaColors, FuchsiaFonts } from '@/constants/theme';
 import { CLOTHING_CATEGORIES } from '@/constants/categories';
 import { ItemFormSkeleton, Skeleton } from '@/components/ui/Skeleton';
-import { createClothingItem, updateClothingItem, getClothingItem, getWardrobes, WardrobeResponse } from '@/api/client';
+import { createClothingItem, updateClothingItem, getClothingItem, getWardrobes, WardrobeResponse, analyzeClothingItemImage } from '@/api/client';
 
 export default function AddOrEditItemScreen() {
   const { id, wardrobeId } = useLocalSearchParams<{ id?: string, wardrobeId?: string }>();
@@ -33,6 +33,7 @@ export default function AddOrEditItemScreen() {
   const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isFetching, setIsFetching] = useState(!!id);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [error, setError] = useState('');
   const [keyboardHeight, setKeyboardHeight] = useState(0);
 
@@ -90,7 +91,10 @@ export default function AddOrEditItemScreen() {
       aspect: [4, 5],
       quality: 0.8,
     });
-    if (!result.canceled) setImageUri(result.assets[0].uri);
+    if (!result.canceled) {
+      setImageUri(result.assets[0].uri);
+      analyzeImage(result.assets[0].uri);
+    }
   };
 
   const handleTakePhoto = async () => {
@@ -105,7 +109,24 @@ export default function AddOrEditItemScreen() {
       aspect: [4, 5],
       quality: 0.8,
     });
-    if (!result.canceled) setImageUri(result.assets[0].uri);
+    if (!result.canceled) {
+      setImageUri(result.assets[0].uri);
+      analyzeImage(result.assets[0].uri);
+    }
+  };
+
+  const analyzeImage = async (uri: string) => {
+    try {
+      setIsAnalyzing(true);
+      const analysis = await analyzeClothingItemImage(uri);
+      if (analysis.name) setName(analysis.name);
+      if (analysis.category) setCategory(analysis.category);
+      if (analysis.color) setColor(analysis.color);
+    } catch (err) {
+      console.error('Failed to analyze image:', err);
+    } finally {
+      setIsAnalyzing(false);
+    }
   };
 
   const handleSave = async () => {
@@ -224,9 +245,9 @@ export default function AddOrEditItemScreen() {
                 <Image source={{ uri: displayImage }} style={styles.previewImage} contentFit="cover" />
               </View>
               <View style={styles.previewDetails}>
-                <ThemedText style={styles.previewName}>{name || 'Item'}</ThemedText>
+                <ThemedText style={styles.previewName}>{isAnalyzing ? 'Analyzing...' : (name || 'Item')}</ThemedText>
                 <ThemedText style={styles.previewSubtext}>
-                  {id && imageUri ? 'Will replace the current photo upon saving' : (id ? 'This is your current photo' : 'Ready to be added to your closet')}
+                  {isAnalyzing ? 'Extracting details...' : (id && imageUri ? 'Will replace the current photo upon saving' : (id ? 'This is your current photo' : 'Ready to be added to your closet'))}
                 </ThemedText>
               </View>
             </View>
