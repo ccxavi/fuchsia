@@ -119,11 +119,20 @@ export default function AddOrEditItemScreen() {
     try {
       setIsAnalyzing(true);
       const analysis = await analyzeClothingItemImage(uri);
+      
+      if (!analysis.name && !analysis.category && !analysis.color) {
+        DeviceEventEmitter.emit('showGlobalToast', 'No clothing detected. Please enter details manually.');
+        return;
+      }
+      
       if (analysis.name) setName(analysis.name);
       if (analysis.category) setCategory(analysis.category);
       if (analysis.color) setColor(analysis.color);
+      
+      DeviceEventEmitter.emit('showGlobalToast', 'Item details auto-filled');
     } catch (err) {
       console.error('Failed to analyze image:', err);
+      DeviceEventEmitter.emit('showGlobalToast', 'Failed to analyze image. Please enter details manually.');
     } finally {
       setIsAnalyzing(false);
     }
