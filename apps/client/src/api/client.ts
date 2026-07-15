@@ -302,6 +302,33 @@ export async function deleteClothingItem(id: string): Promise<void> {
   });
 }
 
+export type ClothingItemAnalysis = {
+  name?: string | null;
+  category?: string | null;
+  color?: string | null;
+  brand?: string | null;
+};
+
+export async function analyzeClothingItemImage(imageUri: string): Promise<ClothingItemAnalysis> {
+  const formData = new FormData();
+  
+  const filename = imageUri.split('/').pop() || 'image.jpg';
+  const match = /\.(\w+)$/.exec(filename);
+  let type = 'image/jpeg';
+  if (match) {
+    const ext = match[1].toLowerCase();
+    if (ext === 'jpg') type = 'image/jpeg';
+    else type = `image/${ext}`;
+  }
+  // @ts-ignore
+  formData.append('image', { uri: imageUri, name: filename, type });
+
+  return apiFetch<ClothingItemAnalysis>('/clothing-items/analyze', {
+    method: 'POST',
+    body: formData,
+  });
+}
+
 export type ClothingItemCreateRequest = {
   name: string;
   category?: string;
