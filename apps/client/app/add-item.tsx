@@ -252,12 +252,32 @@ export default function AddOrEditItemScreen() {
             <View style={styles.previewRow}>
               <View style={styles.previewImageContainer}>
                 <Image source={{ uri: displayImage }} style={styles.previewImage} contentFit="cover" />
+                {isAnalyzing && (
+                  <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(255, 255, 255, 0.6)', justifyContent: 'center', alignItems: 'center' }]}>
+                    <ActivityIndicator size="small" color={FuchsiaColors.deep} />
+                  </View>
+                )}
               </View>
               <View style={styles.previewDetails}>
-                <ThemedText style={styles.previewName}>{isAnalyzing ? 'Analyzing...' : (name || 'Item')}</ThemedText>
-                <ThemedText style={styles.previewSubtext}>
-                  {isAnalyzing ? 'Extracting details...' : (id && imageUri ? 'Will replace the current photo upon saving' : (id ? 'This is your current photo' : 'Ready to be added to your closet'))}
-                </ThemedText>
+                {isAnalyzing ? (
+                  <View style={{ gap: 8, justifyContent: 'center', flex: 1 }}>
+                    <Skeleton width={120} height={20} borderRadius={6} />
+                    <Skeleton width={180} height={14} borderRadius={4} />
+                    <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
+                      <Sparkles size={12} color={FuchsiaColors.deep} style={{ marginRight: 6 }} />
+                      <ThemedText style={{ fontFamily: FuchsiaFonts.body, fontSize: 12, fontWeight: '500', color: FuchsiaColors.deep }}>
+                        Extracting details...
+                      </ThemedText>
+                    </View>
+                  </View>
+                ) : (
+                  <>
+                    <ThemedText style={styles.previewName}>{name || 'Item'}</ThemedText>
+                    <ThemedText style={styles.previewSubtext}>
+                      {id && imageUri ? 'Will replace the current photo upon saving' : (id ? 'This is your current photo' : 'Ready to be added to your closet')}
+                    </ThemedText>
+                  </>
+                )}
               </View>
             </View>
           </View>
