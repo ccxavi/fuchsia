@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+from datetime import date
 from typing import Any
 
 from sqlalchemy import extract, func, select
@@ -11,7 +12,11 @@ from app.models.calendar_outfit import CalendarOutfit
 from app.models.clothing_item import ClothingItem
 from app.models.outfit import Outfit
 from app.models.wardrobe import Wardrobe
-from app.services.weather import get_current_weather
+from app.services.weather import (
+    forecast_window,
+    get_current_weather,
+    get_daily_forecast,
+)
 
 MAX_ITEMS = 100
 
@@ -131,11 +136,13 @@ SUGGEST_OUTFITS_TOOL: dict[str, Any] = {
         "name": "suggest_outfits",
         "description": (
             "Propose one or more complete outfits assembled from pieces the user "
-            "actually owns. Only use clothing items returned by get_clothing_items, "
-            "referencing each by its exact 'id'. Never invent pieces the user does "
-            "not own. Reflect the user's remembered style preferences when choosing. "
-            "Call this in the same turn you answer once you have decided on an outfit; "
-            "if you cannot build one from their wardrobe, do not call it."
+            "actually owns. Call this whenever you have chosen an outfit to show the "
+            "user — for example when they ask you to build, create, or put one "
+            "together. This is the only way the outfit reaches them: describing it in "
+            "your reply does not show it, and they cannot save it. Only use clothing "
+            "items returned by get_clothing_items, referencing each by its exact 'id'. "
+            "Never invent pieces the user does not own. Reflect the user's remembered "
+            "style preferences when choosing."
         ),
         "parameters": {
             "type": "object",
@@ -195,16 +202,27 @@ GET_WEATHER_TOOL: dict[str, Any] = {
     "function": {
         "name": "get_weather",
         "description": (
-            "Get the current weather at the user's location. Call this whenever "
+            "Get the weather at the user's location. Call this whenever "
             "weather-appropriate dressing advice would help — for example when the "
-            "user asks what to wear today or for an outing. Takes no arguments; the "
-            "location comes from the user's device. Returns current conditions only, "
-            "not a multi-day forecast. If the location is unavailable, ask the user "
+            "user asks what to wear today, or for an event later in the week. Omit "
+            "'date' for conditions right now; pass 'date' for that day's forecast "
+            "summary — its low, high, and dominant condition. The location comes "
+            "from the user's device. Forecasts reach about two weeks ahead; past "
+            "weather is not available. If the location is unavailable, ask the user "
             "to describe the weather instead."
         ),
         "parameters": {
             "type": "object",
-            "properties": {},
+            "properties": {
+                "date": {
+                    "type": "string",
+                    "description": (
+                        "Optional. The day to forecast, as YYYY-MM-DD. Resolve "
+                        "relative days like 'Friday' using the current date you were "
+                        "given. Omit for conditions right now."
+                    ),
+                },
+            },
             "additionalProperties": False,
         },
     },
@@ -258,11 +276,14 @@ SUGGEST_CALENDAR_ENTRY_TOOL: dict[str, Any] = {
     "function": {
         "name": "suggest_calendar_entry",
         "description": (
-            "Propose scheduling one or more saved outfits on specific dates. Only "
-            "schedule outfits that already exist — reference each by an 'id' from "
-            "get_outfits, never invent one. Use a concrete calendar date (YYYY-MM-DD); "
-            "resolve relative dates like 'Saturday' using the current date you were "
-            "given. This is a proposal the user confirms; call it once you have decided."
+            "Propose scheduling one or more saved outfits on specific dates. Call "
+            "this whenever the user asks you to put an outfit on their calendar, as "
+            "soon as you know which outfit and which date. This is the only way the "
+            "proposal reaches them: saying you scheduled it in your reply does "
+            "nothing. Only schedule outfits that already exist — reference each by an "
+            "'id' from get_outfits, never invent one. Use a concrete calendar date "
+            "(YYYY-MM-DD); resolve relative dates like 'Saturday' using the current "
+            "date you were given. The user confirms the proposal in the app."
         ),
         "parameters": {
             "type": "object",
@@ -422,24 +443,68 @@ def get_calendar(
     ]
 
 
-def _weather_payload(latitude: float | None, longitude: float | None) -> dict[str, Any]:
-    """Fetch current weather for the injected coordinates as a model-friendly dict.
+def _weather_payload(
+    latitude: float | None,
+    longitude: float | None,
+    *,
+    date_arg: Any = None,
+    today: date | None = None,
+) -> dict[str, Any]:
+    """Fetch weather for the injected coordinates as a model-friendly dict.
+
+    Without ``date_arg`` this reports current conditions; with one it reports
+    that day's forecast summary. ``today`` anchors the accepted date range and
+    should be the same date the model was told it is (see the loop's
+    ``_inject_current_date``), so the range we enforce matches the one it
+    reasoned with.
 
     Bridges the async weather service into the synchronous tool loop. Never
-    raises: a missing location or upstream failure becomes an ``{"error": ...}``
-    payload the model can read and recover from.
+    raises: a missing location, an unusable date, or an upstream failure becomes
+    an ``{"error": ...}`` payload the model can read and recover from.
     """
     if latitude is None or longitude is None:
         return {"error": "Location not available; ask the user about current conditions."}
 
+    if date_arg is None:
+        try:
+            weather = asyncio.run(get_current_weather(latitude, longitude))
+        except Exception:  # noqa: BLE001 - any failure degrades to a readable error
+            return {"error": "Could not fetch the weather right now."}
+
+        return {
+            "temperature_c": weather.get("temperature"),
+            "description": weather.get("description"),
+        }
+
+    if not isinstance(date_arg, str):
+        return {"error": "Invalid date; give a calendar date as YYYY-MM-DD."}
+
     try:
-        weather = asyncio.run(get_current_weather(latitude, longitude))
+        target = date.fromisoformat(date_arg.strip())
+    except ValueError:
+        return {"error": f"Could not read the date {date_arg!r}; use YYYY-MM-DD."}
+
+    # Checked before dispatch: an out-of-range date is answerable without asking
+    # upstream, and the model needs the bounds to pick a different day.
+    earliest, latest = forecast_window(today or date.today())
+    if not earliest <= target <= latest:
+        return {
+            "error": (
+                f"No forecast for {target.isoformat()}. Forecasts are only "
+                f"available from {earliest.isoformat()} to {latest.isoformat()}."
+            )
+        }
+
+    try:
+        forecast = asyncio.run(get_daily_forecast(latitude, longitude, target))
     except Exception:  # noqa: BLE001 - any failure degrades to a readable error
-        return {"error": "Could not fetch the weather right now."}
+        return {"error": f"Could not fetch the forecast for {target.isoformat()}."}
 
     return {
-        "temperature_c": weather.get("temperature"),
-        "description": weather.get("description"),
+        "date": forecast.get("date"),
+        "temperature_min_c": forecast.get("temperature_min"),
+        "temperature_max_c": forecast.get("temperature_max"),
+        "description": forecast.get("description"),
     }
 
 
@@ -451,6 +516,7 @@ def execute_tool(
     user_id: str,
     latitude: float | None = None,
     longitude: float | None = None,
+    today: date | None = None,
 ) -> str:
     """Execute a stylist tool by name and return a JSON string for the model.
 
@@ -458,7 +524,14 @@ def execute_tool(
     returns a JSON error payload the model can read and recover from.
     """
     if name == "get_weather":
-        return json.dumps(_weather_payload(latitude, longitude))
+        return json.dumps(
+            _weather_payload(
+                latitude,
+                longitude,
+                date_arg=arguments.get("date"),
+                today=today,
+            )
+        )
 
     if name == "get_wardrobes":
         wardrobes = get_wardrobes(db, user_id)

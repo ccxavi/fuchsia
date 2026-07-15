@@ -58,6 +58,16 @@ class ParseOutfitSuggestionsTestCase(unittest.TestCase):
         self.assertEqual(len(result), 1)
         self.assertEqual(result[0].name, "Office")
 
+    def test_discarding_a_malformed_suggestion_is_logged(self) -> None:
+        # A blank name fails the schema and the outfit vanishes; say so.
+        with self.assertLogs("app.services.agent.outfits", level="WARNING") as logs:
+            result = _parse_outfit_suggestions(
+                '[{"name": "", "clothing_item_ids": ["a"]}]'
+            )
+
+        self.assertEqual(result, [])
+        self.assertIn("Discarding a malformed outfit suggestion", logs.output[0])
+
     def test_deduplicates_by_name_and_ids(self) -> None:
         result = _parse_outfit_suggestions(
             '[{"name": "Look", "clothing_item_ids": ["a", "b"]},'
@@ -130,6 +140,44 @@ class FilterValidOutfitSuggestionsTestCase(unittest.TestCase):
             result = filter_valid_outfit_suggestions(session, _USER_ID, [suggestion])
 
         self.assertEqual(result, [])
+
+    def test_dropping_an_outfit_is_logged(self) -> None:
+        # A dropped outfit is invisible in the UI and indistinguishable in the
+        # audit table from the model never calling the tool. It must not also
+        # be invisible in the logs.
+        suggestion = OutfitSuggestion(
+            name="Ghost fit", clothing_item_ids=["nope-1", "nope-2"]
+        )
+
+        with self.session_factory() as session:
+            with self.assertLogs("app.services.agent.outfits", level="WARNING") as logs:
+                filter_valid_outfit_suggestions(session, _USER_ID, [suggestion])
+
+        self.assertIn("Dropping outfit suggestion", logs.output[0])
+        self.assertIn(_USER_ID, logs.output[0])
+
+    def test_stripping_unowned_ids_is_logged(self) -> None:
+        # A 4-piece outfit silently becoming a 1-piece outfit is its own bug.
+        suggestion = OutfitSuggestion(
+            name="Weekend",
+            clothing_item_ids=[self.owned_ids[0], "made-up-id"],
+        )
+
+        with self.session_factory() as session:
+            with self.assertLogs("app.services.agent.outfits", level="WARNING") as logs:
+                result = filter_valid_outfit_suggestions(session, _USER_ID, [suggestion])
+
+        self.assertEqual(result[0].clothing_item_ids, [self.owned_ids[0]])
+        self.assertIn("Stripping 1 unowned item id", logs.output[0])
+
+    def test_valid_outfit_logs_nothing(self) -> None:
+        suggestion = OutfitSuggestion(name="Fine", clothing_item_ids=self.owned_ids)
+
+        with self.session_factory() as session:
+            with self.assertNoLogs("app.services.agent.outfits", level="WARNING"):
+                result = filter_valid_outfit_suggestions(session, _USER_ID, [suggestion])
+
+        self.assertEqual(len(result), 1)
 
     def test_keeps_owned_wardrobe_ids(self) -> None:
         suggestion = OutfitSuggestion(

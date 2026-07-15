@@ -107,7 +107,9 @@ def _suggest_outfits_payload(outfits: list[dict]) -> dict:
     }
 
 
-def _weather_tool_call_payload() -> dict:
+def _weather_tool_call_payload(date: str | None = None) -> dict:
+    """A get_weather call; with ``date`` it asks for that day's forecast."""
+    arguments = json.dumps({"date": date}) if date is not None else "{}"
     return {
         "choices": [
             {
@@ -120,7 +122,7 @@ def _weather_tool_call_payload() -> dict:
                             "type": "function",
                             "function": {
                                 "name": "get_weather",
-                                "arguments": "{}",
+                                "arguments": arguments,
                             },
                         }
                     ],
@@ -333,6 +335,71 @@ class RunStylistChatTestCase(unittest.TestCase):
         tool_message = next(m for m in second_body["messages"] if m["role"] == "tool")
         self.assertIn("error", tool_message["content"])
 
+    def test_weather_tool_forwards_date_and_today_to_forecast(self) -> None:
+        fake_forecast = AsyncMock(
+            return_value={
+                "date": "2026-07-17",
+                "temperature_min": 24.0,
+                "temperature_max": 31.0,
+                "description": "Slight Rain",
+                "icon_url": "https://example.test/i.png",
+            }
+        )
+        with patch(
+            "app.services.agent.tools.get_daily_forecast", new=fake_forecast
+        ), patch(
+            "app.services.agent.loop.post_chat",
+            side_effect=[
+                _weather_tool_call_payload("2026-07-17"),
+                _content_payload("Pack an umbrella for Friday."),
+            ],
+        ) as post_mock:
+            result = run_stylist_chat(
+                [ChatMessage(role="user", content="what should I wear on Friday?")],
+                provider=_provider(),
+                db=self.session,
+                user_id="user-1",
+                latitude=16.4,
+                longitude=120.6,
+                today=datetime.date(2026, 7, 15),
+            )
+
+        self.assertEqual(result.message.content, "Pack an umbrella for Friday.")
+        # The requested date reaches the service, parsed into a real date.
+        fake_forecast.assert_awaited_once_with(16.4, 120.6, datetime.date(2026, 7, 17))
+
+        _, second_body = post_mock.call_args_list[1].args
+        tool_message = next(m for m in second_body["messages"] if m["role"] == "tool")
+        self.assertEqual(tool_message["tool_call_id"], "call_weather")
+        self.assertIn("Slight Rain", tool_message["content"])
+
+    def test_weather_tool_date_out_of_range_returns_error_to_model(self) -> None:
+        with patch(
+            "app.services.agent.tools.get_daily_forecast"
+        ) as fake_forecast, patch(
+            "app.services.agent.loop.post_chat",
+            side_effect=[
+                _weather_tool_call_payload("2027-01-01"),
+                _content_payload("That is too far out to forecast."),
+            ],
+        ) as post_mock:
+            result = run_stylist_chat(
+                [ChatMessage(role="user", content="what should I wear next year?")],
+                provider=_provider(),
+                db=self.session,
+                user_id="user-1",
+                latitude=16.4,
+                longitude=120.6,
+                today=datetime.date(2026, 7, 15),
+            )
+
+        # The range error surfaces as a tool message, not an exception.
+        self.assertEqual(result.message.content, "That is too far out to forecast.")
+        fake_forecast.assert_not_called()
+        _, second_body = post_mock.call_args_list[1].args
+        tool_message = next(m for m in second_body["messages"] if m["role"] == "tool")
+        self.assertIn("error", tool_message["content"])
+
     def test_collects_and_validates_calendar_suggestions(self) -> None:
         outfit = Outfit(user_id="user-1", name="Casual Friday")
         self.session.add(outfit)
@@ -529,6 +596,35 @@ class RunStylistChatTestCase(unittest.TestCase):
         # The final, forced request must omit tools.
         _, final_body = post_mock.call_args_list[-1].args
         self.assertNotIn("tools", final_body)
+
+    def test_round_budget_leaves_room_to_read_then_propose(self) -> None:
+        # Measured against the live API, the model routinely spends 2-3 rounds
+        # reading (get_clothing_items, get_weather, get_calendar) before it
+        # proposes anything — one passing trial used all 4 of the old budget.
+        # Once the budget runs out the forced call goes out with tools=None, so
+        # a proposal stops being merely unlikely and becomes impossible.
+        self.assertGreaterEqual(MAX_TOOL_ROUNDS, 6)
+
+    def test_suggestion_on_the_final_tool_round_still_reaches_the_user(self) -> None:
+        # The cliff: a proposal made on the very last tool-capable round must
+        # survive into the response, even though the forced answer that follows
+        # carries no tools.
+        payloads = (
+            [_tool_call_payload()] * (MAX_TOOL_ROUNDS - 1)
+            + [
+                _suggest_outfits_payload(
+                    [{"name": "Last Round Look", "clothing_item_ids": [self.item_id]}]
+                )
+            ]
+            + [_content_payload("Here's a look.")]
+        )
+
+        with patch("app.services.agent.loop.post_chat", side_effect=payloads):
+            result = self._run()
+
+        self.assertEqual(result.message.content, "Here's a look.")
+        self.assertEqual(len(result.outfit_suggestions), 1)
+        self.assertEqual(result.outfit_suggestions[0].name, "Last Round Look")
 
 
 if __name__ == "__main__":

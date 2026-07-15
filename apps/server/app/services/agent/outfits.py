@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+
 from pydantic import ValidationError
 from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
@@ -9,6 +11,8 @@ from app.models.clothing_item import ClothingItem
 from app.models.wardrobe import Wardrobe
 from app.services.agent.memory import _load_json
 from app.v1.schemas import OutfitSuggestion
+
+logger = logging.getLogger(__name__)
 
 
 def filter_valid_outfit_suggestions(
@@ -48,7 +52,25 @@ def filter_valid_outfit_suggestions(
             if item_id in owned_items
         ]
         if not kept_items:
+            # The model proposed an outfit and the user will see none of it.
+            # Logged because this is otherwise indistinguishable, from both the
+            # UI and the audit table, from the model never calling the tool.
+            logger.warning(
+                "Dropping outfit suggestion for user %s: none of its %d item ids "
+                "are owned",
+                user_id,
+                len(suggestion.clothing_item_ids),
+            )
             continue
+        dropped_items = len(suggestion.clothing_item_ids) - len(kept_items)
+        if dropped_items:
+            logger.warning(
+                "Stripping %d unowned item id(s) from an outfit suggestion for "
+                "user %s; %d kept",
+                dropped_items,
+                user_id,
+                len(kept_items),
+            )
         kept_wardrobes = [
             wardrobe_id
             for wardrobe_id in suggestion.wardrobe_ids
@@ -117,7 +139,9 @@ def _parse_outfit_suggestions(text: str) -> list[OutfitSuggestion]:
                 wardrobe_ids=wardrobe_ids,
                 rationale=rationale if isinstance(rationale, str) else None,
             )
-        except ValidationError:
+        except ValidationError as error:
+            # Most often a missing or blank name, which the schema requires.
+            logger.warning("Discarding a malformed outfit suggestion: %s", error)
             continue
 
         key = (suggestion.name.lower(), tuple(suggestion.clothing_item_ids))
