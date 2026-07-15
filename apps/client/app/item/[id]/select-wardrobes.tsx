@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, Pressable, ScrollView, ActivityIndicator, useWindowDimensions, DeviceEventEmitter, TextInput, Modal } from 'react-native';
+import { View, Text, StyleSheet, Pressable, ScrollView, FlatList, ActivityIndicator, useWindowDimensions, DeviceEventEmitter, TextInput, Modal } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useState, useEffect } from 'react';
 import { useLocalSearchParams, router } from 'expo-router';
@@ -167,52 +167,56 @@ export default function SelectWardrobesScreen() {
         <Text style={styles.statsCount}>{filteredWardrobes.length} total</Text>
       </View>
 
-      <ScrollView 
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        {isLoading || !item ? (
+      {isLoading || !item ? (
+        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
           <GridSkeleton />
-        ) : filteredWardrobes.length === 0 ? (
-          <Text style={styles.emptyMessage}>No wardrobes found.</Text>
-        ) : (
-          <View style={styles.gridContainer}>
-            {filteredWardrobes.map(wardrobe => {
-              const isSelected = selectedIds.has(wardrobe.id);
-              return (
-                <Pressable 
-                  key={wardrobe.id} 
-                  style={[styles.itemCard, { width: '47%' }]}
-                  onPress={() => toggleSelection(wardrobe.id)}
-                >
-                  <View style={[styles.itemImageContainer, { aspectRatio: 1.5 }, isSelected && styles.itemImageContainerSelected]}>
-                    {wardrobe.image_url ? (
-                      <Image source={{ uri: wardrobe.image_url }} style={StyleSheet.absoluteFillObject} contentFit="cover" />
-                    ) : (
-                      <LinearGradient
-                        colors={['#D4145A', '#86003C']}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 1 }}
-                        style={StyleSheet.absoluteFillObject}
-                      />
-                    )}
-                    <View style={styles.wardrobeCardOverlay}>
-                      <Text style={styles.wardrobeCardText} numberOfLines={2}>{wardrobe.name}</Text>
-                    </View>
-                    {isSelected && (
-                      <View style={styles.selectedOverlay}>
-                        <View style={styles.checkmarkBadge}>
-                          <Check size={16} color="#fff" />
-                        </View>
-                      </View>
-                    )}
+        </ScrollView>
+      ) : (
+        <FlatList
+          data={filteredWardrobes}
+          keyExtractor={(wardrobe) => wardrobe.id}
+          numColumns={2}
+          contentContainerStyle={[styles.scrollContent, filteredWardrobes.length === 0 && { flex: 1, justifyContent: 'center' }]}
+          columnWrapperStyle={filteredWardrobes.length > 0 ? { justifyContent: 'space-between' } : undefined}
+          showsVerticalScrollIndicator={false}
+          ListEmptyComponent={() => (
+            <Text style={styles.emptyMessage}>No wardrobes found.</Text>
+          )}
+          renderItem={({ item: wardrobe }) => {
+            const isSelected = selectedIds.has(wardrobe.id);
+            return (
+              <Pressable 
+                key={wardrobe.id} 
+                style={[styles.itemCard, { width: '47%' }]}
+                onPress={() => toggleSelection(wardrobe.id)}
+              >
+                <View style={[styles.itemImageContainer, { aspectRatio: 1.5 }, isSelected && styles.itemImageContainerSelected]}>
+                  {wardrobe.image_url ? (
+                    <Image source={{ uri: wardrobe.image_url }} style={StyleSheet.absoluteFillObject} contentFit="cover" />
+                  ) : (
+                    <LinearGradient
+                      colors={['#D4145A', '#86003C']}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={StyleSheet.absoluteFillObject}
+                    />
+                  )}
+                  <View style={styles.wardrobeCardOverlay}>
+                    <Text style={styles.wardrobeCardText} numberOfLines={2}>{wardrobe.name}</Text>
                   </View>
-                </Pressable>
-              );
-            })}
-          </View>
-        )}
-      </ScrollView>
+                  {isSelected && (
+                    <View style={styles.selectedOverlay}>
+                      <View style={styles.checkmarkBadge}>
+                        <Check size={16} color="#fff" />
+                      </View>
+                    </View>
+                  )}
+                </View>
+              </Pressable>
+            );
+          }}
+        />
+      )}
 
       {/* Cart / Selected Items Modal */}
       <Modal

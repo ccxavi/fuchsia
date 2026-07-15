@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, Pressable, ScrollView, ActivityIndicator, useWindowDimensions, DeviceEventEmitter, TextInput, Modal } from 'react-native';
+import { View, Text, StyleSheet, Pressable, ScrollView, FlatList, ActivityIndicator, useWindowDimensions, DeviceEventEmitter, TextInput, Modal } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useState, useEffect } from 'react';
 import { useLocalSearchParams, router } from 'expo-router';
@@ -257,51 +257,59 @@ export default function SelectOutfitsScreen() {
       </View>
 
       <View style={styles.flex1}>
-        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-          {isLoading || !wardrobe ? (
+        {isLoading || !wardrobe ? (
+          <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
             <GridSkeleton />
-          ) : filteredOutfits.length === 0 ? (
-            <View style={styles.emptyState}>
-              <Text style={styles.emptyTitle}>No outfits found</Text>
-              <Text style={styles.emptySubtitle}>Try adjusting your search or create a new outfit.</Text>
-            </View>
-          ) : (
-            <View style={styles.gridContainer}>
-              {filteredOutfits.map(outfit => {
-                const isSelected = selectedIds.has(outfit.id);
-                
-                return (
-                  <Pressable 
-                    key={outfit.id} 
-                    style={[styles.itemCard, { width: itemWidth }]}
-                    onPress={() => toggleSelection(outfit.id)}
-                  >
-                    <View style={[
-                      styles.itemImageContainer, 
-                      { height: itemWidth * 1.25 },
-                      isSelected && styles.itemImageContainerSelected
-                    ]}>
-                      {renderOutfitImage(outfit)}
-                      
-                      {isSelected && (
-                        <View style={styles.selectedOverlay}>
-                          <View style={styles.checkmarkBadge}>
-                            <Check size={16} color="white" />
-                          </View>
+          </ScrollView>
+        ) : (
+          <FlatList
+            data={filteredOutfits}
+            keyExtractor={(outfit) => outfit.id}
+            numColumns={2}
+            style={styles.content}
+            contentContainerStyle={[{ padding: 16, gap: 16 }, filteredOutfits.length === 0 && { flex: 1, justifyContent: 'center' }]}
+            columnWrapperStyle={filteredOutfits.length > 0 ? { gap: 16 } : undefined}
+            showsVerticalScrollIndicator={false}
+            ListEmptyComponent={() => (
+              <View style={styles.emptyState}>
+                <Text style={styles.emptyTitle}>No outfits found</Text>
+                <Text style={styles.emptySubtitle}>Try adjusting your search or create a new outfit.</Text>
+              </View>
+            )}
+            ListFooterComponent={<View style={{ height: (insets.bottom || 24) + 40 }} />}
+            renderItem={({ item: outfit }) => {
+              const isSelected = selectedIds.has(outfit.id);
+              
+              return (
+                <Pressable 
+                  key={outfit.id} 
+                  style={[styles.itemCard, { width: itemWidth }]}
+                  onPress={() => toggleSelection(outfit.id)}
+                >
+                  <View style={[
+                    styles.itemImageContainer, 
+                    { height: itemWidth * 1.25 },
+                    isSelected && styles.itemImageContainerSelected
+                  ]}>
+                    {renderOutfitImage(outfit)}
+                    
+                    {isSelected && (
+                      <View style={styles.selectedOverlay}>
+                        <View style={styles.checkmarkBadge}>
+                          <Check size={16} color="white" />
                         </View>
-                      )}
-                    </View>
-                    <View style={styles.itemInfo}>
-                      <Text style={styles.itemTitle} numberOfLines={1}>{outfit.name}</Text>
-                      <Text style={styles.itemCategory}>{outfit.clothing_items_count} Items</Text>
-                    </View>
-                  </Pressable>
-                );
-              })}
-            </View>
-          )}
-          <View style={{ height: (insets.bottom || 24) + 40 }} />
-        </ScrollView>
+                      </View>
+                    )}
+                  </View>
+                  <View style={styles.itemInfo}>
+                    <Text style={styles.itemTitle} numberOfLines={1}>{outfit.name}</Text>
+                    <Text style={styles.itemCategory}>{outfit.clothing_items_count} Items</Text>
+                  </View>
+                </Pressable>
+              );
+            }}
+          />
+        )}
         
         
       </View>
