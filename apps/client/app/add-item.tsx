@@ -21,6 +21,7 @@ export default function AddOrEditItemScreen() {
   const [name, setName] = useState('');
   const [category, setCategory] = useState('');
   const [color, setColor] = useState('');
+  const [brand, setBrand] = useState('');
   
   const [wardrobes, setWardrobes] = useState<WardrobeResponse[]>([]);
   const [selectedWardrobeIds, setSelectedWardrobeIds] = useState<string[]>(
@@ -54,6 +55,7 @@ export default function AddOrEditItemScreen() {
       setName(data.name || '');
       setCategory(data.category || '');
       setColor(data.color || '');
+      setBrand(data.brand || '');
       setOriginalImage(data.image_url || null);
       if (data.wardrobes && data.wardrobes.length > 0) {
         setSelectedWardrobeIds(data.wardrobes.map(w => w.id));
@@ -128,6 +130,7 @@ export default function AddOrEditItemScreen() {
       if (analysis.name) setName(analysis.name);
       if (analysis.category) setCategory(analysis.category);
       if (analysis.color) setColor(analysis.color);
+      if (analysis.brand) setBrand(analysis.brand);
       
       DeviceEventEmitter.emit('showGlobalToast', 'Item details auto-filled');
     } catch (err) {
@@ -152,6 +155,7 @@ export default function AddOrEditItemScreen() {
           name: name.trim(),
           category: category.trim() || undefined,
           color: color.trim() || undefined,
+          brand: brand.trim() || undefined,
           wardrobe_ids: selectedWardrobeIds,
           imageUri: imageUri || undefined,
         });
@@ -162,6 +166,7 @@ export default function AddOrEditItemScreen() {
           name: name.trim(),
           category: category.trim() || undefined,
           color: color.trim() || undefined,
+          brand: brand.trim() || undefined,
           wardrobe_ids: selectedWardrobeIds.length > 0 ? selectedWardrobeIds : undefined,
           imageUri: imageUri || undefined,
         });
@@ -325,6 +330,17 @@ export default function AddOrEditItemScreen() {
               placeholderTextColor={FuchsiaColors.mist}
               value={color}
               onChangeText={setColor}
+            />
+          </View>
+
+          <View style={styles.formGroup}>
+            <ThemedText style={styles.label}>Brand (Optional)</ThemedText>
+            <TextInput
+              style={styles.input}
+              placeholder="e.g. Levi's"
+              placeholderTextColor={FuchsiaColors.mist}
+              value={brand}
+              onChangeText={setBrand}
             />
           </View>
           
