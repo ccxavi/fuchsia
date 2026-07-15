@@ -2,6 +2,8 @@ import httpx
 from datetime import datetime, timedelta
 from fastapi import HTTPException
 
+from app.core.config import settings
+
 WEATHER_CACHE = {}
 CACHE_TTL = timedelta(minutes=15)
 
@@ -47,8 +49,8 @@ async def get_current_weather(lat: float, lon: float) -> dict:
         if now - timestamp < CACHE_TTL:
             return cached_data
 
-    # Open-Meteo API endpoint (No API key required)
-    url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current=temperature_2m,weather_code"
+    # Open-Meteo API endpoint
+    url = f"{settings.weather_api_url}?latitude={lat}&longitude={lon}&current=temperature_2m,weather_code"
     
     async with httpx.AsyncClient() as client:
         try:
