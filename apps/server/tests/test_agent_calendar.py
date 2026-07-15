@@ -111,6 +111,27 @@ class FilterValidCalendarSuggestionsTestCase(unittest.TestCase):
 
         self.assertEqual(result, [])
 
+    def test_dropping_an_entry_is_logged(self) -> None:
+        # As in outfits.py: a dropped proposal is invisible to the user and
+        # looks exactly like the model never calling the tool.
+        with self.session_factory() as session:
+            with self.assertLogs("app.services.agent.calendar", level="WARNING") as logs:
+                filter_valid_calendar_suggestions(
+                    session, _USER_ID, [self._suggestion("made-up-outfit")]
+                )
+
+        self.assertIn("Dropping calendar suggestion", logs.output[0])
+        self.assertIn("made-up-outfit", logs.output[0])
+
+    def test_valid_entry_logs_nothing(self) -> None:
+        with self.session_factory() as session:
+            with self.assertNoLogs("app.services.agent.calendar", level="WARNING"):
+                result = filter_valid_calendar_suggestions(
+                    session, _USER_ID, [self._suggestion(self.outfit_id)]
+                )
+
+        self.assertEqual(len(result), 1)
+
     def test_empty_input_returns_empty(self) -> None:
         with self.session_factory() as session:
             self.assertEqual(

@@ -117,6 +117,47 @@ class StylistToolsTestCase(unittest.TestCase):
         self.assertEqual(parsed["count"], 1)
         self.assertEqual(parsed["items"][0]["name"], "Blue jeans")
 
+    def _tool_description(self, name: str) -> str:
+        tool = next(t for t in STYLIST_TOOLS if t["function"]["name"] == name)
+        return tool["function"]["description"]
+
+    def test_suggest_outfits_has_no_opt_out_clause(self) -> None:
+        # "if you cannot build one from their wardrobe, do not call it" is
+        # vacuously true before get_clothing_items has run, and the model took
+        # the out: 0/5 suggestions against the live API. See test_agent_prompt.
+        description = self._tool_description("suggest_outfits")
+
+        self.assertNotIn("do not call it", description)
+        self.assertIn("only way the outfit reaches them", description)
+
+    def test_suggest_outfits_triggers_on_the_users_ask(self) -> None:
+        # Trigger on what the user does, not on the model's internal state:
+        # "once you have decided" is a state it can satisfy by writing prose.
+        description = self._tool_description("suggest_outfits")
+
+        self.assertIn("build, create, or put one", description)
+        self.assertNotIn("once you have decided", description)
+
+    def test_suggest_outfits_keeps_its_id_fidelity_rules(self) -> None:
+        # These are load-bearing and measured working (5/5 ids survived the
+        # ownership filter); removing them would resurface as silent drops.
+        description = self._tool_description("suggest_outfits")
+
+        self.assertIn("Only use clothing items returned by get_clothing_items", description)
+        self.assertIn("Never invent pieces", description)
+
+    def test_suggest_calendar_entry_has_no_self_referential_trigger(self) -> None:
+        description = self._tool_description("suggest_calendar_entry")
+
+        self.assertNotIn("once you have decided", description)
+        self.assertIn("only way the proposal reaches them", description)
+
+    def test_suggest_memories_keeps_its_opt_out(self) -> None:
+        # Already fires 4/4. Its opt-out is correct, unlike the other two.
+        description = self._tool_description("suggest_memories")
+
+        self.assertIn("if there is nothing new worth remembering, do not call it", description)
+
     def test_advertised_tools_cover_the_stylist_capabilities(self) -> None:
         names = {tool["function"]["name"] for tool in STYLIST_TOOLS}
 

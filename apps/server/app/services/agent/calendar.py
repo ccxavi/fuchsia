@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+
 from pydantic import ValidationError
 from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
@@ -8,6 +10,8 @@ from sqlalchemy.orm import Session
 from app.models.outfit import Outfit
 from app.services.agent.memory import _load_json
 from app.v1.schemas import CalendarSuggestion
+
+logger = logging.getLogger(__name__)
 
 
 def filter_valid_calendar_suggestions(
@@ -32,11 +36,20 @@ def filter_valid_calendar_suggestions(
     except SQLAlchemyError:
         return suggestions
 
-    return [
-        suggestion
-        for suggestion in suggestions
-        if suggestion.outfit_id in owned
-    ]
+    valid: list[CalendarSuggestion] = []
+    for suggestion in suggestions:
+        if suggestion.outfit_id not in owned:
+            # As in outfits.py: a dropped proposal is invisible to the user and
+            # looks exactly like the model never having called the tool.
+            logger.warning(
+                "Dropping calendar suggestion for user %s: outfit %s is not theirs",
+                user_id,
+                suggestion.outfit_id,
+            )
+            continue
+        valid.append(suggestion)
+
+    return valid
 
 
 def _parse_calendar_suggestions(text: str) -> list[CalendarSuggestion]:

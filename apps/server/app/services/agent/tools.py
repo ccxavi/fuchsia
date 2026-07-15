@@ -136,11 +136,13 @@ SUGGEST_OUTFITS_TOOL: dict[str, Any] = {
         "name": "suggest_outfits",
         "description": (
             "Propose one or more complete outfits assembled from pieces the user "
-            "actually owns. Only use clothing items returned by get_clothing_items, "
-            "referencing each by its exact 'id'. Never invent pieces the user does "
-            "not own. Reflect the user's remembered style preferences when choosing. "
-            "Call this in the same turn you answer once you have decided on an outfit; "
-            "if you cannot build one from their wardrobe, do not call it."
+            "actually owns. Call this whenever you have chosen an outfit to show the "
+            "user — for example when they ask you to build, create, or put one "
+            "together. This is the only way the outfit reaches them: describing it in "
+            "your reply does not show it, and they cannot save it. Only use clothing "
+            "items returned by get_clothing_items, referencing each by its exact 'id'. "
+            "Never invent pieces the user does not own. Reflect the user's remembered "
+            "style preferences when choosing."
         ),
         "parameters": {
             "type": "object",
@@ -274,11 +276,14 @@ SUGGEST_CALENDAR_ENTRY_TOOL: dict[str, Any] = {
     "function": {
         "name": "suggest_calendar_entry",
         "description": (
-            "Propose scheduling one or more saved outfits on specific dates. Only "
-            "schedule outfits that already exist — reference each by an 'id' from "
-            "get_outfits, never invent one. Use a concrete calendar date (YYYY-MM-DD); "
-            "resolve relative dates like 'Saturday' using the current date you were "
-            "given. This is a proposal the user confirms; call it once you have decided."
+            "Propose scheduling one or more saved outfits on specific dates. Call "
+            "this whenever the user asks you to put an outfit on their calendar, as "
+            "soon as you know which outfit and which date. This is the only way the "
+            "proposal reaches them: saying you scheduled it in your reply does "
+            "nothing. Only schedule outfits that already exist — reference each by an "
+            "'id' from get_outfits, never invent one. Use a concrete calendar date "
+            "(YYYY-MM-DD); resolve relative dates like 'Saturday' using the current "
+            "date you were given. The user confirms the proposal in the app."
         ),
         "parameters": {
             "type": "object",

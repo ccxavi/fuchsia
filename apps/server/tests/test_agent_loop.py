@@ -597,6 +597,35 @@ class RunStylistChatTestCase(unittest.TestCase):
         _, final_body = post_mock.call_args_list[-1].args
         self.assertNotIn("tools", final_body)
 
+    def test_round_budget_leaves_room_to_read_then_propose(self) -> None:
+        # Measured against the live API, the model routinely spends 2-3 rounds
+        # reading (get_clothing_items, get_weather, get_calendar) before it
+        # proposes anything — one passing trial used all 4 of the old budget.
+        # Once the budget runs out the forced call goes out with tools=None, so
+        # a proposal stops being merely unlikely and becomes impossible.
+        self.assertGreaterEqual(MAX_TOOL_ROUNDS, 6)
+
+    def test_suggestion_on_the_final_tool_round_still_reaches_the_user(self) -> None:
+        # The cliff: a proposal made on the very last tool-capable round must
+        # survive into the response, even though the forced answer that follows
+        # carries no tools.
+        payloads = (
+            [_tool_call_payload()] * (MAX_TOOL_ROUNDS - 1)
+            + [
+                _suggest_outfits_payload(
+                    [{"name": "Last Round Look", "clothing_item_ids": [self.item_id]}]
+                )
+            ]
+            + [_content_payload("Here's a look.")]
+        )
+
+        with patch("app.services.agent.loop.post_chat", side_effect=payloads):
+            result = self._run()
+
+        self.assertEqual(result.message.content, "Here's a look.")
+        self.assertEqual(len(result.outfit_suggestions), 1)
+        self.assertEqual(result.outfit_suggestions[0].name, "Last Round Look")
+
 
 if __name__ == "__main__":
     unittest.main()
