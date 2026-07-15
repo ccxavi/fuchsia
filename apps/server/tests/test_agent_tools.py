@@ -320,6 +320,146 @@ class StylistToolsTestCase(unittest.TestCase):
         parsed = json.loads(result)
         self.assertIn("error", parsed)
 
+    # --- get_weather with a date ---------------------------------------------
+
+    def _forecast_mock(self) -> AsyncMock:
+        return AsyncMock(
+            return_value={
+                "date": "2026-07-17",
+                "temperature_min": 24.0,
+                "temperature_max": 31.0,
+                "description": "Slight Rain",
+                "icon_url": "https://example.test/icon.png",
+            }
+        )
+
+    def _run_get_weather(
+        self,
+        arguments: dict,
+        *,
+        forecast: AsyncMock | None = None,
+        current: AsyncMock | None = None,
+        today: datetime.date | None = datetime.date(2026, 7, 15),
+    ) -> dict:
+        """Dispatch get_weather with both service functions patched out."""
+        forecast = forecast or self._forecast_mock()
+        current = current or AsyncMock(
+            return_value={"temperature": 21.5, "description": "Clear Sky"}
+        )
+        with (
+            patch("app.services.agent.tools.get_daily_forecast", new=forecast),
+            patch("app.services.agent.tools.get_current_weather", new=current),
+        ):
+            result = execute_tool(
+                "get_weather",
+                arguments,
+                db=self.session,
+                user_id="user-1",
+                latitude=14.6,
+                longitude=121.0,
+                today=today,
+            )
+        self.forecast_mock = forecast
+        self.current_mock = current
+        return json.loads(result)
+
+    def test_get_weather_schema_exposes_optional_date(self) -> None:
+        tool = next(
+            t for t in STYLIST_TOOLS if t["function"]["name"] == "get_weather"
+        )
+        parameters = tool["function"]["parameters"]
+
+        self.assertIn("date", parameters["properties"])
+        # Absent "required" is what keeps the no-argument call legal.
+        self.assertNotIn("required", parameters)
+
+    def test_get_weather_with_date_returns_daily_summary(self) -> None:
+        parsed = self._run_get_weather({"date": "2026-07-17"})
+
+        self.forecast_mock.assert_awaited_once_with(14.6, 121.0, datetime.date(2026, 7, 17))
+        self.assertEqual(parsed["date"], "2026-07-17")
+        self.assertEqual(parsed["temperature_min_c"], 24.0)
+        self.assertEqual(parsed["temperature_max_c"], 31.0)
+        self.assertEqual(parsed["description"], "Slight Rain")
+
+    def test_get_weather_with_date_does_not_call_current_conditions(self) -> None:
+        self._run_get_weather({"date": "2026-07-17"})
+
+        self.current_mock.assert_not_awaited()
+
+    def test_get_weather_for_today_returns_the_daily_summary(self) -> None:
+        # Asking for a day gets a day; "right now" is expressed by omitting date.
+        self._run_get_weather({"date": "2026-07-15"})
+
+        self.forecast_mock.assert_awaited_once_with(14.6, 121.0, datetime.date(2026, 7, 15))
+        self.current_mock.assert_not_awaited()
+
+    def test_get_weather_rejects_unparseable_date(self) -> None:
+        parsed = self._run_get_weather({"date": "Friday"})
+
+        self.assertIn("error", parsed)
+        self.forecast_mock.assert_not_awaited()
+
+    def test_get_weather_rejects_non_string_date(self) -> None:
+        parsed = self._run_get_weather({"date": 20260717})
+
+        self.assertIn("error", parsed)
+        self.forecast_mock.assert_not_awaited()
+
+    def test_get_weather_rejects_date_beyond_horizon(self) -> None:
+        parsed = self._run_get_weather({"date": "2026-12-25"})
+
+        # Answerable without asking upstream, and the model needs the bounds.
+        self.forecast_mock.assert_not_awaited()
+        self.assertIn("2026-07-14", parsed["error"])
+        self.assertIn("2026-07-29", parsed["error"])
+
+    def test_get_weather_rejects_past_date(self) -> None:
+        parsed = self._run_get_weather({"date": "2026-01-01"})
+
+        self.assertIn("error", parsed)
+        self.forecast_mock.assert_not_awaited()
+
+    def test_get_weather_accepts_yesterday_for_timezone_skew(self) -> None:
+        # The server's "today" can run ahead of a user further west.
+        self._run_get_weather({"date": "2026-07-14"})
+
+        self.forecast_mock.assert_awaited_once_with(14.6, 121.0, datetime.date(2026, 7, 14))
+
+    def test_get_weather_accepts_the_far_edge_of_the_window(self) -> None:
+        self._run_get_weather({"date": "2026-07-29"})
+
+        self.forecast_mock.assert_awaited_once_with(14.6, 121.0, datetime.date(2026, 7, 29))
+
+    def test_get_weather_swallows_forecast_service_errors(self) -> None:
+        failing = AsyncMock(side_effect=HTTPException(status_code=503, detail="down"))
+
+        parsed = self._run_get_weather({"date": "2026-07-17"}, forecast=failing)
+
+        self.assertIn("error", parsed)
+        self.assertIn("2026-07-17", parsed["error"])
+
+    def test_get_weather_with_date_but_no_coords_returns_error(self) -> None:
+        forecast = self._forecast_mock()
+        with patch("app.services.agent.tools.get_daily_forecast", new=forecast):
+            result = execute_tool(
+                "get_weather",
+                {"date": "2026-07-17"},
+                db=self.session,
+                user_id="user-1",
+            )
+
+        self.assertIn("error", json.loads(result))
+        forecast.assert_not_awaited()
+
+    def test_get_weather_falls_back_to_server_today_without_today_kwarg(self) -> None:
+        # execute_tool's today defaults to None; the range still has to resolve.
+        target = datetime.date.today() + datetime.timedelta(days=2)
+
+        self._run_get_weather({"date": target.isoformat()}, today=None)
+
+        self.forecast_mock.assert_awaited_once_with(14.6, 121.0, target)
+
 
 if __name__ == "__main__":
     unittest.main()

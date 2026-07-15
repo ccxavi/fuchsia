@@ -135,6 +135,7 @@ def _run_tool_call(
     calendar_suggestions: list[CalendarSuggestion],
     latitude: float | None,
     longitude: float | None,
+    today: datetime.date | None,
 ) -> dict[str, Any]:
     function = tool_call.get("function") or {}
     name = function.get("name") or ""
@@ -169,6 +170,7 @@ def _run_tool_call(
             user_id=user_id,
             latitude=latitude,
             longitude=longitude,
+            today=today,
         )
 
     return {
@@ -191,6 +193,7 @@ def _generate_answer(
     calendar_suggestions: list[CalendarSuggestion],
     latitude: float | None,
     longitude: float | None,
+    today: datetime.date | None,
     stats: InvocationStats,
 ) -> ChatResponse:
     """Run the tool loop and return the model's final text answer.
@@ -243,6 +246,7 @@ def _generate_answer(
                     calendar_suggestions=calendar_suggestions,
                     latitude=latitude,
                     longitude=longitude,
+                    today=today,
                 )
             )
 
@@ -303,6 +307,7 @@ def run_stylist_chat(
             calendar_suggestions=calendar_suggestions,
             latitude=latitude,
             longitude=longitude,
+            today=today,
             stats=stats,
         )
     except HTTPException as exc:

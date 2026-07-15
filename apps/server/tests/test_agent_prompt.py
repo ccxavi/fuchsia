@@ -16,6 +16,15 @@ class StylistSystemPromptTestCase(unittest.TestCase):
     def test_mentions_weather_tool(self) -> None:
         self.assertIn("get_weather", STYLIST_SYSTEM_PROMPT)
 
+    def test_mentions_weather_forecast(self) -> None:
+        self.assertIn("forecast", STYLIST_SYSTEM_PROMPT)
+
+    def test_does_not_claim_weather_is_current_only(self) -> None:
+        # The tool takes an optional date now; a prompt that denies forecasts
+        # exist would talk the model out of ever asking for one.
+        self.assertNotIn("current conditions only", STYLIST_SYSTEM_PROMPT)
+        self.assertNotIn("not a future forecast", STYLIST_SYSTEM_PROMPT)
+
     def test_mentions_wardrobes_tool(self) -> None:
         self.assertIn("get_wardrobes", STYLIST_SYSTEM_PROMPT)
 

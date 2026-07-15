@@ -107,7 +107,9 @@ def _suggest_outfits_payload(outfits: list[dict]) -> dict:
     }
 
 
-def _weather_tool_call_payload() -> dict:
+def _weather_tool_call_payload(date: str | None = None) -> dict:
+    """A get_weather call; with ``date`` it asks for that day's forecast."""
+    arguments = json.dumps({"date": date}) if date is not None else "{}"
     return {
         "choices": [
             {
@@ -120,7 +122,7 @@ def _weather_tool_call_payload() -> dict:
                             "type": "function",
                             "function": {
                                 "name": "get_weather",
-                                "arguments": "{}",
+                                "arguments": arguments,
                             },
                         }
                     ],
@@ -329,6 +331,71 @@ class RunStylistChatTestCase(unittest.TestCase):
 
         self.assertEqual(result.message.content, "Where are you based?")
         fake_weather.assert_not_called()
+        _, second_body = post_mock.call_args_list[1].args
+        tool_message = next(m for m in second_body["messages"] if m["role"] == "tool")
+        self.assertIn("error", tool_message["content"])
+
+    def test_weather_tool_forwards_date_and_today_to_forecast(self) -> None:
+        fake_forecast = AsyncMock(
+            return_value={
+                "date": "2026-07-17",
+                "temperature_min": 24.0,
+                "temperature_max": 31.0,
+                "description": "Slight Rain",
+                "icon_url": "https://example.test/i.png",
+            }
+        )
+        with patch(
+            "app.services.agent.tools.get_daily_forecast", new=fake_forecast
+        ), patch(
+            "app.services.agent.loop.post_chat",
+            side_effect=[
+                _weather_tool_call_payload("2026-07-17"),
+                _content_payload("Pack an umbrella for Friday."),
+            ],
+        ) as post_mock:
+            result = run_stylist_chat(
+                [ChatMessage(role="user", content="what should I wear on Friday?")],
+                provider=_provider(),
+                db=self.session,
+                user_id="user-1",
+                latitude=16.4,
+                longitude=120.6,
+                today=datetime.date(2026, 7, 15),
+            )
+
+        self.assertEqual(result.message.content, "Pack an umbrella for Friday.")
+        # The requested date reaches the service, parsed into a real date.
+        fake_forecast.assert_awaited_once_with(16.4, 120.6, datetime.date(2026, 7, 17))
+
+        _, second_body = post_mock.call_args_list[1].args
+        tool_message = next(m for m in second_body["messages"] if m["role"] == "tool")
+        self.assertEqual(tool_message["tool_call_id"], "call_weather")
+        self.assertIn("Slight Rain", tool_message["content"])
+
+    def test_weather_tool_date_out_of_range_returns_error_to_model(self) -> None:
+        with patch(
+            "app.services.agent.tools.get_daily_forecast"
+        ) as fake_forecast, patch(
+            "app.services.agent.loop.post_chat",
+            side_effect=[
+                _weather_tool_call_payload("2027-01-01"),
+                _content_payload("That is too far out to forecast."),
+            ],
+        ) as post_mock:
+            result = run_stylist_chat(
+                [ChatMessage(role="user", content="what should I wear next year?")],
+                provider=_provider(),
+                db=self.session,
+                user_id="user-1",
+                latitude=16.4,
+                longitude=120.6,
+                today=datetime.date(2026, 7, 15),
+            )
+
+        # The range error surfaces as a tool message, not an exception.
+        self.assertEqual(result.message.content, "That is too far out to forecast.")
+        fake_forecast.assert_not_called()
         _, second_body = post_mock.call_args_list[1].args
         tool_message = next(m for m in second_body["messages"] if m["role"] == "tool")
         self.assertIn("error", tool_message["content"])
