@@ -118,35 +118,36 @@ export default function ProfileScreen() {
         </View>
 
         <View style={styles.settingsGroup}>
-          <ThemedText style={styles.groupTitle}>AI Stylist</ThemedText>
-          <TouchableOpacity 
-            style={styles.settingsItem}
-            onPress={() => router.push('/memory')}
-          >
-            <View style={styles.settingsItemLeft}>
-              <View style={styles.itemIcon}>
-                <BrainCircuit size={20} color={FuchsiaColors.slate} />
-              </View>
-              <ThemedText style={styles.settingsItemText}>Manage AI Memory</ThemedText>
-            </View>
-            <ChevronRight size={20} color={FuchsiaColors.slate} />
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.settingsGroup}>
           <ThemedText style={styles.groupTitle}>Preferences</ThemedText>
-          <TouchableOpacity 
-            style={styles.settingsItem}
-            onPress={() => router.push('/notifications' as any)}
-          >
-            <View style={styles.settingsItemLeft}>
-              <View style={styles.itemIcon}>
-                <Bell size={20} color={FuchsiaColors.slate} />
+          <View style={styles.settingsCard}>
+            <TouchableOpacity 
+              style={styles.settingsRow}
+              onPress={() => router.push('/memory')}
+            >
+              <View style={styles.settingsItemLeft}>
+                <View style={styles.itemIcon}>
+                  <BrainCircuit size={20} color={FuchsiaColors.slate} />
+                </View>
+                <ThemedText style={styles.settingsItemText}>AI Memory Management</ThemedText>
               </View>
-              <ThemedText style={styles.settingsItemText}>Notifications</ThemedText>
-            </View>
-            <ChevronRight size={20} color={FuchsiaColors.slate} />
-          </TouchableOpacity>
+              <ChevronRight size={20} color={FuchsiaColors.slate} />
+            </TouchableOpacity>
+            
+            <View style={styles.settingsDivider} />
+            
+            <TouchableOpacity 
+              style={styles.settingsRow}
+              onPress={() => router.push('/notifications' as any)}
+            >
+              <View style={styles.settingsItemLeft}>
+                <View style={styles.itemIcon}>
+                  <Bell size={20} color={FuchsiaColors.slate} />
+                </View>
+                <ThemedText style={styles.settingsItemText}>Notifications</ThemedText>
+              </View>
+              <ChevronRight size={20} color={FuchsiaColors.slate} />
+            </TouchableOpacity>
+          </View>
         </View>
 
         <View style={styles.settingsGroup}>
