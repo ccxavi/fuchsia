@@ -1,5 +1,6 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
+from fastapi.middleware.gzip import GZipMiddleware
 
 from app.core.logging import setup_logging
 from app.v1.router import router as v1_router
@@ -36,4 +37,6 @@ tags_metadata = [
 ]
 # Combine both the lifespan AND the openapi_tags!
 app = FastAPI(title="Fuchsia API", lifespan=lifespan, openapi_tags=tags_metadata)
+
+app.add_middleware(GZipMiddleware, minimum_size=1000)
 app.include_router(v1_router, prefix="/api/v1")

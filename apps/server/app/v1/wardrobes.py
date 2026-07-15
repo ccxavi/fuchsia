@@ -1,7 +1,7 @@
 from typing import Annotated
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
 from fastapi.security import HTTPAuthorizationCredentials
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -56,11 +56,15 @@ async def create_wardrobe(
 def get_wardrobes(
     user: Annotated[AuthenticatedUser, Depends(get_current_authenticated_user)],
     db: Annotated[Session, Depends(get_db_session)],
+    limit: int = Query(50, ge=1, le=100),
+    offset: int = Query(0, ge=0)
 ):
     wardrobes = db.scalars(
         select(Wardrobe)
         .options(selectinload(Wardrobe.clothing_items), selectinload(Wardrobe.outfits))
         .where(Wardrobe.user_id == user.user.id)
+        .limit(limit)
+        .offset(offset)
     ).all()
     return wardrobes
 

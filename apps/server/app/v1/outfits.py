@@ -120,6 +120,8 @@ def get_recent_looks(
 def get_outfits(
     user: Annotated[AuthenticatedUser, Depends(get_current_authenticated_user)],
     db: Annotated[Session, Depends(get_db_session)],
+    limit: int = Query(50, ge=1, le=100),
+    offset: int = Query(0, ge=0)
 ):
     outfits = db.scalars(
         select(Outfit)
@@ -129,6 +131,8 @@ def get_outfits(
             selectinload(Outfit.images)
         )
         .where(Outfit.user_id == user.user.id)
+        .limit(limit)
+        .offset(offset)
     ).all()
     return outfits
 
