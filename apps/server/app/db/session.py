@@ -6,6 +6,7 @@ from functools import lru_cache
 from sqlalchemy import create_engine
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.pool import NullPool
 
 from app.core.config import settings
 
@@ -15,6 +16,7 @@ def get_engine() -> Engine:
     return create_engine(
         settings.require_database_url(),
         pool_pre_ping=True,
+        poolclass=NullPool,
     )
 
 

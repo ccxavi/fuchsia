@@ -1,7 +1,7 @@
 from typing import Annotated
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status, Query
 from fastapi.security import HTTPAuthorizationCredentials
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -159,11 +159,15 @@ def remove_item_from_wardrobe(
 def get_clothing_items(
     user: AuthenticatedUser = Depends(get_current_authenticated_user),
     db: Session = Depends(get_db_session),
+    limit: int = Query(50, ge=1, le=100),
+    offset: int = Query(0, ge=0)
 ):
     items = db.scalars(
         select(ClothingItem)
         .options(selectinload(ClothingItem.wardrobes), selectinload(ClothingItem.outfits))
         .where(ClothingItem.user_id == user.user.id)
+        .limit(limit)
+        .offset(offset)
     ).all()
     return items
 
