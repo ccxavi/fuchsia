@@ -214,7 +214,7 @@ export default function AddOrEditItemScreen() {
           <View style={{ alignItems: 'center' }}>
             <ThemedText style={styles.uploadTitle}>{id ? 'Replace photo' : 'Take a photo or upload'}</ThemedText>
             <ThemedText style={styles.uploadSubtitle}>
-              {id ? 'Upload a new photo to replace the current one' : 'AI will auto-detect the item and remove the background'}
+              {id ? 'Upload a new photo to replace the current one' : 'AI will auto-detect the item details'}
             </ThemedText>
           </View>
           <View style={styles.uploadButtonsRow}>
