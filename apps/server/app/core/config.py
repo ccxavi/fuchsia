@@ -25,6 +25,7 @@ class Settings(BaseSettings):
     # real matches land ~0.23-0.30, unrelated/greeting noise ~0.42+.
     memory_recall_top_k: int = 6
     memory_recall_max_distance: float = 0.38
+    weather_api_url: str = "https://api.open-meteo.com/v1/forecast"
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
