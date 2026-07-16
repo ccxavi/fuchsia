@@ -10,10 +10,7 @@ import * as SecureStore from 'expo-secure-store';
 import { makeRedirectUri } from 'expo-auth-session';
 import { useState } from 'react';
 
-const { width } = Dimensions.get('window');
-const ITEM_WIDTH = 200;
-const ITEM_SPACING = 16;
-const SNAP_INTERVAL = ITEM_WIDTH + ITEM_SPACING;
+
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -30,30 +27,10 @@ function GoogleIcon() {
   );
 }
 
-const CAROUSEL_DATA = [
-  {
-    id: '1',
-    title: 'Everyday',
-    subtitle: 'Casual & Comfy',
-    image: 'https://placehold.co/400x600/FDF2F8/D4145A/png?text=Style+1',
-  },
-  {
-    id: '2',
-    title: 'Workwear',
-    subtitle: 'Smart & Sharp',
-    image: 'https://placehold.co/400x600/F8F8FC/4A4A68/png?text=Style+2',
-  },
-  {
-    id: '3',
-    title: 'Night Out',
-    subtitle: 'Bold & Elegant',
-    image: 'https://placehold.co/400x600/FDF2F8/86003C/png?text=Style+3',
-  }
-];
+
 
 export default function WelcomeScreen() {
   const router = useRouter();
-  const [activeIndex, setActiveIndex] = useState(0);
 
   const handleGoogleSignIn = async () => {
     try {
@@ -91,13 +68,7 @@ export default function WelcomeScreen() {
     }
   };
 
-  const handleScroll = (event: any) => {
-    const scrollPosition = event.nativeEvent.contentOffset.x;
-    const index = Math.round(scrollPosition / SNAP_INTERVAL);
-    if (index !== activeIndex && index >= 0 && index < CAROUSEL_DATA.length) {
-      setActiveIndex(index);
-    }
-  };
+
 
   return (
     <View style={styles.container}>
@@ -108,51 +79,7 @@ export default function WelcomeScreen() {
         style={styles.topHalf}
       >
         <SafeAreaView edges={['top']} style={styles.safeAreaTop} />
-        
-        <View style={styles.carouselContainer}>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            snapToInterval={SNAP_INTERVAL}
-            decelerationRate="fast"
-            contentContainerStyle={styles.carouselContent}
-            onScroll={handleScroll}
-            scrollEventThrottle={16}
-          >
-            {CAROUSEL_DATA.map((item, index) => (
-              <View 
-                key={item.id} 
-                style={[
-                  styles.carouselItem,
-                  { marginRight: index !== CAROUSEL_DATA.length - 1 ? ITEM_SPACING : 0 }
-                ]}
-              >
-                <Image source={{ uri: item.image }} style={styles.carouselImage} contentFit="cover" />
-                <LinearGradient
-                  colors={['transparent', 'rgba(134,0,60,0.2)', 'rgba(134,0,60,0.9)']}
-                  style={StyleSheet.absoluteFillObject}
-                />
-                <View style={styles.carouselTextContainer}>
-                  <Text style={styles.carouselTitle}>{item.title}</Text>
-                  <Text style={styles.carouselSubtitle}>{item.subtitle}</Text>
-                </View>
-              </View>
-            ))}
-          </ScrollView>
-        </View>
 
-        {/* Indicators */}
-        <View style={styles.indicatorContainer}>
-          {CAROUSEL_DATA.map((_, i) => (
-            <View
-              key={i}
-              style={[
-                styles.indicator,
-                activeIndex === i ? styles.indicatorActive : styles.indicatorInactive
-              ]}
-            />
-          ))}
-        </View>
       </LinearGradient>
 
       {/* Bottom Half */}
@@ -191,71 +118,7 @@ const styles = StyleSheet.create({
   safeAreaTop: {
     flex: 0,
   },
-  carouselContainer: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    marginBottom: 8,
-  },
-  carouselContent: {
-    paddingHorizontal: (width - ITEM_WIDTH) / 2,
-    alignItems: 'center',
-  },
-  carouselItem: {
-    width: ITEM_WIDTH,
-    height: 280,
-    borderRadius: 28,
-    overflow: 'hidden',
-    borderColor: 'rgba(255,255,255,0.2)',
-    borderWidth: 1,
-    shadowColor: '#86003C',
-    shadowOffset: { width: 0, height: 20 },
-    shadowOpacity: 0.4,
-    shadowRadius: 20,
-    elevation: 10,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-  },
-  carouselImage: {
-    width: '100%',
-    height: '100%',
-    opacity: 0.8,
-  },
-  carouselTextContainer: {
-    position: 'absolute',
-    bottom: 20,
-    left: 20,
-  },
-  carouselTitle: {
-    color: '#fff',
-    fontSize: 18,
-    fontFamily: 'Inter_700Bold',
-    letterSpacing: 0.5,
-  },
-  carouselSubtitle: {
-    color: 'rgba(255,255,255,0.8)',
-    fontSize: 12,
-    fontFamily: 'Inter_400Regular',
-    marginTop: 2,
-  },
-  indicatorContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 8,
-    marginTop: 8,
-    marginBottom: 16,
-  },
-  indicator: {
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#fff',
-  },
-  indicatorActive: {
-    width: 20,
-    opacity: 1,
-  },
-  indicatorInactive: {
-    width: 6,
-    opacity: 0.4,
-  },
+
   bottomHalf: {
     backgroundColor: '#FDF2F8',
     borderTopLeftRadius: 36,
