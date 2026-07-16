@@ -1,4 +1,4 @@
-import { View, StyleSheet, TextInput, Pressable, ScrollView, ActivityIndicator, Modal, useWindowDimensions, DeviceEventEmitter, Text, KeyboardAvoidingView, Platform, Keyboard } from 'react-native';
+import { View, StyleSheet, TextInput, Pressable, ScrollView, FlatList, ActivityIndicator, Modal, useWindowDimensions, DeviceEventEmitter, Text, KeyboardAvoidingView, Platform, Keyboard } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useState, useEffect } from 'react';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -518,53 +518,56 @@ export default function AddOrEditOutfitScreen() {
 
           {/* Grid */}
           <View style={styles.flex1}>
-            <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-              {filteredItems.length === 0 ? (
+            <FlatList
+              data={filteredItems}
+              keyExtractor={(item) => item.id}
+              numColumns={2}
+              style={styles.content}
+              contentContainerStyle={[{ padding: 16, gap: 16 }, filteredItems.length === 0 && { flex: 1, justifyContent: 'center' }]}
+              columnWrapperStyle={filteredItems.length > 0 ? { gap: 16 } : undefined}
+              showsVerticalScrollIndicator={false}
+              ListEmptyComponent={() => (
                 <View style={styles.emptyState}>
                   <Text style={styles.emptyTitle}>No items found</Text>
                   <Text style={styles.emptySubtitle}>Try adjusting your search or filters.</Text>
                 </View>
-              ) : (
-                <View style={styles.gridContainer}>
-                  {filteredItems.map(item => {
-                    const isSelected = pickerSelectedIds.has(item.id);
-                    
-                    return (
-                      <Pressable 
-                        key={item.id} 
-                        style={[styles.itemCard, { width: pickerItemWidth }]}
-                        onPress={() => togglePickerItem(item.id)}
-                      >
-                        <View style={[
-                          styles.itemImageContainer, 
-                          { height: pickerItemWidth * 1.25 },
-                          isSelected && styles.itemImageContainerSelected
-                        ]}>
-                          {item.image_url ? (
-                            <Image source={{ uri: item.image_url }} style={StyleSheet.absoluteFillObject} contentFit="cover" />
-                          ) : (
-                            <View style={[StyleSheet.absoluteFillObject, { backgroundColor: FuchsiaColors.mist }]} />
-                          )}
-                          
-                          {isSelected && (
-                            <View style={styles.selectedOverlay}>
-                              <View style={styles.checkmarkBadge}>
-                                <Check size={16} color="white" />
-                              </View>
-                            </View>
-                          )}
-                        </View>
-                        <View style={styles.itemInfo}>
-                          <Text style={styles.itemTitle} numberOfLines={1}>{item.name}</Text>
-                          {item.category && <Text style={styles.itemCategory}>{item.category}</Text>}
-                        </View>
-                      </Pressable>
-                    );
-                  })}
-                </View>
               )}
-              <View style={{ height: (insets.bottom || 24) + 40 }} />
-            </ScrollView>
+              ListFooterComponent={<View style={{ height: (insets.bottom || 24) + 40 }} />}
+              renderItem={({ item }) => {
+                const isSelected = pickerSelectedIds.has(item.id);
+                
+                return (
+                  <Pressable 
+                    style={[styles.itemCard, { width: pickerItemWidth }]}
+                    onPress={() => togglePickerItem(item.id)}
+                  >
+                    <View style={[
+                      styles.itemImageContainer, 
+                      { height: pickerItemWidth * 1.25 },
+                      isSelected && styles.itemImageContainerSelected
+                    ]}>
+                      {item.image_url ? (
+                        <Image source={{ uri: item.image_url }} style={StyleSheet.absoluteFillObject} contentFit="cover" />
+                      ) : (
+                        <View style={[StyleSheet.absoluteFillObject, { backgroundColor: FuchsiaColors.mist }]} />
+                      )}
+                      
+                      {isSelected && (
+                        <View style={styles.selectedOverlay}>
+                          <View style={styles.checkmarkBadge}>
+                            <Check size={16} color="white" />
+                          </View>
+                        </View>
+                      )}
+                    </View>
+                    <View style={styles.itemInfo}>
+                      <Text style={styles.itemTitle} numberOfLines={1}>{item.name}</Text>
+                      {item.category && <Text style={styles.itemCategory}>{item.category}</Text>}
+                    </View>
+                  </Pressable>
+                );
+              }}
+            />
             
 
             

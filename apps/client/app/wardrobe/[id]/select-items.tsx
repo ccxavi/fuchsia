@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, Pressable, ScrollView, ActivityIndicator, useWindowDimensions, DeviceEventEmitter, TextInput, Modal } from 'react-native';
+import { View, Text, StyleSheet, Pressable, ScrollView, FlatList, ActivityIndicator, useWindowDimensions, DeviceEventEmitter, TextInput, Modal } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useState, useEffect } from 'react';
 import { useLocalSearchParams, router } from 'expo-router';
@@ -209,55 +209,63 @@ export default function SelectItemsScreen() {
 
       {/* Grid */}
       <View style={styles.flex1}>
-        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-          {isLoading || !wardrobe ? (
+        {isLoading || !wardrobe ? (
+          <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
             <GridSkeleton />
-          ) : filteredItems.length === 0 ? (
-            <View style={styles.emptyState}>
-              <Text style={styles.emptyTitle}>No items found</Text>
-              <Text style={styles.emptySubtitle}>Try adjusting your search or filters.</Text>
-            </View>
-          ) : (
-            <View style={styles.gridContainer}>
-              {filteredItems.map(item => {
-                const isSelected = selectedIds.has(item.id);
-                
-                return (
-                  <Pressable 
-                    key={item.id} 
-                    style={[styles.itemCard, { width: itemWidth }]}
-                    onPress={() => toggleSelection(item.id)}
-                  >
-                    <View style={[
-                      styles.itemImageContainer, 
-                      { height: itemWidth * 1.25 },
-                      isSelected && styles.itemImageContainerSelected
-                    ]}>
-                      {item.image_url ? (
-                        <Image source={{ uri: item.image_url }} style={StyleSheet.absoluteFillObject} contentFit="cover" />
-                      ) : (
-                        <View style={[StyleSheet.absoluteFillObject, { backgroundColor: FuchsiaColors.mist }]} />
-                      )}
-                      
-                      {isSelected && (
-                        <View style={styles.selectedOverlay}>
-                          <View style={styles.checkmarkBadge}>
-                            <Check size={16} color="white" />
-                          </View>
+          </ScrollView>
+        ) : (
+          <FlatList
+            data={filteredItems}
+            keyExtractor={(item) => item.id}
+            numColumns={2}
+            style={styles.content}
+            contentContainerStyle={[{ padding: 16, gap: 16 }, filteredItems.length === 0 && { flex: 1, justifyContent: 'center' }]}
+            columnWrapperStyle={filteredItems.length > 0 ? { gap: 16 } : undefined}
+            showsVerticalScrollIndicator={false}
+            ListEmptyComponent={() => (
+              <View style={styles.emptyState}>
+                <Text style={styles.emptyTitle}>No items found</Text>
+                <Text style={styles.emptySubtitle}>Try adjusting your search or filters.</Text>
+              </View>
+            )}
+            ListFooterComponent={<View style={{ height: (insets.bottom || 24) + 40 }} />}
+            renderItem={({ item }) => {
+              const isSelected = selectedIds.has(item.id);
+              
+              return (
+                <Pressable 
+                  key={item.id} 
+                  style={[styles.itemCard, { width: itemWidth }]}
+                  onPress={() => toggleSelection(item.id)}
+                >
+                  <View style={[
+                    styles.itemImageContainer, 
+                    { height: itemWidth * 1.25 },
+                    isSelected && styles.itemImageContainerSelected
+                  ]}>
+                    {item.image_url ? (
+                      <Image source={{ uri: item.image_url }} style={StyleSheet.absoluteFillObject} contentFit="cover" />
+                    ) : (
+                      <View style={[StyleSheet.absoluteFillObject, { backgroundColor: FuchsiaColors.mist }]} />
+                    )}
+                    
+                    {isSelected && (
+                      <View style={styles.selectedOverlay}>
+                        <View style={styles.checkmarkBadge}>
+                          <Check size={16} color="white" />
                         </View>
-                      )}
-                    </View>
-                    <View style={styles.itemInfo}>
-                      <Text style={styles.itemTitle} numberOfLines={1}>{item.name}</Text>
-                      {item.category && <Text style={styles.itemCategory}>{item.category}</Text>}
-                    </View>
-                  </Pressable>
-                );
-              })}
-            </View>
-          )}
-          <View style={{ height: (insets.bottom || 24) + 40 }} />
-        </ScrollView>
+                      </View>
+                    )}
+                  </View>
+                  <View style={styles.itemInfo}>
+                    <Text style={styles.itemTitle} numberOfLines={1}>{item.name}</Text>
+                    {item.category && <Text style={styles.itemCategory}>{item.category}</Text>}
+                  </View>
+                </Pressable>
+              );
+            }}
+          />
+        )}
         
         
         

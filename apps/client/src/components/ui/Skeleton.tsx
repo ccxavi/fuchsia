@@ -429,20 +429,19 @@ export const CalendarSkeleton = ({ calendarDays }: { calendarDays?: (number | nu
     <View style={{ flex: 1 }}>
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 24 }} showsVerticalScrollIndicator={false} bounces={false}>
         <View style={{ marginBottom: 16 }}>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12, paddingHorizontal: 4 }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
             {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day, i) => (
-              <View key={i} style={{ width: cellWidth, alignItems: 'center' }}>
-                <Text style={{ textAlign: 'center', fontFamily: FuchsiaFonts.body, fontSize: 10, fontWeight: '600', color: FuchsiaColors.slate }}>{day}</Text>
-              </View>
+              <Text key={i} style={{ width: cellWidth, textAlign: 'center', fontFamily: FuchsiaFonts.body, fontSize: 10, fontWeight: '600', color: FuchsiaColors.slate }}>{day}</Text>
             ))}
           </View>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' }}>
             {days.map((dayNum, i) => {
+              const cellHeight = cellWidth * 1.35;
               if (dayNum === null) {
-                return <View key={i} style={{ width: cellWidth, height: cellWidth, marginBottom: 4 }} />;
+                return <View key={i} style={{ width: cellWidth, height: cellHeight, marginBottom: 4 }} />;
               }
               return (
-                <View key={i} style={{ width: cellWidth, height: cellWidth, marginBottom: 4, borderRadius: 12, overflow: 'hidden', backgroundColor: 'rgba(248, 248, 252, 0.3)', position: 'relative' }}>
+                <View key={i} style={{ width: cellWidth, height: cellHeight, marginBottom: 4, borderRadius: 12, overflow: 'hidden', backgroundColor: 'rgba(248, 248, 252, 0.3)', position: 'relative' }}>
                   <Text style={{ position: 'absolute', top: 4, left: 6, fontFamily: FuchsiaFonts.body, fontSize: 10, fontWeight: '500', color: 'rgba(74, 74, 104, 0.6)', zIndex: 10 }}>
                     {dayNum}
                   </Text>
@@ -452,7 +451,7 @@ export const CalendarSkeleton = ({ calendarDays }: { calendarDays?: (number | nu
             })}
           </View>
         </View>
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12, backgroundColor: FuchsiaColors.blush, borderRadius: 12, paddingVertical: 14, paddingHorizontal: 16, marginBottom: 24 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12, backgroundColor: FuchsiaColors.blush, borderRadius: 12, paddingVertical: 10, paddingHorizontal: 16, marginBottom: 16 }}>
            <Skeleton width={60} height={14} />
            <Text style={{ color: FuchsiaColors.mist, fontSize: 14 }}>·</Text>
            <Skeleton width={60} height={14} />
