@@ -935,6 +935,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     marginBottom: 12,
     marginLeft: 40,
+    alignSelf: 'flex-start',
   },
   imagePreview: {
     width: 80,
