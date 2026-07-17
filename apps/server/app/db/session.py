@@ -17,6 +17,13 @@ def get_engine() -> Engine:
         settings.require_database_url(),
         pool_pre_ping=True,
         poolclass=NullPool,
+        # Disable psycopg3 server-side prepared statements. Behind a
+        # transaction-mode pooler (Supabase/Supavisor, PgBouncer) a logical
+        # connection is multiplexed across rotating backends, so a reused
+        # prepared-statement name (e.g. "_pg3_0") collides with one already
+        # prepared on another backend, raising DuplicatePreparedStatement and
+        # aborting the whole transaction.
+        connect_args={"prepare_threshold": None},
     )
 
 
