@@ -18,6 +18,21 @@ from app.v1.schemas import OutfitResponse, OutfitWithItemsResponse, OutfitWithWa
 
 router = APIRouter()
 
+# The *_count fields on our response schemas are len(relationship) properties,
+# so every collection they read must be eager-loaded or serialization fires a
+# lazy query per row (N+1).
+#
+# Nested ClothingItemResponse reads ClothingItem.wardrobes / .outfits.
+_OUTFIT_ITEM_COUNT_LOADS = (
+    selectinload(Outfit.clothing_items).selectinload(ClothingItem.wardrobes),
+    selectinload(Outfit.clothing_items).selectinload(ClothingItem.outfits),
+)
+# Nested WardrobeResponse reads Wardrobe.clothing_items / .outfits.
+_OUTFIT_WARDROBE_COUNT_LOADS = (
+    selectinload(Outfit.wardrobes).selectinload(Wardrobe.clothing_items),
+    selectinload(Outfit.wardrobes).selectinload(Wardrobe.outfits),
+)
+
 
 @router.post("/", status_code=status.HTTP_201_CREATED, response_model=OutfitResponse)
 async def create_outfit(
@@ -106,7 +121,12 @@ def get_recent_looks(
     recent_images = db.scalars(
         select(OutfitImage)
         .join(OutfitImage.outfit)
-        .options(selectinload(OutfitImage.outfit))
+        .options(
+            # RecentLookResponse.outfit is an OutfitResponse whose
+            # clothing_items_count / wardrobes_count read these collections.
+            selectinload(OutfitImage.outfit).selectinload(Outfit.clothing_items),
+            selectinload(OutfitImage.outfit).selectinload(Outfit.wardrobes),
+        )
         .where(Outfit.user_id == user.user.id)
         .order_by(OutfitImage.created_at.desc())
         .limit(limit)
@@ -126,9 +146,9 @@ def get_outfits(
     outfits = db.scalars(
         select(Outfit)
         .options(
-            selectinload(Outfit.clothing_items), 
+            *_OUTFIT_ITEM_COUNT_LOADS,
             selectinload(Outfit.wardrobes),
-            selectinload(Outfit.images)
+            selectinload(Outfit.images),
         )
         .where(Outfit.user_id == user.user.id)
         .limit(limit)
@@ -143,13 +163,14 @@ def get_outfit(
     user: Annotated[AuthenticatedUser, Depends(get_current_authenticated_user)],
     db: Annotated[Session, Depends(get_db_session)],
 ):
-    # Use selectinload to eagerly load clothing_items, wardrobes, and images and avoid N+1 queries
+    # Eagerly load clothing_items (with their count collections), wardrobes, and
+    # images to avoid N+1 queries during response serialization.
     outfit = db.scalar(
         select(Outfit)
         .options(
-            selectinload(Outfit.clothing_items), 
-            selectinload(Outfit.wardrobes),
-            selectinload(Outfit.images)
+            *_OUTFIT_ITEM_COUNT_LOADS,
+            *_OUTFIT_WARDROBE_COUNT_LOADS,
+            selectinload(Outfit.images),
         )
         .where(Outfit.id == outfit_id, Outfit.user_id == user.user.id)
     )

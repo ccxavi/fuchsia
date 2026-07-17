@@ -10,6 +10,7 @@ from app.core.auth import AuthenticatedUser, bearer_scheme, get_current_authenti
 from app.db.session import get_db_session
 from app.models.wardrobe import Wardrobe
 from app.models.outfit import Outfit
+from app.models.clothing_item import ClothingItem
 from app.services.supabase_storage import upload_file_to_supabase
 from app.v1.schemas import ClothingItemResponse, WardrobeResponse, WardrobeWithDetailsResponse, OutfitResponse
 from sqlalchemy.orm import selectinload
@@ -75,12 +76,18 @@ def get_wardrobe(
     user: Annotated[AuthenticatedUser, Depends(get_current_authenticated_user)],
     db: Annotated[Session, Depends(get_db_session)],
 ):
+    # WardrobeWithDetailsResponse nests ClothingItemResponse and
+    # OutfitWithItemsResponse, whose *_count fields read association collections.
+    # Eager-load the full tree so serialization doesn't fire per-row lazy queries.
     wardrobe = db.scalar(
         select(Wardrobe)
         .options(
-            selectinload(Wardrobe.clothing_items), 
-            selectinload(Wardrobe.outfits).selectinload(Outfit.clothing_items),
-            selectinload(Wardrobe.outfits).selectinload(Outfit.images)
+            selectinload(Wardrobe.clothing_items).selectinload(ClothingItem.wardrobes),
+            selectinload(Wardrobe.clothing_items).selectinload(ClothingItem.outfits),
+            selectinload(Wardrobe.outfits).selectinload(Outfit.clothing_items).selectinload(ClothingItem.wardrobes),
+            selectinload(Wardrobe.outfits).selectinload(Outfit.clothing_items).selectinload(ClothingItem.outfits),
+            selectinload(Wardrobe.outfits).selectinload(Outfit.wardrobes),
+            selectinload(Wardrobe.outfits).selectinload(Outfit.images),
         )
         .where(
             Wardrobe.id == wardrobe_id, Wardrobe.user_id == user.user.id
@@ -156,14 +163,20 @@ def get_wardrobe_clothing_items(
     user: Annotated[AuthenticatedUser, Depends(get_current_authenticated_user)],
     db: Annotated[Session, Depends(get_db_session)],
 ):
+    # Each ClothingItemResponse reads .wardrobes / .outfits for its counts.
     wardrobe = db.scalar(
-        select(Wardrobe).where(
+        select(Wardrobe)
+        .options(
+            selectinload(Wardrobe.clothing_items).selectinload(ClothingItem.wardrobes),
+            selectinload(Wardrobe.clothing_items).selectinload(ClothingItem.outfits),
+        )
+        .where(
             Wardrobe.id == wardrobe_id, Wardrobe.user_id == user.user.id
         )
     )
     if not wardrobe:
         raise HTTPException(status_code=404, detail="Wardrobe not found")
-        
+
     return wardrobe.clothing_items
 
 
@@ -173,15 +186,19 @@ def get_wardrobe_outfits(
     user: Annotated[AuthenticatedUser, Depends(get_current_authenticated_user)],
     db: Annotated[Session, Depends(get_db_session)],
 ):
+    # Each OutfitResponse reads .clothing_items / .wardrobes for its counts.
     wardrobe = db.scalar(
         select(Wardrobe)
-        .options(selectinload(Wardrobe.outfits))
+        .options(
+            selectinload(Wardrobe.outfits).selectinload(Outfit.clothing_items),
+            selectinload(Wardrobe.outfits).selectinload(Outfit.wardrobes),
+        )
         .where(
             Wardrobe.id == wardrobe_id, Wardrobe.user_id == user.user.id
         )
     )
     if not wardrobe:
         raise HTTPException(status_code=404, detail="Wardrobe not found")
-        
+
     return wardrobe.outfits
 

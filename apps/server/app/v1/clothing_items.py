@@ -178,11 +178,17 @@ def get_clothing_item(
     user: AuthenticatedUser = Depends(get_current_authenticated_user),
     db: Session = Depends(get_db_session),
 ):
+    # ClothingItemWithDetailsResponse nests WardrobeResponse and
+    # OutfitWithItemsResponse, whose *_count fields read association collections.
+    # Eager-load the full tree to avoid per-row lazy queries during serialization.
     item = db.scalar(
         select(ClothingItem)
         .options(
-            selectinload(ClothingItem.wardrobes),
-            selectinload(ClothingItem.outfits).selectinload(Outfit.clothing_items),
+            selectinload(ClothingItem.wardrobes).selectinload(Wardrobe.clothing_items),
+            selectinload(ClothingItem.wardrobes).selectinload(Wardrobe.outfits),
+            selectinload(ClothingItem.outfits).selectinload(Outfit.clothing_items).selectinload(ClothingItem.wardrobes),
+            selectinload(ClothingItem.outfits).selectinload(Outfit.clothing_items).selectinload(ClothingItem.outfits),
+            selectinload(ClothingItem.outfits).selectinload(Outfit.wardrobes),
             selectinload(ClothingItem.outfits).selectinload(Outfit.images),
         )
         .where(
