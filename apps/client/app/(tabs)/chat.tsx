@@ -486,45 +486,81 @@ export default function ChatScreen() {
       setIsLoading(false);
     }
   };
-  const renderMessageContent = (content: string | ContentPart[], isUser: boolean) => {
-    const textColor = isUser ? '#fff' : FuchsiaColors.ink;
+  const MessageImage = ({ uri }: { uri: string }) => {
+    const [aspectRatio, setAspectRatio] = useState<number>(3/4);
     
-    if (typeof content === 'string') {
-      return <MarkdownText style={[styles.messageText, { color: textColor }]}>{content}</MarkdownText>;
-    }
-    
+    useEffect(() => {
+      if (!uri) return;
+      Image.getSize(uri, (w, h) => {
+        if (w && h) setAspectRatio(w / h);
+      }, () => {});
+    }, [uri]);
+  
     return (
-      <View style={{ gap: 8 }}>
-        {content.map((part, index) => {
-          if (part.type === 'text') {
-            return <MarkdownText key={index} style={[styles.messageText, { color: textColor }]}>{part.text}</MarkdownText>;
-          }
-          if (part.type === 'image_url') {
-            return (
-              <Image 
-                key={index} 
-                source={{ uri: part.image_url.url }} 
-                style={styles.messageImage} 
-                resizeMode="cover" 
-              />
-            );
-          }
-          return null;
-        })}
-      </View>
+      <Image 
+        source={{ uri }} 
+        style={{
+          width: 260,
+          aspectRatio,
+          borderRadius: 16,
+        }} 
+        resizeMode="cover" 
+      />
     );
   };
 
   const renderMessage = ({ item }: { item: ChatMessage }) => {
     const isUser = item.role === 'user';
+    const textColor = isUser ? '#fff' : FuchsiaColors.ink;
+
+    const renderParts = () => {
+      if (typeof item.content === 'string') {
+        return (
+          <View style={[
+            styles.messageBubble, 
+            isUser ? styles.userBubble : styles.aiBubble
+          ]}>
+            <MarkdownText style={[styles.messageText, { color: textColor }]}>{item.content}</MarkdownText>
+          </View>
+        );
+      }
+      
+      return (
+        <View style={{ gap: 4 }}>
+          {item.content.map((part, index) => {
+            if (part.type === 'text') {
+              return (
+                <View key={index} style={[
+                  styles.messageBubble, 
+                  isUser ? styles.userBubble : styles.aiBubble,
+                  { alignSelf: isUser ? 'flex-end' : 'flex-start' }
+                ]}>
+                  <MarkdownText style={[styles.messageText, { color: textColor }]}>{part.text}</MarkdownText>
+                </View>
+              );
+            }
+            if (part.type === 'image_url') {
+              return (
+                <View key={index} style={{
+                  alignSelf: isUser ? 'flex-end' : 'flex-start',
+                  overflow: 'hidden',
+                  borderRadius: 16,
+                  borderWidth: isUser ? 0 : 1,
+                  borderColor: 'rgba(0,0,0,0.08)',
+                }}>
+                  <MessageImage uri={part.image_url.url} />
+                </View>
+              );
+            }
+            return null;
+          })}
+        </View>
+      );
+    };
+
     return (
       <View style={{ marginBottom: 16 }}>
-        <View style={[
-          styles.messageBubble, 
-          isUser ? styles.userBubble : styles.aiBubble
-        ]}>
-          {renderMessageContent(item.content, isUser)}
-        </View>
+        {renderParts()}
         {item.outfit_suggestions && item.outfit_suggestions.length > 0 && (
           <View style={{ marginTop: 12, gap: 12 }}>
             {item.outfit_suggestions.map((suggestion, idx) => (
@@ -705,7 +741,6 @@ const styles = StyleSheet.create({
     width: 200,
     height: 200,
     borderRadius: 8,
-    lineHeight: 22,
   },
   heroCard: {
     borderRadius: 16,
