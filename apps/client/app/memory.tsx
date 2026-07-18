@@ -143,45 +143,36 @@ export default function MemoryScreen() {
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <Stack.Screen options={{ headerShown: false }} />
+
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+          <ArrowLeft size={20} color={FuchsiaColors.slate} />
+        </TouchableOpacity>
+        <ThemedText style={styles.headerTitle}>AI Memory</ThemedText>
+        <View style={{ width: 40 }} />
+      </View>
+
       {loading ? (
         <View style={{ flex: 1 }}>
           <MemoryScreenSkeleton />
         </View>
       ) : memories.length === 0 ? (
-        <>
-          <View style={styles.header}>
-            <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-              <ArrowLeft size={20} color={FuchsiaColors.slate} />
-            </TouchableOpacity>
-            <ThemedText style={styles.headerTitle}>AI Memory</ThemedText>
-            <View style={{ width: 40 }} />
+        <View style={styles.emptyContainer}>
+          <View style={styles.emptyIconContainer}>
+            <BrainCircuit size={40} color={FuchsiaColors.slate} />
           </View>
-          <View style={styles.emptyContainer}>
-            <View style={styles.emptyIconContainer}>
-              <BrainCircuit size={40} color={FuchsiaColors.slate} />
-            </View>
-            <ThemedText style={styles.emptyTitle}>Nothing Remembered Yet</ThemedText>
-            <ThemedText style={styles.emptyText}>
-              As you chat with the stylist about your wardrobe, it will remember important details about you here.
-            </ThemedText>
-          </View>
-        </>
+          <ThemedText style={styles.emptyTitle}>Nothing Remembered Yet</ThemedText>
+          <ThemedText style={styles.emptyText}>
+            As you chat with the stylist about your wardrobe, it will remember important details about you here.
+          </ThemedText>
+        </View>
       ) : (
-        <>
-          <View style={styles.header}>
-            <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-              <ArrowLeft size={20} color={FuchsiaColors.slate} />
-            </TouchableOpacity>
-            <ThemedText style={styles.headerTitle}>AI Memory</ThemedText>
-            <View style={{ width: 40 }} />
-          </View>
-          <FlatList
-            data={memories}
-            keyExtractor={(item) => item.id}
-            renderItem={renderMemory}
-            contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom + 24 }]}
-          />
-        </>
+        <FlatList
+          data={memories}
+          keyExtractor={(item) => item.id}
+          renderItem={renderMemory}
+          contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom + 24 }]}
+        />
       )}
 
       {/* Edit Modal */}

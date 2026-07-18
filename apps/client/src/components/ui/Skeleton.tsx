@@ -60,11 +60,6 @@ export const GridSkeleton = () => {
 export const MemoryScreenSkeleton = () => {
   return (
     <View style={{ flex: 1 }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 12 }}>
-        <Skeleton width={40} height={40} borderRadius={12} />
-        <Skeleton width={120} height={20} />
-        <View style={{ width: 40 }} />
-      </View>
       <View style={{ gap: 12, padding: 16 }}>
       {[...Array(5)].map((_, i) => (
         <View key={i} style={{ backgroundColor: '#fff', borderRadius: 16, padding: 16, flexDirection: 'row', alignItems: 'flex-start', borderWidth: 1, borderColor: 'rgba(0,0,0,0.05)' }}>
@@ -103,10 +98,6 @@ export const ItemDetailSkeleton = () => {
   const insets = useSafeAreaInsets();
   return (
     <View style={styles.detailContainer}>
-      <View style={{ position: 'absolute', top: insets.top + 16, left: 20, right: 20, flexDirection: 'row', justifyContent: 'space-between', zIndex: 10 }}>
-        <Skeleton width={40} height={40} borderRadius={12} />
-        <Skeleton width={40} height={40} borderRadius={12} />
-      </View>
       <View style={{ width: '100%', aspectRatio: 1, overflow: 'hidden' }}>
         <Skeleton width="100%" height="100%" borderRadius={0} />
       </View>
@@ -145,10 +136,6 @@ export const WardrobeDetailSkeleton = () => {
   const insets = useSafeAreaInsets();
   return (
     <View style={styles.detailContainer}>
-      <View style={{ position: 'absolute', top: insets.top + 16, left: 20, right: 20, flexDirection: 'row', justifyContent: 'space-between', zIndex: 10 }}>
-        <Skeleton width={40} height={40} borderRadius={12} />
-        <Skeleton width={40} height={40} borderRadius={12} />
-      </View>
       <View style={{ width: '100%', aspectRatio: 1.25, overflow: 'hidden', justifyContent: 'flex-end' }}>
         <Skeleton width="100%" height="100%" borderRadius={0} style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} />
         <View style={{ padding: 20 }}>
@@ -187,11 +174,6 @@ export const WardrobeDetailSkeleton = () => {
 export const OutfitDetailSkeleton = () => {
   return (
     <View style={styles.detailContainer}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 12 }}>
-        <Skeleton width={40} height={40} borderRadius={12} />
-        <Skeleton width={120} height={20} />
-        <Skeleton width={40} height={40} borderRadius={12} />
-      </View>
       <View style={{ padding: 20, paddingTop: 8 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
           <Skeleton width="50%" height={32} />
