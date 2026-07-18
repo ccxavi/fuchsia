@@ -80,6 +80,12 @@ class StylistSystemPromptTestCase(unittest.TestCase):
     def test_mentions_calendar_tool(self) -> None:
         self.assertIn("get_calendar", STYLIST_SYSTEM_PROMPT)
 
+    def test_steers_toward_concise_replies(self) -> None:
+        # Mobile users want a quick look, not an essay; the prompt must default
+        # the model to short, skimmable answers (adaptive, not always-terse).
+        self.assertIn("quick look or quick advice", STYLIST_SYSTEM_PROMPT)
+        self.assertIn("Default to a short", STYLIST_SYSTEM_PROMPT)
+
 
 class BuildStylistMessagesTestCase(unittest.TestCase):
     def test_prepends_system_prompt_and_preserves_order(self) -> None:
