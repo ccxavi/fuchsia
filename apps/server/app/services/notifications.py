@@ -16,6 +16,7 @@ from app.db.session import get_session_factory
 from app.models.user import User
 from app.models.calendar_outfit import CalendarOutfit
 from app.models.outfit import Outfit
+from app.models.outfit_image import OutfitImage
 
 logger = logging.getLogger(__name__)
 
@@ -177,6 +178,61 @@ def send_unworn_clothes_alert() -> None:
         _send_push_messages(messages)
 
 
+def send_fit_pic_reminder() -> None:
+    """
+    Scheduled for 5:00 PM daily.
+    Checks if users have an outfit scheduled for today but haven't logged a photo of it yet.
+    """
+    logger.info("Starting fit pic reminder job...")
+    today = datetime.date.today()
+    
+    with get_session_factory()() as db:
+        users = db.scalars(
+            select(User).where(
+                User.daily_reminders == True,
+                User.push_token.is_not(None)
+            )
+        ).all()
+        
+        messages = []
+        for user in users:
+            if not user.push_token or not user.push_token.startswith("ExponentPushToken["):
+                continue
+                
+            # Find the outfit scheduled for today
+            stmt_calendar = (
+                select(CalendarOutfit)
+                .join(Outfit)
+                .where(Outfit.user_id == user.id, CalendarOutfit.date == today)
+                .limit(1)
+            )
+            calendar_outfit = db.scalar(stmt_calendar)
+            
+            if calendar_outfit:
+                # Check if there is an OutfitImage for this outfit with today's date
+                stmt_image = (
+                    select(OutfitImage)
+                    .where(
+                        OutfitImage.outfit_id == calendar_outfit.outfit_id,
+                        OutfitImage.date == today
+                    )
+                )
+                has_image = db.scalar(stmt_image) is not None
+                
+                if not has_image:
+                    messages.append(
+                        PushMessage(
+                            to=user.push_token,
+                            title="Outfit check! 📸",
+                            body="Loving today's outfit? Take a quick mirror selfie to save the memory before you change!",
+                            sound="default",
+                            data={"route": "/outfits"},
+                        )
+                    )
+
+        _send_push_messages(messages)
+
+
 def start_scheduler() -> None:
     """Start the APScheduler background jobs."""
     if not scheduler.running:
@@ -201,6 +257,14 @@ def start_scheduler() -> None:
             send_unworn_clothes_alert,
             trigger=CronTrigger(day_of_week=6, hour=16, minute=0, timezone="Asia/Manila"),
             id="unworn_clothes_alert_job",
+            replace_existing=True,
+        )
+        
+        # 4. 5:00 PM Daily - Fit pic reminder
+        scheduler.add_job(
+            send_fit_pic_reminder,
+            trigger=CronTrigger(hour=17, minute=0, timezone="Asia/Manila"),
+            id="fit_pic_reminder_job",
             replace_existing=True,
         )
 
