@@ -1,5 +1,6 @@
 import * as SecureStore from 'expo-secure-store';
 import { router } from 'expo-router';
+import EventSource from 'react-native-sse';
 
 const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 
@@ -677,6 +678,81 @@ export async function postChat(data: ChatRequest): Promise<ChatResponse> {
     },
     body: JSON.stringify(data),
   });
+}
+
+export type ChatStreamEvent = {
+  event: 'phase' | 'token' | 'done' | 'error';
+  data: any;
+};
+
+export type StreamCallbacks = {
+  onEvent?: (event: ChatStreamEvent) => void;
+  onError?: (error: any) => void;
+  onClose?: () => void;
+};
+
+export function streamChat(data: ChatRequest, callbacks: StreamCallbacks): () => void {
+  let isClosed = false;
+  let es: EventSource | null = null;
+
+  SecureStore.getItemAsync('access_token').then((token) => {
+    if (isClosed) return;
+    
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    es = new EventSource(`${API_BASE}/chat/stream`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(data),
+    });
+
+    const handleMessage = (e: any) => {
+      try {
+        const data = JSON.parse(e.data || '{}');
+        callbacks.onEvent?.({ event: e.type, data });
+      } catch (err) {
+        // ignore parse error
+      }
+    };
+
+    es.addEventListener('phase' as any, handleMessage);
+    es.addEventListener('token' as any, handleMessage);
+    es.addEventListener('done' as any, (e: any) => {
+      handleMessage(e);
+      if (es) {
+        es.close();
+        callbacks.onClose?.();
+      }
+    });
+    
+    es.addEventListener('error', (e: any) => {
+      if (e.type === 'error' && e.data) {
+        try {
+          const data = JSON.parse(e.data);
+          callbacks.onError?.(data.detail || 'Streaming failed');
+        } catch {
+          callbacks.onError?.('Streaming failed');
+        }
+      } else {
+        callbacks.onError?.(e.message || 'Stream connection error');
+      }
+      es?.close();
+    });
+
+  }).catch((err) => {
+    callbacks.onError?.(err);
+  });
+
+  return () => {
+    isClosed = true;
+    if (es) {
+      es.removeAllEventListeners();
+      es.close();
+    }
+  };
 }
 
 // ── Memory ──────────────────────────────────────────────────────────

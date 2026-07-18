@@ -9,7 +9,7 @@ import { FuchsiaColors, FuchsiaFonts } from '@/constants/theme';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Image as ImageIcon, X, Sparkles, Calendar, Mic, Plus, Square } from 'lucide-react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import { ChatMessage, postChat, ContentPart, ingestMemories, getClothingItems, ClothingItemResponse, OutfitSuggestion, createOutfit, CalendarSuggestion, createCalendarOutfit, getOutfits, OutfitWithItemsResponse } from '@/api/client';
+import { ChatMessage, postChat, streamChat, ContentPart, ingestMemories, getClothingItems, ClothingItemResponse, OutfitSuggestion, createOutfit, CalendarSuggestion, createCalendarOutfit, getOutfits, OutfitWithItemsResponse } from '@/api/client';
 import { ExpoSpeechRecognitionModule, useSpeechRecognitionEvent } from 'expo-speech-recognition';
 function TypingIndicator() {
   const dot1 = useRef(new Animated.Value(0)).current;
@@ -291,6 +291,8 @@ export default function ChatScreen() {
   const [isKeyboardVisible, setKeyboardVisible] = useState(false);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [recognizing, setRecognizing] = useState(false);
+  const [streamingContent, setStreamingContent] = useState('');
+  const [streamingPhaseLabel, setStreamingPhaseLabel] = useState('');
   const flatListRef = useRef<FlatList>(null);
 
   useSpeechRecognitionEvent('start', () => setRecognizing(true));
@@ -417,32 +419,66 @@ export default function ChatScreen() {
     setInput('');
     removeImage();
     setIsLoading(true);
+    setStreamingContent('');
+    setStreamingPhaseLabel('Thinking...');
+
+    let currentPhase = 'thinking';
+    let accumulatedText = '';
 
     try {
-      const response = await postChat({
+      streamChat({
         messages: updatedMessages.slice(-6),
         latitude: location?.coords.latitude,
         longitude: location?.coords.longitude,
-      });
-      
-      const newMessage: ChatMessage = {
-        ...response.message,
-        outfit_suggestions: response.outfit_suggestions,
-        calendar_suggestions: response.calendar_suggestions,
-      };
-      setMessages((prev) => [...prev, newMessage]);
+      }, {
+        onEvent: (event) => {
+          if (event.event === 'phase') {
+            currentPhase = event.data.phase;
+            if (event.data.phase === 'thinking') setStreamingPhaseLabel('Thinking...');
+            else if (event.data.phase === 'acting') setStreamingPhaseLabel(event.data.label || 'Working...');
+            else if (event.data.phase === 'responding') setStreamingPhaseLabel('');
+          } else if (event.event === 'token') {
+            if (currentPhase && accumulatedText && !accumulatedText.match(/\s$/)) {
+              accumulatedText += ' ';
+            }
+            currentPhase = '';
+            accumulatedText += event.data.text;
+            setStreamingPhaseLabel('');
+            setStreamingContent(accumulatedText);
+          } else if (event.event === 'done') {
+            const response = event.data;
+            const newMessage: ChatMessage = {
+              ...response.message,
+              outfit_suggestions: response.outfit_suggestions,
+              calendar_suggestions: response.calendar_suggestions,
+            };
+            setMessages((prev) => [...prev, newMessage]);
+            setStreamingContent('');
+            setStreamingPhaseLabel('');
+            setIsLoading(false);
 
-      if (response.memory_suggestions && response.memory_suggestions.length > 0) {
-        try {
-          await ingestMemories({ memories: response.memory_suggestions });
-        } catch (memError) {
-          console.error("Failed to ingest memory suggestions:", memError);
+            if (response.memory_suggestions && response.memory_suggestions.length > 0) {
+              ingestMemories({ memories: response.memory_suggestions }).catch(memError => {
+                console.error("Failed to ingest memory suggestions:", memError);
+              });
+            }
+          }
+        },
+        onError: (error) => {
+          console.error("Chat error:", error);
+          setIsLoading(false);
+          setStreamingContent('');
+          setStreamingPhaseLabel('');
+        },
+        onClose: () => {
+          setIsLoading(false);
         }
-      }
+      });
     } catch (error) {
       console.error("Chat error:", error);
-    } finally {
       setIsLoading(false);
+      setStreamingContent('');
+      setStreamingPhaseLabel('');
     }
   };
   const sendDirectMessage = async (displayMessage: string, hiddenPrompt?: string) => {
@@ -453,37 +489,69 @@ export default function ChatScreen() {
     
     setMessages(updatedUIMessages);
     setIsLoading(true);
+    setStreamingContent('');
+    setStreamingPhaseLabel('Thinking...');
+
+    let currentPhase = 'thinking';
+    let accumulatedText = '';
 
     try {
-      // Send the explicit hidden prompt to the backend to force tool usage, 
-      // without exposing the awkward instructions to the user.
       const backendMessage: ChatMessage = { role: 'user', content: hiddenPrompt || displayMessage };
       const backendMessages = [...messages, backendMessage];
 
-      const response = await postChat({
+      streamChat({
         messages: backendMessages.slice(-6),
         latitude: location?.coords.latitude,
         longitude: location?.coords.longitude,
-      });
-      
-      const newMessage: ChatMessage = {
-        ...response.message,
-        outfit_suggestions: response.outfit_suggestions,
-        calendar_suggestions: response.calendar_suggestions,
-      };
-      setMessages((prev) => [...prev, newMessage]);
+      }, {
+        onEvent: (event) => {
+          if (event.event === 'phase') {
+            currentPhase = event.data.phase;
+            if (event.data.phase === 'thinking') setStreamingPhaseLabel('Thinking...');
+            else if (event.data.phase === 'acting') setStreamingPhaseLabel(event.data.label || 'Working...');
+            else if (event.data.phase === 'responding') setStreamingPhaseLabel('');
+          } else if (event.event === 'token') {
+            if (currentPhase && accumulatedText && !accumulatedText.match(/\s$/)) {
+              accumulatedText += ' ';
+            }
+            currentPhase = '';
+            accumulatedText += event.data.text;
+            setStreamingPhaseLabel('');
+            setStreamingContent(accumulatedText);
+          } else if (event.event === 'done') {
+            const response = event.data;
+            const newMessage: ChatMessage = {
+              ...response.message,
+              outfit_suggestions: response.outfit_suggestions,
+              calendar_suggestions: response.calendar_suggestions,
+            };
+            setMessages((prev) => [...prev, newMessage]);
+            setStreamingContent('');
+            setStreamingPhaseLabel('');
+            setIsLoading(false);
 
-      if (response.memory_suggestions && response.memory_suggestions.length > 0) {
-        try {
-          await ingestMemories({ memories: response.memory_suggestions });
-        } catch (memError) {
-          console.error("Failed to ingest memory suggestions:", memError);
+            if (response.memory_suggestions && response.memory_suggestions.length > 0) {
+              ingestMemories({ memories: response.memory_suggestions }).catch(memError => {
+                console.error("Failed to ingest memory suggestions:", memError);
+              });
+            }
+          }
+        },
+        onError: (error) => {
+          console.error("Chat error:", error);
+          setIsLoading(false);
+          setStreamingContent('');
+          setStreamingPhaseLabel('');
+        },
+        onClose: () => {
+          setIsLoading(false);
         }
-      }
+      });
     } catch (error) {
       console.error("Chat error:", error);
-    } finally {
       setIsLoading(false);
+      setStreamingContent('');
+      setStreamingPhaseLabel('');
     }
   };
   const MessageImage = ({ uri }: { uri: string }) => {
@@ -611,11 +679,34 @@ export default function ChatScreen() {
         ListHeaderComponent={<HeroCard />}
       />
       
-      {isLoading && (
+      {(isLoading || streamingContent || streamingPhaseLabel) && (
         <View style={styles.loadingContainer}>
-          <View style={[styles.messageBubble, styles.aiBubble, { paddingHorizontal: 16, paddingVertical: 12 }]}>
-            <TypingIndicator />
-          </View>
+          {streamingContent ? (
+            <View style={{ gap: 8 }}>
+              <View style={[styles.messageBubble, styles.aiBubble, { paddingHorizontal: 16, paddingVertical: 12 }]}>
+                <MarkdownText style={[styles.messageText, { color: FuchsiaColors.ink }]}>
+                  {streamingContent}
+                </MarkdownText>
+              </View>
+              {!!streamingPhaseLabel && (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingLeft: 8, marginBottom: 8 }}>
+                  <TypingIndicator />
+                  <ThemedText style={{ color: FuchsiaColors.slate, fontSize: 13, fontFamily: FuchsiaFonts.body }}>
+                    {streamingPhaseLabel}
+                  </ThemedText>
+                </View>
+              )}
+            </View>
+          ) : (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingLeft: 8, marginBottom: 8 }}>
+              <TypingIndicator />
+              {!!streamingPhaseLabel && (
+                <ThemedText style={{ color: FuchsiaColors.slate, fontSize: 13, fontFamily: FuchsiaFonts.body }}>
+                  {streamingPhaseLabel}
+                </ThemedText>
+              )}
+            </View>
+          )}
         </View>
       )}
 
