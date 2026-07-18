@@ -53,6 +53,11 @@ def _sse(event: str, data: dict[str, Any]) -> str:
     return f"event: {event}\ndata: {json.dumps(data)}\n\n"
 
 
+def _phase(name: str, **extra: Any) -> str:
+    """Frame a ``phase`` progress marker (thinking / acting / responding)."""
+    return _sse("phase", {"phase": name, **extra})
+
+
 def _merge_tool_call_deltas(
     slots: dict[int, dict[str, Any]], deltas: list[dict[str, Any]]
 ) -> None:
@@ -95,23 +100,26 @@ def _stream_answer(
     today: datetime.date | None,
     stats: InvocationStats,
 ) -> Iterator[str]:
-    """Stream the tool loop, yielding ``token`` and ``status`` SSE frames.
+    """Stream the tool loop as progress phases, tokens, then a result.
 
     Returns (via ``StopIteration.value``) the final answer text and model name so
     the caller can build the terminal ``done`` frame. Mirrors ``_generate_answer``
-    but streams: content deltas are forwarded as they arrive, tool-call rounds
-    emit a status frame per call and dispatch through the shared ``_run_tool_call``
-    (synchronous, so the tools' internal ``asyncio.run`` stays safe).
+    but streams: each round opens with a ``thinking`` phase, tool rounds emit an
+    ``acting`` phase per call and dispatch through the shared ``_run_tool_call``
+    (synchronous, so the tools' internal ``asyncio.run`` stays safe), and the
+    answering round emits a ``responding`` phase before forwarding content deltas
+    as ``token`` frames the moment they arrive.
     """
     last_model: str | None = None
 
     def _consume_round(*, tools: list[dict[str, Any]] | None) -> Iterator[str]:
-        """Stream one LLM round: yield ``token`` frames live, return its result.
+        """Stream one LLM round: yield phase/token frames live, return its result.
 
-        Returns ``(content, tool_calls)`` via ``StopIteration.value``. Content
-        deltas are forwarded the moment they arrive (true token streaming); a
-        round that turns out to be a tool round carries empty content in practice,
-        so nothing spurious reaches the client.
+        Returns ``(content, tool_calls)`` via ``StopIteration.value``. On the first
+        content delta it emits a ``responding`` phase, then forwards each delta as a
+        ``token`` frame (true token streaming). A tool round carries empty content
+        in practice, so it never emits ``responding`` and nothing spurious reaches
+        the client.
         """
         nonlocal last_model
         body = build_body(
@@ -124,6 +132,7 @@ def _stream_answer(
         )
         stats.llm_calls += 1
         content = ""
+        responded = False
         tool_call_slots: dict[int, dict[str, Any]] = {}
         for chunk in stream_chat(provider, body):
             model = chunk.get("model")
@@ -138,6 +147,9 @@ def _stream_answer(
             delta = choices[0].get("delta") or {}
             piece = delta.get("content")
             if isinstance(piece, str) and piece:
+                if not responded:
+                    responded = True
+                    yield _phase("responding")
                 content += piece
                 yield _sse("token", {"text": piece})
             tool_deltas = delta.get("tool_calls")
@@ -147,6 +159,7 @@ def _stream_answer(
         return content, tool_calls
 
     for _ in range(MAX_TOOL_ROUNDS):
+        yield _phase("thinking")
         content, tool_calls = yield from _consume_round(tools=STYLIST_TOOLS)
         if not tool_calls:
             return content, last_model
@@ -157,9 +170,10 @@ def _stream_answer(
         )
         for tool_call in tool_calls:
             name = (tool_call.get("function") or {}).get("name") or ""
-            yield _sse(
-                "status",
-                {"tool": name, "label": TOOL_STATUS_LABELS.get(name, DEFAULT_STATUS_LABEL)},
+            yield _phase(
+                "acting",
+                tool=name,
+                label=TOOL_STATUS_LABELS.get(name, DEFAULT_STATUS_LABEL),
             )
             serialized.append(
                 _run_tool_call(
@@ -176,6 +190,7 @@ def _stream_answer(
             )
 
     # Tools were requested every round; force a final text answer without tools.
+    yield _phase("thinking")
     content, _ = yield from _consume_round(tools=None)
     return content, last_model
 
@@ -192,15 +207,16 @@ def stream_stylist_chat(
     longitude: float | None = None,
     today: datetime.date | None = None,
 ) -> Iterator[str]:
-    """Stream the stylist's answer as SSE frames: status, token, then done.
+    """Stream the stylist's answer as SSE frames: phase, token, then done.
 
     The SSE counterpart to :func:`run_stylist_chat`. It shares that function's
     setup (memory + date injection), tool dispatch, and — via
     :func:`finalize_response` — its audit and suggestion reconciliation, so the
-    buffered and streaming endpoints stay in lockstep. Emits ``status`` frames as
-    the agent uses tools, ``token`` frames as the answer streams, a terminal
-    ``done`` frame carrying the reconciled ``ChatResponse``, or an ``error`` frame
-    (with an audited failure) if the upstream call fails mid-stream.
+    buffered and streaming endpoints stay in lockstep. Emits ``phase`` progress
+    frames (``thinking`` → ``acting`` per tool → ``responding``), ``token`` frames
+    as the answer streams, a terminal ``done`` frame carrying the reconciled
+    ``ChatResponse``, or an ``error`` frame (with an audited failure) if the
+    upstream call fails mid-stream.
     """
     serialized = serialize_messages(messages, flatten=provider.flatten_content)
     used_memories: list[Memory] = _inject_memory_context(

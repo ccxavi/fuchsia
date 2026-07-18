@@ -48,7 +48,10 @@ def _authenticated_user() -> AuthenticatedUser:
 
 def _sample_frames() -> list[str]:
     return [
-        'event: status\ndata: {"tool": "web_search", "label": "Searching the web"}\n\n',
+        'event: phase\ndata: {"phase": "thinking"}\n\n',
+        'event: phase\ndata: {"phase": "acting", "tool": "web_search",'
+        ' "label": "Searching the web"}\n\n',
+        'event: phase\ndata: {"phase": "responding"}\n\n',
         'event: token\ndata: {"text": "Wear "}\n\n',
         'event: token\ndata: {"text": "boots."}\n\n',
         'event: done\ndata: {"message": {"role": "assistant", "content": "Wear boots."},'
@@ -104,7 +107,7 @@ class StreamEndpointTestCase(unittest.TestCase):
 
         frames = [b.strip() for b in body.split("\n\n") if b.strip()]
         events = [line.split("\n")[0][len("event: "):] for line in frames]
-        self.assertEqual(events, ["status", "token", "token", "done"])
+        self.assertEqual(events, ["phase", "phase", "phase", "token", "token", "done"])
         done_data = json.loads(frames[-1].split("\n")[1][len("data: "):])
         self.assertEqual(done_data["message"]["content"], "Wear boots.")
 

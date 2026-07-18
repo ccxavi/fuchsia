@@ -152,7 +152,7 @@ class StreamStylistChatTestCase(unittest.TestCase):
             )
         return frames, execute_mock, audit_mock
 
-    def test_status_then_tokens_then_done(self) -> None:
+    def test_phases_tokens_then_done_in_order(self) -> None:
         round_1 = [
             _chunk(
                 tool_calls=[_tool_fragment(0, id="c1", name="web_search", args='{"query":"boots"}')]
@@ -167,9 +167,21 @@ class StreamStylistChatTestCase(unittest.TestCase):
         frames, execute_mock, audit_mock = self._run([round_1, round_2])
 
         events = [event for event, _ in frames]
-        self.assertEqual(events[0], "status")
-        self.assertEqual(frames[0][1], {"tool": "web_search", "label": "Searching the web"})
-        self.assertIn("token", events)
+        # The stream opens with a thinking phase.
+        self.assertEqual(frames[0], ("phase", {"phase": "thinking"}))
+        # The tool round announces the tool it is running.
+        self.assertIn(
+            ("phase", {"phase": "acting", "tool": "web_search", "label": "Searching the web"}),
+            frames,
+        )
+        # A responding phase immediately precedes the first token.
+        first_token = events.index("token")
+        self.assertEqual(frames[first_token - 1], ("phase", {"phase": "responding"}))
+        # Acting comes before responding, which comes before the tokens.
+        acting_idx = next(
+            i for i, (e, d) in enumerate(frames) if e == "phase" and d["phase"] == "acting"
+        )
+        self.assertLess(acting_idx, first_token - 1)
         # Tokens stream in order and reassemble into the final message.
         tokens = [data["text"] for event, data in frames if event == "token"]
         self.assertEqual("".join(tokens), "You could wear boots.")
@@ -187,7 +199,7 @@ class StreamStylistChatTestCase(unittest.TestCase):
         # A success invocation was audited.
         self.assertEqual(audit_mock.call_args.kwargs["status"], "success")
 
-    def test_output_only_tool_emits_remembering_status(self) -> None:
+    def test_output_only_tool_emits_remembering_acting_phase(self) -> None:
         round_1 = [
             _chunk(
                 tool_calls=[
@@ -204,8 +216,10 @@ class StreamStylistChatTestCase(unittest.TestCase):
 
         frames, execute_mock, _ = self._run([round_1, round_2])
 
-        statuses = [data for event, data in frames if event == "status"]
-        self.assertEqual(statuses[0], {"tool": "suggest_memories", "label": "Remembering"})
+        acting = [data for event, data in frames if event == "phase" and data["phase"] == "acting"]
+        self.assertEqual(
+            acting[0], {"phase": "acting", "tool": "suggest_memories", "label": "Remembering"}
+        )
         # Output-only tools never reach execute_tool; the loop handles them inline.
         execute_mock.assert_not_called()
         self.assertEqual(frames[-1][0], "done")
@@ -216,8 +230,9 @@ class StreamStylistChatTestCase(unittest.TestCase):
 
         frames, _, audit_mock = self._run(boom)
 
-        self.assertEqual(len(frames), 1)
-        self.assertEqual(frames[0], ("error", {"detail": "Failed to reach DeepSeek."}))
+        # A thinking phase opens the stream before the upstream call fails.
+        self.assertEqual(frames[0], ("phase", {"phase": "thinking"}))
+        self.assertEqual(frames[-1], ("error", {"detail": "Failed to reach DeepSeek."}))
         self.assertEqual(audit_mock.call_args.kwargs["status"], "error")
 
     def test_empty_final_answer_becomes_error_frame(self) -> None:
