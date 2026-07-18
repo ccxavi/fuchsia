@@ -89,7 +89,7 @@ export default function HomeScreen() {
     if (temp > 25) {
       return {
         title: isNight ? "Warm evening ahead" : "Stay cool and stylish",
-        desc: `With today's ${roundedTemp}°C heat, light linen or cotton fabrics are your best friend. Tap the sparkles below to ask me for summer outfit ideas!`,
+        desc: `With today's ${roundedTemp}°C heat, light linen or cotton fabrics are your best friend. Chat with your AI stylist for some summer outfit ideas!`,
       };
     }
     if (temp < 15) {

@@ -50,6 +50,20 @@ export default function WardrobeDetailScreen() {
   if (isLoading || !wardrobe) {
     return (
       <View style={styles.container}>
+        {/* Fixed Navigation Buttons */}
+        <Pressable 
+          style={[styles.heroButton, { top: insets.top + 16, left: 20 }]} 
+          onPress={() => router.back()}
+        >
+          <ArrowLeft size={20} color={FuchsiaColors.slate} />
+        </Pressable>
+
+        <Pressable 
+          style={[styles.heroButton, { top: insets.top + 16, right: 20, opacity: 0.5 }]}
+          disabled={true}
+        >
+          <MoreHorizontal size={20} color={FuchsiaColors.slate} />
+        </Pressable>
         <WardrobeDetailSkeleton />
       </View>
     );

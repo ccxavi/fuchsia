@@ -89,6 +89,15 @@ export default function ItemDetailScreen() {
   if (isLoading || !item) {
     return (
       <View style={styles.container}>
+        {/* Fixed Navigation Overlay */}
+        <View style={[styles.navOverlay, { top: insets.top + 16 }]} pointerEvents="box-none">
+          <Pressable onPress={() => router.back()} style={styles.backButton}>
+            <ArrowLeft color={FuchsiaColors.slate} size={20} />
+          </Pressable>
+          <Pressable style={[styles.backButton, { opacity: 0.5 }]} disabled={true}>
+            <MoreHorizontal color={FuchsiaColors.slate} size={20} />
+          </Pressable>
+        </View>
         <ItemDetailSkeleton />
       </View>
     );
@@ -273,7 +282,9 @@ export default function ItemDetailScreen() {
                 <Palette size={16} color={FuchsiaColors.slate} />
                 <Text style={styles.statLabel}>Color</Text>
               </View>
-              <Text style={styles.statValue}>{item.color || 'Unspecified'}</Text>
+              <Text style={styles.statValue}>
+                {item.color ? (item.color.charAt(0).toUpperCase() + item.color.slice(1)) : 'Unspecified'}
+              </Text>
             </View>
             <View style={styles.statCard}>
               <View style={styles.statHeader}>

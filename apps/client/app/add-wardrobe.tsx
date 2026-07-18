@@ -127,22 +127,6 @@ export default function AddWardrobeScreen() {
     }
   };
 
-  if (isFetching) {
-    return (
-      <View style={[styles.container, { paddingTop: insets.top }]}>
-        <View style={styles.header}>
-          <Skeleton width={40} height={40} borderRadius={12} />
-          <Skeleton width={120} height={20} />
-          <View style={{ width: 40 }} />
-        </View>
-        <WardrobeFormSkeleton />
-        <View style={[styles.footer, { paddingBottom: (insets.bottom || 24) + 16 }]}>
-          <Skeleton width="100%" height={52} borderRadius={12} />
-        </View>
-      </View>
-    );
-  }
-
   return (
     <KeyboardAvoidingView 
       style={styles.container} 
@@ -157,7 +141,10 @@ export default function AddWardrobeScreen() {
         <View style={{ width: 40 }} />
       </View>
 
-      <ScrollView style={styles.content} keyboardShouldPersistTaps="handled">
+      {isFetching ? (
+        <WardrobeFormSkeleton />
+      ) : (
+        <ScrollView style={styles.content} keyboardShouldPersistTaps="handled">
         
         {/* Cover Photo Upload Area */}
         {imageUri ? (
@@ -210,7 +197,8 @@ export default function AddWardrobeScreen() {
         <View style={{ height: 8 }} />
 
         {error ? <ThemedText style={styles.errorText}>{error}</ThemedText> : null}
-      </ScrollView>
+        </ScrollView>
+      )}
 
       <View style={[styles.footer, { paddingBottom: (insets.bottom || 24) + 16 }]}>
         <Pressable 

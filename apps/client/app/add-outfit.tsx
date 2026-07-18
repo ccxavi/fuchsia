@@ -242,22 +242,6 @@ export default function AddOrEditOutfitScreen() {
     return matchesSearch && matchesCategory;
   });
 
-  if (isFetching) {
-    return (
-      <View style={[styles.container, { paddingTop: insets.top }]}>
-        <View style={styles.header}>
-          <Skeleton width={40} height={40} borderRadius={12} />
-          <Skeleton width={120} height={20} />
-          <View style={{ width: 40 }} />
-        </View>
-        <OutfitFormSkeleton />
-        <View style={[styles.footer, { paddingBottom: (insets.bottom || 24) + 16 }]}>
-          <Skeleton width="100%" height={52} borderRadius={12} />
-        </View>
-      </View>
-    );
-  }
-
   const pickerItemWidth = (width - 48) / 2;
   const selectedCount = pickerSelectedIds.size;
   const selectedItemsData = allItems.filter(i => pickerSelectedIds.has(i.id));
@@ -279,11 +263,14 @@ export default function AddOrEditOutfitScreen() {
         <View style={{ width: 40 }} />
       </View>
 
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
-        keyboardShouldPersistTaps="handled"
-      >
+      {isFetching ? (
+        <OutfitFormSkeleton />
+      ) : (
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+        >
         {/* Selected Items Section */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
@@ -423,7 +410,8 @@ export default function AddOrEditOutfitScreen() {
 
         {error ? <ThemedText style={styles.errorText}>{error}</ThemedText> : null}
         <View style={{ height: 24 }} />
-      </ScrollView>
+        </ScrollView>
+      )}
 
       {/* Save Button */}
       <View style={[styles.footer, { paddingBottom: (insets.bottom || 24) + 16 }]}>

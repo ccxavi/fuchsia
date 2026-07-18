@@ -129,7 +129,7 @@ export default function AddOrEditItemScreen() {
       
       if (analysis.name) setName(analysis.name);
       if (analysis.category) setCategory(analysis.category);
-      if (analysis.color) setColor(analysis.color);
+      if (analysis.color) setColor(analysis.color.charAt(0).toUpperCase() + analysis.color.slice(1));
       if (analysis.brand) setBrand(analysis.brand);
       
       DeviceEventEmitter.emit('showGlobalToast', 'Item details auto-filled');
@@ -182,24 +182,6 @@ export default function AddOrEditItemScreen() {
 
 
 
-  if (isFetching) {
-    return (
-      <View style={styles.container}>
-        <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
-          <Skeleton width={40} height={40} borderRadius={12} />
-          <Skeleton width={120} height={20} />
-          <View style={{ width: 40 }} />
-        </View>
-        <ItemFormSkeleton />
-        <View style={[styles.footer, { paddingBottom: (insets.bottom || 24) + 16 }]}>
-          <Skeleton width="100%" height={52} borderRadius={12} />
-        </View>
-      </View>
-    );
-  }
-
-  const displayImage = imageUri || originalImage;
-
   return (
     <KeyboardAvoidingView 
       style={styles.container} 
@@ -214,11 +196,14 @@ export default function AddOrEditItemScreen() {
         <View style={{ width: 40 }} />
       </View>
 
-      <ScrollView 
-        style={styles.content} 
-        contentContainerStyle={{ paddingBottom: 24 }}
-        keyboardShouldPersistTaps="handled"
-      >
+      {isFetching ? (
+        <ItemFormSkeleton />
+      ) : (
+        <ScrollView 
+          style={styles.content} 
+          contentContainerStyle={{ paddingBottom: 24 }}
+          keyboardShouldPersistTaps="handled"
+        >
         
         {/* Upload Area */}
         <View style={styles.uploadArea}>
@@ -244,7 +229,7 @@ export default function AddOrEditItemScreen() {
         </View>
 
         {/* Image Preview / AI Detection Mockup */}
-        {displayImage && (
+        {(imageUri || originalImage) && (
           <View style={styles.previewCard}>
             <View style={styles.previewHeader}>
               <View style={styles.sparkleIcon}>
@@ -256,7 +241,7 @@ export default function AddOrEditItemScreen() {
             </View>
             <View style={styles.previewRow}>
               <View style={styles.previewImageContainer}>
-                <Image source={{ uri: displayImage }} style={styles.previewImage} contentFit="cover" />
+                <Image source={{ uri: (imageUri || originalImage) as string }} style={styles.previewImage} contentFit="cover" />
                 {isAnalyzing && (
                   <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(255, 255, 255, 0.6)', justifyContent: 'center', alignItems: 'center' }]}>
                     <ActivityIndicator size="small" color={FuchsiaColors.deep} />
@@ -395,7 +380,8 @@ export default function AddOrEditItemScreen() {
           {error ? <ThemedText style={styles.errorText}>{error}</ThemedText> : null}
         </View>
         <View style={{ height: 24 }} />
-      </ScrollView>
+        </ScrollView>
+      )}
 
       <View style={[styles.footer, { paddingBottom: (insets.bottom || 24) + 16 }]}>
         <Pressable 

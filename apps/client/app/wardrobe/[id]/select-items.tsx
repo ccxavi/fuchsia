@@ -152,9 +152,12 @@ export default function SelectItemsScreen() {
                 {wardrobe.image_url ? (
                   <Image source={{ uri: wardrobe.image_url }} style={styles.headerImage} contentFit="cover" />
                 ) : (
-                  <View style={[styles.headerImage, { backgroundColor: FuchsiaColors.mist, alignItems: 'center', justifyContent: 'center' }]}>
-                    <ShoppingBag size={14} color="#fff" />
-                  </View>
+                  <LinearGradient
+                    colors={['#D4145A', '#86003C']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.headerImage}
+                  />
                 )}
                 <Text style={styles.headerTitleSub} numberOfLines={1}>
                   {wardrobe.name}

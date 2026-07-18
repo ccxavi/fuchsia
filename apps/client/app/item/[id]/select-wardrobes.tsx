@@ -8,7 +8,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 
 import { FuchsiaColors, FuchsiaFonts } from '@/constants/theme';
 import { getWardrobes, addItemToWardrobe, removeItemFromWardrobe, getClothingItem, WardrobeResponse, ClothingItemWithDetailsResponse } from '@/api/client';
-import { GridSkeleton, Skeleton } from '@/components/ui/Skeleton';
+import { WardrobeGridSkeleton, Skeleton } from '@/components/ui/Skeleton';
 
 export default function SelectWardrobesScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -168,8 +168,8 @@ export default function SelectWardrobesScreen() {
       </View>
 
       {isLoading || !item ? (
-        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-          <GridSkeleton />
+        <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
+          <WardrobeGridSkeleton />
         </ScrollView>
       ) : (
         <FlatList
@@ -409,6 +409,8 @@ const styles = StyleSheet.create({
   scrollContent: {
     flexGrow: 1,
     paddingBottom: 24,
+    paddingHorizontal: 20,
+    paddingTop: 16,
   },
   gridContainer: {
     flexDirection: 'row',

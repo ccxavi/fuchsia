@@ -150,6 +150,19 @@ export default function OutfitDetailScreen() {
   if (isLoading || !outfit) {
     return (
       <View style={[styles.container, { paddingTop: insets.top }]}>
+        {/* Header */}
+        <View style={styles.header}>
+          <Pressable onPress={() => router.back()} style={styles.headerButton}>
+            <ArrowLeft size={18} color={FuchsiaColors.slate} />
+          </Pressable>
+          <Text style={styles.headerTitle}>Outfit Detail</Text>
+          <Pressable 
+            style={[styles.headerButton, { opacity: 0.5 }]}
+            disabled={true}
+          >
+            <MoreHorizontal size={18} color={FuchsiaColors.slate} />
+          </Pressable>
+        </View>
         <OutfitDetailSkeleton />
       </View>
     );
