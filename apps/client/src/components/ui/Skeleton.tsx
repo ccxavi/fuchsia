@@ -39,6 +39,21 @@ export const Skeleton = ({ width, height, borderRadius = 4, style }: any) => {
   );
 };
 
+export const WardrobeGridSkeleton = () => {
+  return (
+    <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 16 }}>
+      {[...Array(14)].map((_, i) => (
+        <View key={i} style={{ width: '47%', marginBottom: 16 }}>
+          <View style={{ width: '100%', aspectRatio: 1.5, borderRadius: 16, overflow: 'hidden' }}>
+            <Skeleton width="100%" height="100%" borderRadius={16} />
+          </View>
+        </View>
+      ))}
+    </View>
+  );
+};
+
+
 export const GridSkeleton = () => {
   return (
     <View style={styles.gridContainer}>
