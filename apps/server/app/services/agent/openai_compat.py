@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Iterator
 
 import httpx
 from fastapi import HTTPException, status
@@ -78,6 +79,7 @@ def build_body(
     tools: list[dict[str, Any]] | None = None,
     response_format: dict[str, Any] | None = None,
     reasoning_effort: str | None = None,
+    stream: bool = False,
 ) -> dict[str, Any]:
     """Build an OpenAI-compatible chat completion request body.
 
@@ -86,13 +88,18 @@ def build_body(
     rounds. ``response_format`` (e.g. ``{"type": "json_object"}``) is forwarded
     when provided so callers can request structured output. ``reasoning_effort``
     (e.g. ``"none"``) controls a thinking model's internal reasoning budget;
-    ``"none"`` disables it for fast, deterministic single-shot responses.
+    ``"none"`` disables it for fast, deterministic single-shot responses. When
+    ``stream`` is set the response is delivered as SSE deltas and usage is
+    requested in a trailing chunk (``stream_options.include_usage``) so the
+    streaming loop can still audit token counts.
     """
     payload: dict[str, Any] = {
         "model": model,
         "messages": message_dicts,
-        "stream": False,
+        "stream": stream,
     }
+    if stream:
+        payload["stream_options"] = {"include_usage": True}
     if temperature is not None:
         payload["temperature"] = temperature
     if max_tokens is not None:
@@ -142,6 +149,50 @@ def post_chat(provider: Provider, body: dict[str, Any]) -> dict[str, Any]:
         )
 
     return payload
+
+
+def stream_chat(provider: Provider, body: dict[str, Any]) -> Iterator[dict[str, Any]]:
+    """Stream a chat completion, yielding each OpenAI-compatible SSE chunk dict.
+
+    A synchronous generator (Starlette runs the response body in a threadpool),
+    so it composes with the otherwise-synchronous tool loop and the tools'
+    internal ``asyncio.run`` calls. ``body`` must have been built with
+    ``build_body(..., stream=True)``. Mirrors :func:`post_chat`'s error contract:
+    a transport failure becomes a 502 and a non-2xx upstream status is surfaced
+    via :func:`raise_from_response`. Lines that are not ``data:`` frames, the
+    terminal ``[DONE]`` sentinel, and unparseable payloads are skipped.
+    """
+    url = f"{provider.base_url.rstrip('/')}/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {provider.api_key}",
+        "Content-Type": "application/json",
+    }
+
+    try:
+        with httpx.Client(timeout=_HTTP_TIMEOUT) as client:
+            with client.stream("POST", url, headers=headers, json=body) as response:
+                if response.is_error:
+                    # Materialize the body so raise_from_response can read it.
+                    response.read()
+                    raise_from_response(response, provider=provider.name)
+
+                for line in response.iter_lines():
+                    if not line or not line.startswith("data:"):
+                        continue
+                    data = line[len("data:"):].strip()
+                    if data == "[DONE]":
+                        break
+                    try:
+                        chunk = json.loads(data)
+                    except ValueError:
+                        continue
+                    if isinstance(chunk, dict):
+                        yield chunk
+    except httpx.HTTPError as error:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Failed to reach {provider.name}.",
+        ) from error
 
 
 def raise_from_response(response: httpx.Response, *, provider: str) -> None:

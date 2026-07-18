@@ -172,6 +172,7 @@ class StylistToolsTestCase(unittest.TestCase):
                 "suggest_outfits",
                 "suggest_calendar_entry",
                 "get_weather",
+                "web_search",
             },
         )
 
@@ -500,6 +501,99 @@ class StylistToolsTestCase(unittest.TestCase):
         self._run_get_weather({"date": target.isoformat()}, today=None)
 
         self.forecast_mock.assert_awaited_once_with(14.6, 121.0, target)
+
+    # --- web_search ----------------------------------------------------------
+
+    def test_web_search_schema_requires_query(self) -> None:
+        tool = next(
+            t for t in STYLIST_TOOLS if t["function"]["name"] == "web_search"
+        )
+        parameters = tool["function"]["parameters"]
+
+        self.assertIn("query", parameters["properties"])
+        self.assertEqual(parameters["required"], ["query"])
+
+    def test_web_search_returns_results_payload(self) -> None:
+        fake = AsyncMock(
+            return_value={
+                "query": "fall trends",
+                "results": [
+                    {"title": "Trend", "url": "https://ex.test/1", "content": "..."},
+                ],
+                "answer": "Earth tones are in.",
+            }
+        )
+        with patch("app.services.agent.tools.web_search", new=fake):
+            result = execute_tool(
+                "web_search",
+                {"query": "fall trends"},
+                db=self.session,
+                user_id="user-1",
+            )
+
+        fake.assert_awaited_once_with("fall trends")
+        parsed = json.loads(result)
+        self.assertEqual(parsed["answer"], "Earth tones are in.")
+        self.assertEqual(parsed["results"][0]["url"], "https://ex.test/1")
+
+    def test_web_search_strips_the_query_before_searching(self) -> None:
+        fake = AsyncMock(return_value={"query": "boots", "results": []})
+        with patch("app.services.agent.tools.web_search", new=fake):
+            execute_tool(
+                "web_search",
+                {"query": "  boots  "},
+                db=self.session,
+                user_id="user-1",
+            )
+
+        fake.assert_awaited_once_with("boots")
+
+    def test_web_search_missing_query_returns_error(self) -> None:
+        fake = AsyncMock()
+        with patch("app.services.agent.tools.web_search", new=fake):
+            result = execute_tool(
+                "web_search", {}, db=self.session, user_id="user-1"
+            )
+
+        parsed = json.loads(result)
+        self.assertIn("error", parsed)
+        fake.assert_not_awaited()
+
+    def test_web_search_blank_query_returns_error(self) -> None:
+        fake = AsyncMock()
+        with patch("app.services.agent.tools.web_search", new=fake):
+            result = execute_tool(
+                "web_search", {"query": "   "}, db=self.session, user_id="user-1"
+            )
+
+        parsed = json.loads(result)
+        self.assertIn("error", parsed)
+        fake.assert_not_awaited()
+
+    def test_web_search_non_string_query_returns_error(self) -> None:
+        fake = AsyncMock()
+        with patch("app.services.agent.tools.web_search", new=fake):
+            result = execute_tool(
+                "web_search", {"query": 123}, db=self.session, user_id="user-1"
+            )
+
+        parsed = json.loads(result)
+        self.assertIn("error", parsed)
+        fake.assert_not_awaited()
+
+    def test_web_search_swallows_service_errors(self) -> None:
+        fake = AsyncMock(side_effect=HTTPException(status_code=503, detail="down"))
+        with patch("app.services.agent.tools.web_search", new=fake):
+            result = execute_tool(
+                "web_search",
+                {"query": "trends"},
+                db=self.session,
+                user_id="user-1",
+            )
+
+        # Never raises; the failure is a readable error payload for the model.
+        parsed = json.loads(result)
+        self.assertIn("error", parsed)
 
 
 if __name__ == "__main__":
