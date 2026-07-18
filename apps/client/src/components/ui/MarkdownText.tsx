@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { StyleSheet, type TextStyle } from 'react-native';
 import Markdown, { ASTNode } from 'react-native-markdown-display';
-import { FuchsiaFonts } from '@/constants/theme';
+import { FuchsiaFonts, FuchsiaColors } from '@/constants/theme';
 
 type Props = {
   children: string;
@@ -25,6 +25,48 @@ export function MarkdownText({ children, style, boldStyle, italicStyle }: Props)
         color: flatStyle.color || '#000',
         lineHeight: flatStyle.lineHeight || 22,
         marginBottom: -10, // Offset the margin of the last paragraph so bubble padding is perfect
+      },
+      heading1: {
+        fontFamily: FuchsiaFonts.heading,
+        fontSize: 20,
+        color: flatStyle.color || FuchsiaColors.ink,
+        marginTop: 12,
+        marginBottom: 8,
+      },
+      heading2: {
+        fontFamily: FuchsiaFonts.heading,
+        fontSize: 18,
+        color: flatStyle.color || FuchsiaColors.ink,
+        marginTop: 12,
+        marginBottom: 8,
+      },
+      heading3: {
+        fontFamily: FuchsiaFonts.heading,
+        fontSize: 16,
+        color: flatStyle.color || FuchsiaColors.ink,
+        marginTop: 12,
+        marginBottom: 8,
+      },
+      heading4: {
+        fontFamily: FuchsiaFonts.heading,
+        fontSize: 15,
+        color: flatStyle.color || FuchsiaColors.ink,
+        marginTop: 12,
+        marginBottom: 8,
+      },
+      heading5: {
+        fontFamily: FuchsiaFonts.heading,
+        fontSize: 14,
+        color: flatStyle.color || FuchsiaColors.ink,
+        marginTop: 12,
+        marginBottom: 8,
+      },
+      heading6: {
+        fontFamily: FuchsiaFonts.heading,
+        fontSize: 14,
+        color: flatStyle.color || FuchsiaColors.ink,
+        marginTop: 12,
+        marginBottom: 8,
       },
       paragraph: {
         marginTop: 0,
@@ -58,6 +100,10 @@ export function MarkdownText({ children, style, boldStyle, italicStyle }: Props)
         borderColor: 'rgba(0,0,0,0.1)',
         borderRadius: 8,
         marginVertical: 12,
+      },
+      link: {
+        color: FuchsiaColors.vibrant,
+        textDecorationLine: 'underline',
       },
       tr: {
         borderBottomWidth: 1,
