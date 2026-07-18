@@ -333,6 +333,46 @@ def run_stylist_chat(
         )
         raise
 
+    return finalize_response(
+        response,
+        db=db,
+        user_id=user_id,
+        provider=provider,
+        messages=messages,
+        stats=stats,
+        used_memories=used_memories,
+        suggestions=suggestions,
+        outfit_suggestions=outfit_suggestions,
+        calendar_suggestions=calendar_suggestions,
+        temperature=temperature,
+        max_tokens=max_tokens,
+    )
+
+
+def finalize_response(
+    response: ChatResponse,
+    *,
+    db: Session,
+    user_id: str,
+    provider: Provider,
+    messages: list[ChatMessage],
+    stats: InvocationStats,
+    used_memories: list[Memory],
+    suggestions: list[MemorySuggestion],
+    outfit_suggestions: list[OutfitSuggestion],
+    calendar_suggestions: list[CalendarSuggestion],
+    temperature: float | None,
+    max_tokens: int | None,
+) -> ChatResponse:
+    """Audit a successful invocation and attach its reconciled suggestions.
+
+    Shared by the buffered (:func:`run_stylist_chat`) and streaming
+    (``stream_stylist_chat``) paths so both record the same audit row and apply
+    the identical dedupe/validation to the model's proposals — the two endpoints
+    can never drift. Records the success invocation, then dedupes memory
+    suggestions and drops already-stored ones, and validates proposed outfit and
+    calendar ids against the user's own records before surfacing them.
+    """
     record_agent_invocation(
         db,
         user_id=user_id,
