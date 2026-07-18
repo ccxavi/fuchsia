@@ -146,7 +146,7 @@ export default function NotificationsScreen() {
               </View>
               <View style={styles.settingTextContainer}>
                 <ThemedText style={styles.settingTitle}>Daily Outfit Reminders</ThemedText>
-                <ThemedText style={styles.settingDescription}>A morning nudge to log or pick today&apos;s outfit.</ThemedText>
+                <ThemedText style={styles.settingDescription}>Daily nudges to log your outfits and prep for tomorrow.</ThemedText>
               </View>
             </View>
             {isLoading ? (
