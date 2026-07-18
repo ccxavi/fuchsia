@@ -230,6 +230,8 @@ const styles = StyleSheet.create({
   title: {
     fontFamily: FuchsiaFonts.heading,
     fontSize: 24,
+    lineHeight: 32,
+    paddingBottom: 4,
     color: FuchsiaColors.ink,
     textAlign: 'center',
   },
@@ -239,6 +241,7 @@ const styles = StyleSheet.create({
     color: FuchsiaColors.slate,
     textAlign: 'center',
     lineHeight: 22,
+    marginTop: -6,
   },
   statsContainer: {
     flexDirection: 'row',
