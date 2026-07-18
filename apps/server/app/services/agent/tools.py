@@ -17,6 +17,7 @@ from app.services.weather import (
     get_current_weather,
     get_daily_forecast,
 )
+from app.services.web_search import search as web_search
 
 MAX_ITEMS = 100
 
@@ -325,6 +326,41 @@ SUGGEST_CALENDAR_ENTRY_TOOL: dict[str, Any] = {
     },
 }
 
+WEB_SEARCH_TOOL: dict[str, Any] = {
+    "type": "function",
+    "function": {
+        "name": "web_search",
+        "description": (
+            "Search the live web and get back the top results. Call this when the "
+            "answer depends on current, external, or specific information the "
+            "wardrobe, weather, and calendar tools cannot provide — for example: "
+            "current fashion trends and runway or designer news; looking up a "
+            "specific garment to buy, its price, or where to find it; facts about a "
+            "venue or occasion's dress code; and outside style references or how-to "
+            "guidance (how to style or care for a piece, an aesthetic, a fabric). "
+            "Ground shopping and product claims in what the results actually say — "
+            "do not invent prices, links, or availability. Prefer get_clothing_items "
+            "and get_weather for anything they already cover; use web_search for what "
+            "they cannot. Summarize findings in your own words for the user."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": (
+                        "The search query, phrased as you would type it into a search "
+                        "engine, e.g. 'menswear color trends fall 2026' or "
+                        "'black leather chelsea boots under $200'."
+                    ),
+                },
+            },
+            "required": ["query"],
+            "additionalProperties": False,
+        },
+    },
+}
+
 STYLIST_TOOLS: list[dict[str, Any]] = [
     CLOTHING_ITEMS_TOOL,
     GET_WARDROBES_TOOL,
@@ -334,6 +370,7 @@ STYLIST_TOOLS: list[dict[str, Any]] = [
     SUGGEST_OUTFITS_TOOL,
     SUGGEST_CALENDAR_ENTRY_TOOL,
     GET_WEATHER_TOOL,
+    WEB_SEARCH_TOOL,
 ]
 
 
@@ -508,6 +545,22 @@ def _weather_payload(
     }
 
 
+def _web_search_payload(query: Any) -> dict[str, Any]:
+    """Run a web search for the model as a JSON-friendly dict.
+
+    Bridges the async search service into the synchronous tool loop, mirroring
+    ``_weather_payload``. Never raises: a missing query or an upstream failure
+    becomes an ``{"error": ...}`` payload the model can read and recover from.
+    """
+    if not isinstance(query, str) or not query.strip():
+        return {"error": "Provide a non-empty search query string."}
+
+    try:
+        return asyncio.run(web_search(query.strip()))
+    except Exception:  # noqa: BLE001 - any failure degrades to a readable error
+        return {"error": "Could not run the web search right now."}
+
+
 def execute_tool(
     name: str,
     arguments: dict[str, Any],
@@ -523,6 +576,9 @@ def execute_tool(
     Never raises for a caller-recoverable problem (unknown tool, bad args); it
     returns a JSON error payload the model can read and recover from.
     """
+    if name == "web_search":
+        return json.dumps(_web_search_payload(arguments.get("query")))
+
     if name == "get_weather":
         return json.dumps(
             _weather_payload(

@@ -26,6 +26,8 @@ class Settings(BaseSettings):
     memory_recall_top_k: int = 6
     memory_recall_max_distance: float = 0.38
     weather_api_url: str = "https://api.open-meteo.com/v1/forecast"
+    tavily_api_key: str | None = None
+    tavily_base_url: str = "https://api.tavily.com"
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
@@ -91,6 +93,12 @@ class Settings(BaseSettings):
             raise ValueError("GEMINI_BASE_URL is not configured.")
 
         return self.gemini_base_url.rstrip("/")
+
+    def require_tavily_api_key(self) -> str:
+        if not self.tavily_api_key:
+            raise ValueError("TAVILY_API_KEY is not configured.")
+
+        return self.tavily_api_key
 
 
 settings = Settings()
