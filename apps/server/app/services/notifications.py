@@ -183,7 +183,7 @@ def start_scheduler() -> None:
         # 1. 10:00 AM Daily - Empty calendar nudge
         scheduler.add_job(
             send_empty_calendar_nudge,
-            trigger=CronTrigger(hour=10, minute=0),
+            trigger=CronTrigger(hour=10, minute=0, timezone="Asia/Manila"),
             id="empty_calendar_nudge_job",
             replace_existing=True,
         )
@@ -191,7 +191,7 @@ def start_scheduler() -> None:
         # 2. 8:00 PM Daily - Tomorrow outfit reminder
         scheduler.add_job(
             send_tomorrow_outfit_reminder,
-            trigger=CronTrigger(hour=20, minute=0),
+            trigger=CronTrigger(hour=20, minute=0, timezone="Asia/Manila"),
             id="tomorrow_outfit_reminder_job",
             replace_existing=True,
         )
@@ -199,7 +199,7 @@ def start_scheduler() -> None:
         # 3. 4:00 PM Sundays - Unworn clothes alert (day_of_week=6 is Sunday)
         scheduler.add_job(
             send_unworn_clothes_alert,
-            trigger=CronTrigger(day_of_week=6, hour=16, minute=0),
+            trigger=CronTrigger(day_of_week=6, hour=16, minute=0, timezone="Asia/Manila"),
             id="unworn_clothes_alert_job",
             replace_existing=True,
         )
