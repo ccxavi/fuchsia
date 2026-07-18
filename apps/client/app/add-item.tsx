@@ -129,7 +129,7 @@ export default function AddOrEditItemScreen() {
       
       if (analysis.name) setName(analysis.name);
       if (analysis.category) setCategory(analysis.category);
-      if (analysis.color) setColor(analysis.color);
+      if (analysis.color) setColor(analysis.color.charAt(0).toUpperCase() + analysis.color.slice(1));
       if (analysis.brand) setBrand(analysis.brand);
       
       DeviceEventEmitter.emit('showGlobalToast', 'Item details auto-filled');

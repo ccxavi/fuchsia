@@ -282,7 +282,9 @@ export default function ItemDetailScreen() {
                 <Palette size={16} color={FuchsiaColors.slate} />
                 <Text style={styles.statLabel}>Color</Text>
               </View>
-              <Text style={styles.statValue}>{item.color || 'Unspecified'}</Text>
+              <Text style={styles.statValue}>
+                {item.color ? (item.color.charAt(0).toUpperCase() + item.color.slice(1)) : 'Unspecified'}
+              </Text>
             </View>
             <View style={styles.statCard}>
               <View style={styles.statHeader}>
