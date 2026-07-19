@@ -4,7 +4,7 @@ import logging
 import datetime
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
-from sqlalchemy import select, and_, or_
+from sqlalchemy import select, and_, or_, func, desc
 from sqlalchemy.orm import Session
 from exponent_server_sdk import (
     PushClient,
@@ -17,6 +17,8 @@ from app.models.user import User
 from app.models.calendar_outfit import CalendarOutfit
 from app.models.outfit import Outfit
 from app.models.outfit_image import OutfitImage
+from app.models.clothing_item import ClothingItem
+from app.models.outfit_item import OutfitItem
 
 logger = logging.getLogger(__name__)
 
@@ -189,7 +191,7 @@ def send_fit_pic_reminder() -> None:
     with get_session_factory()() as db:
         users = db.scalars(
             select(User).where(
-                User.daily_reminders == True,
+                User.fit_pic_reminders == True,
                 User.push_token.is_not(None)
             )
         ).all()
@@ -233,6 +235,73 @@ def send_fit_pic_reminder() -> None:
         _send_push_messages(messages)
 
 
+def send_weekly_style_stats() -> None:
+    """
+    Scheduled for 10:00 AM on Sundays.
+    Sends a recap of the user's most worn outfit and clothing item over the past 7 days.
+    """
+    logger.info("Starting weekly style stats job...")
+    today = datetime.date.today()
+    seven_days_ago = today - datetime.timedelta(days=7)
+    
+    with get_session_factory()() as db:
+        users = db.scalars(
+            select(User).where(
+                User.weekly_stats_reminders == True,
+                User.push_token.is_not(None)
+            )
+        ).all()
+        
+        messages = []
+        for user in users:
+            if not user.push_token or not user.push_token.startswith("ExponentPushToken["):
+                continue
+                
+            # Find most worn outfit in the past 7 days
+            stmt_outfit = (
+                select(Outfit.name)
+                .join(CalendarOutfit, Outfit.id == CalendarOutfit.outfit_id)
+                .where(
+                    Outfit.user_id == user.id,
+                    CalendarOutfit.date >= seven_days_ago,
+                    CalendarOutfit.date <= today
+                )
+                .group_by(Outfit.name)
+                .order_by(desc(func.count(CalendarOutfit.id)))
+                .limit(1)
+            )
+            most_worn_outfit_name = db.scalar(stmt_outfit)
+            
+            # Find most worn clothing item in the past 7 days
+            stmt_item = (
+                select(ClothingItem.name)
+                .join(OutfitItem, ClothingItem.id == OutfitItem.clothing_item_id)
+                .join(CalendarOutfit, OutfitItem.outfit_id == CalendarOutfit.outfit_id)
+                .where(
+                    ClothingItem.user_id == user.id,
+                    CalendarOutfit.date >= seven_days_ago,
+                    CalendarOutfit.date <= today
+                )
+                .group_by(ClothingItem.name)
+                .order_by(desc(func.count(CalendarOutfit.id)))
+                .limit(1)
+            )
+            most_worn_item_name = db.scalar(stmt_item)
+            
+            if most_worn_outfit_name and most_worn_item_name:
+                messages.append(
+                    PushMessage(
+                        to=user.push_token,
+                        title="Weekly Style Stats 📊",
+                        body=f"Your '{most_worn_outfit_name}' outfit and '{most_worn_item_name}' were your most worn this week. 🏆",
+                        sound="default",
+                        data={"route": "/profile"},
+                    )
+                )
+
+        _send_push_messages(messages)
+
+
 def start_scheduler() -> None:
     """Start the APScheduler background jobs."""
     if not scheduler.running:
@@ -260,11 +329,19 @@ def start_scheduler() -> None:
             replace_existing=True,
         )
         
-        # 4. 5:00 PM Daily - Fit pic reminder
+        # 4. 3:00 PM Daily - Fit pic reminder
         scheduler.add_job(
             send_fit_pic_reminder,
-            trigger=CronTrigger(hour=17, minute=0, timezone="Asia/Manila"),
+            trigger=CronTrigger(hour=15, minute=0, timezone="Asia/Manila"),
             id="fit_pic_reminder_job",
+            replace_existing=True,
+        )
+        
+        # 5. 10:00 AM Sundays - Weekly style stats (day_of_week=6 is Sunday)
+        scheduler.add_job(
+            send_weekly_style_stats,
+            trigger=CronTrigger(day_of_week=6, hour=10, minute=0, timezone="Asia/Manila"),
+            id="weekly_style_stats_job",
             replace_existing=True,
         )
 
