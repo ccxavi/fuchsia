@@ -16,9 +16,9 @@ export default function NotificationsScreen() {
   const [isLoading, setIsLoading] = useState(true);
 
   const [toggles, setToggles] = useState({
-    dailyReminders: true,
-    fitPicReminders: true,
-    weeklyStatsReminders: true,
+    dailyReminders: false,
+    fitPicReminders: false,
+    weeklyStatsReminders: false,
   });
 
   useEffect(() => {
@@ -27,9 +27,9 @@ export default function NotificationsScreen() {
         const data = await getMe();
         if (data?.user) {
           setToggles({
-            dailyReminders: data.user.daily_reminders ?? true,
-            fitPicReminders: data.user.fit_pic_reminders ?? true,
-            weeklyStatsReminders: data.user.weekly_stats_reminders ?? true,
+            dailyReminders: data.user.daily_reminders ?? false,
+            fitPicReminders: data.user.fit_pic_reminders ?? false,
+            weeklyStatsReminders: data.user.weekly_stats_reminders ?? false,
           });
         }
       } catch (error) {
