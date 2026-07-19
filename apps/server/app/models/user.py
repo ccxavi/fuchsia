@@ -37,3 +37,13 @@ class User(TimestampMixin, Base):
         default=False,
         nullable=False,
     )
+    fit_pic_reminders: Mapped[bool] = mapped_column(
+        Boolean,
+        default=False,
+        nullable=False,
+    )
+    weekly_stats_reminders: Mapped[bool] = mapped_column(
+        Boolean,
+        default=False,
+        nullable=False,
+    )
