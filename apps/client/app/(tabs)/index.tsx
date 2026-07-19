@@ -487,6 +487,8 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontFamily: FuchsiaFonts.heading,
     fontSize: 24,
+    lineHeight: 32,
+    paddingBottom: 4,
     color: FuchsiaColors.ink,
   },
 

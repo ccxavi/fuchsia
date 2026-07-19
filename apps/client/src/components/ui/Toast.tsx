@@ -16,7 +16,7 @@ export function Toast({ visible, message, fadeAnim }: ToastProps) {
   if (!visible) return null;
 
   return (
-    <Animated.View style={[styles.toastContainer, { opacity: fadeAnim, bottom: (insets.bottom || 24) + 20 }]}>
+    <Animated.View style={[styles.toastContainer, { opacity: fadeAnim, bottom: Math.max(insets.bottom || 0, 24) + 84 }]}>
       <Check size={16} color="#fff" />
       <Text style={styles.toastText}>{message}</Text>
     </Animated.View>
