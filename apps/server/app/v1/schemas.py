@@ -17,6 +17,8 @@ class AuthenticatedUserResponse(BaseModel):
     display_name: str | None = None
     push_token: str | None = None
     daily_reminders: bool
+    fit_pic_reminders: bool
+    weekly_stats_reminders: bool
     created_at: datetime.datetime
     updated_at: datetime.datetime
 
@@ -29,6 +31,8 @@ class UserPreferencesUpdateRequest(BaseModel):
     display_name: str | None = None
     push_token: str | None = None
     daily_reminders: bool | None = None
+    fit_pic_reminders: bool | None = None
+    weekly_stats_reminders: bool | None = None
 
     @field_validator("display_name")
     @classmethod

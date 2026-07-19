@@ -116,6 +116,8 @@ export type AuthenticatedUserResponse = {
   created_at: string;
   updated_at: string;
   daily_reminders?: boolean;
+  fit_pic_reminders?: boolean;
+  weekly_stats_reminders?: boolean;
 };
 
 export type AuthMeResponse = {
@@ -130,6 +132,8 @@ export type UserPreferencesUpdateRequest = {
   display_name?: string | null;
   push_token?: string | null;
   daily_reminders?: boolean | null;
+  fit_pic_reminders?: boolean | null;
+  weekly_stats_reminders?: boolean | null;
 };
 
 export async function updateProfile(payload: UserPreferencesUpdateRequest): Promise<AuthMeResponse> {

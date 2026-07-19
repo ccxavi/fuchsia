@@ -1,6 +1,6 @@
 import { View, StyleSheet, ScrollView, TouchableOpacity, Switch, Platform, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
-import { ArrowLeft, Bell, Sun, Megaphone, CalendarClock } from 'lucide-react-native';
+import { ArrowLeft, Bell, Camera, BarChart3, CalendarClock } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useState, useEffect } from 'react';
 import * as Device from 'expo-device';
@@ -16,9 +16,9 @@ export default function NotificationsScreen() {
   const [isLoading, setIsLoading] = useState(true);
 
   const [toggles, setToggles] = useState({
-    dailyReminders: true,
-    weatherAlerts: true,
-    newFeatures: true,
+    dailyReminders: false,
+    fitPicReminders: false,
+    weeklyStatsReminders: false,
   });
 
   useEffect(() => {
@@ -26,10 +26,11 @@ export default function NotificationsScreen() {
       try {
         const data = await getMe();
         if (data?.user) {
-          setToggles(prev => ({
-            ...prev,
-            dailyReminders: data.user.daily_reminders ?? true,
-          }));
+          setToggles({
+            dailyReminders: data.user.daily_reminders ?? false,
+            fitPicReminders: data.user.fit_pic_reminders ?? false,
+            weeklyStatsReminders: data.user.weekly_stats_reminders ?? false,
+          });
         }
       } catch (error) {
         console.error('Failed to fetch user preferences:', error);
@@ -55,7 +56,9 @@ export default function NotificationsScreen() {
         try {
           await updateProfile({
             push_token: token,
-            ...(key === 'dailyReminders' && { daily_reminders: newValue })
+            ...(key === 'dailyReminders' && { daily_reminders: newValue }),
+            ...(key === 'fitPicReminders' && { fit_pic_reminders: newValue }),
+            ...(key === 'weeklyStatsReminders' && { weekly_stats_reminders: newValue }),
           });
         } catch (e) {
           console.error("Failed to sync push token with backend", e);
@@ -66,12 +69,14 @@ export default function NotificationsScreen() {
       }
     } else {
       // Sync with backend
-      if (key === 'dailyReminders') {
-        try {
-          await updateProfile({ daily_reminders: newValue });
-        } catch (e) {
-          console.error("Failed to sync daily reminders off", e);
-        }
+      try {
+        await updateProfile({
+          ...(key === 'dailyReminders' && { daily_reminders: newValue }),
+          ...(key === 'fitPicReminders' && { fit_pic_reminders: newValue }),
+          ...(key === 'weeklyStatsReminders' && { weekly_stats_reminders: newValue }),
+        });
+      } catch (e) {
+        console.error("Failed to sync reminder off", e);
       }
     }
   };
@@ -167,11 +172,11 @@ export default function NotificationsScreen() {
           <View style={styles.settingRow}>
             <View style={styles.settingInfo}>
               <View style={styles.settingIcon}>
-                <Sun size={20} color={FuchsiaColors.ink} />
+                <Camera size={20} color={FuchsiaColors.ink} />
               </View>
               <View style={styles.settingTextContainer}>
-                <ThemedText style={styles.settingTitle}>Weather Alerts</ThemedText>
-                <ThemedText style={styles.settingDescription}>Suggestions based on sudden weather changes.</ThemedText>
+                <ThemedText style={styles.settingTitle}>Fit Pic Reminders</ThemedText>
+                <ThemedText style={styles.settingDescription}>Reminders to snap a photo of your outfit today.</ThemedText>
               </View>
             </View>
             {isLoading ? (
@@ -181,8 +186,8 @@ export default function NotificationsScreen() {
                 trackColor={{ false: FuchsiaColors.mist, true: FuchsiaColors.vibrant }}
                 thumbColor={'#fff'}
                 ios_backgroundColor={FuchsiaColors.mist}
-                onValueChange={() => toggleSwitch('weatherAlerts')}
-                value={toggles.weatherAlerts}
+                onValueChange={() => toggleSwitch('fitPicReminders')}
+                value={toggles.fitPicReminders}
               />
             )}
           </View>
@@ -192,11 +197,11 @@ export default function NotificationsScreen() {
           <View style={styles.settingRow}>
             <View style={styles.settingInfo}>
               <View style={styles.settingIcon}>
-                <Megaphone size={20} color={FuchsiaColors.ink} />
+                <BarChart3 size={20} color={FuchsiaColors.ink} />
               </View>
               <View style={styles.settingTextContainer}>
-                <ThemedText style={styles.settingTitle}>New Features & Updates</ThemedText>
-                <ThemedText style={styles.settingDescription}>Occasional news about major app updates.</ThemedText>
+                <ThemedText style={styles.settingTitle}>Weekly Style Stats</ThemedText>
+                <ThemedText style={styles.settingDescription}>A weekly summary of your most worn outfits and items.</ThemedText>
               </View>
             </View>
             {isLoading ? (
@@ -206,8 +211,8 @@ export default function NotificationsScreen() {
                 trackColor={{ false: FuchsiaColors.mist, true: FuchsiaColors.vibrant }}
                 thumbColor={'#fff'}
                 ios_backgroundColor={FuchsiaColors.mist}
-                onValueChange={() => toggleSwitch('newFeatures')}
-                value={toggles.newFeatures}
+                onValueChange={() => toggleSwitch('weeklyStatsReminders')}
+                value={toggles.weeklyStatsReminders}
               />
             )}
           </View>
