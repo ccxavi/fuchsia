@@ -24,7 +24,7 @@
     },
     "web": {
       "output": "static",
-      "favicon": "./assets/images/fuchsia.png"
+      "favicon": "./assets/images/fuchsia.ico"
     },
     "plugins": [
       "expo-router",
